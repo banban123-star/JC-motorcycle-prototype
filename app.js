@@ -17,6 +17,80 @@ const $ = (id) => document.getElementById(id);
 const uid = () => Math.random().toString(36).slice(2, 8);
 
 /**
+ * Navigation two-tone color specifications (Google Workspace style).
+ * Main color + lighter tint pairs.
+ */
+const NAV_COLORS = {
+  dash:    { main: "var(--nav-dash, #2563EB)",    tint: "var(--nav-dash-tint, #BFDBFE)" },
+  cust:    { main: "var(--nav-cust, #7C3AED)",    tint: "var(--nav-cust-tint, #DDD6FE)" },
+  insp:    { main: "var(--nav-insp, #0891B2)",    tint: "var(--nav-insp-tint, #A5F3FC)" },
+  rep:     { main: "var(--nav-rep, #EA580C)",     tint: "var(--nav-rep-tint, #FED7AA)" },
+  pos:     { main: "var(--nav-pos, #D97706)",     tint: "var(--nav-pos-tint, #FDE68A)" },
+  cat:     { main: "var(--nav-cat, #059669)",     tint: "var(--nav-cat-tint, #A7F3D0)" },
+  bill:    { main: "var(--nav-bill, #16A34A)",    tint: "var(--nav-bill-tint, #BBF7D0)" },
+  his:     { main: "var(--nav-his, #4F46E5)",     tint: "var(--nav-his-tint, #C7D2FE)" },
+  reports: { main: "var(--nav-reports, #DB2777)", tint: "var(--nav-reports-tint, #FBCFE8)" },
+  users:   { main: "var(--nav-users, #475569)",   tint: "var(--nav-users-tint, #CBD5E1)" }
+};
+
+/**
+ * Preserved single-color line icons for non-sidebar elements (KPI cards, search bars, tables).
+ */
+const LINE_ICONS = {
+  dash: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>`,
+  cust: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`,
+  insp: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>`,
+  rep: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>`,
+  pos: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`,
+  posMenu: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>`,
+  ql: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"></path><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"></path><line x1="2" y1="13" x2="22" y2="13"></line></svg>`,
+  cat: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"></line><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>`,
+  bill: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>`,
+  his: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`,
+  reports: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>`,
+  users: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`
+};
+
+/**
+ * Global UI SVG icons (Sidebar nav items feature 22px two-tone Google Workspace style icons).
+ */
+const ICONS = {
+  dash: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><rect x="2" y="2" width="8" height="8" rx="2.5" fill="var(--nav-dash, #2563EB)"/><rect x="12" y="2" width="8" height="8" rx="2.5" fill="var(--nav-dash-tint, #BFDBFE)"/><rect x="2" y="12" width="8" height="8" rx="2.5" fill="var(--nav-dash-tint, #BFDBFE)"/><rect x="12" y="12" width="8" height="8" rx="2.5" fill="var(--nav-dash, #2563EB)"/></svg>`,
+  cust: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><circle cx="15.5" cy="7.5" r="3" fill="var(--nav-cust-tint, #DDD6FE)"/><path d="M11 19.5c0-2.8 2-4.5 4.5-4.5s4.5 1.7 4.5 4.5" stroke="var(--nav-cust-tint, #DDD6FE)" stroke-width="3" stroke-linecap="round"/><circle cx="7.5" cy="7.5" r="3.5" fill="var(--nav-cust, #7C3AED)"/><path d="M2.5 20c0-3.3 2.2-5.5 5-5.5s5 2.2 5 5.5" stroke="var(--nav-cust, #7C3AED)" stroke-width="3.5" stroke-linecap="round"/></svg>`,
+  insp: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><circle cx="9.5" cy="9.5" r="7.5" fill="var(--nav-insp-tint, #A5F3FC)"/><circle cx="9.5" cy="9.5" r="7" stroke="var(--nav-insp, #0891B2)" stroke-width="2"/><path d="M6 10a3.5 3.5 0 0 1 6-2" stroke="var(--nav-insp, #0891B2)" stroke-width="1.6" stroke-linecap="round"/><circle cx="9.5" cy="9.5" r="1.8" fill="var(--nav-insp, #0891B2)"/><line x1="9.5" y1="9.5" x2="12.5" y2="7.5" stroke="var(--nav-insp, #0891B2)" stroke-width="1.8" stroke-linecap="round"/><path d="M15 15l4.8 4.8" stroke="var(--nav-insp, #0891B2)" stroke-width="2.6" stroke-linecap="round"/></svg>`,
+  rep: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><circle cx="7" cy="15" r="4.5" fill="var(--nav-rep-tint, #FED7AA)"/><circle cx="7" cy="15" r="2" fill="var(--nav-rep, #EA580C)"/><path d="M14.8 3.2a4 4 0 0 0-3.6 5.8L4.7 15.5a1.8 1.8 0 0 0 2.5 2.5l6.5-6.5a4 4 0 0 0 5.8-3.6c0-.6-.1-1.1-.4-1.6l-2.6 2.6-1.8-1.8 2.6-2.6a3.9 3.9 0 0 0-2.6-.7z" fill="var(--nav-rep, #EA580C)"/><path d="M9.8 10.4l1.8 1.8" stroke="var(--nav-rep-tint, #FED7AA)" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+  pos: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="9" fill="var(--nav-pos-tint, #FDE68A)"/><path d="M12.5 3L5.5 12h5l-1.5 7L16.5 10h-5l1.5-7z" fill="var(--nav-pos, #D97706)" stroke="var(--nav-pos, #D97706)" stroke-width="0.8" stroke-linejoin="round"/></svg>`,
+  posMenu: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="9" fill="var(--nav-pos-tint, #FDE68A)"/><path d="M12.5 3L5.5 12h5l-1.5 7L16.5 10h-5l1.5-7z" fill="var(--nav-pos, #D97706)" stroke="var(--nav-pos, #D97706)" stroke-width="0.8" stroke-linejoin="round"/></svg>`,
+  ql: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"></path><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"></path><line x1="2" y1="13" x2="22" y2="13"></line></svg>`,
+  cat: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><path d="M11 2.2L19.5 6.8L11 11.4L2.5 6.8L11 2.2Z" fill="var(--nav-cat-tint, #A7F3D0)"/><path d="M2.5 7.4L11 12V20L2.5 15.4V7.4Z" fill="var(--nav-cat, #059669)"/><path d="M11 12L19.5 7.4V15.4L11 20V12Z" fill="var(--nav-cat, #059669)" opacity="0.85"/><path d="M8.2 10.1L11 11.6L13.8 10.1V7.8L11 9.2L8.2 7.8V10.1Z" fill="var(--nav-cat-tint, #A7F3D0)"/></svg>`,
+  bill: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><rect x="2" y="4" width="18" height="14" rx="3" fill="var(--nav-bill-tint, #BBF7D0)"/><rect x="2" y="7.5" width="18" height="3" fill="var(--nav-bill, #16A34A)"/><rect x="4.5" y="12" width="4.5" height="3.5" rx="1" fill="var(--nav-bill, #16A34A)"/><rect x="11" y="13" width="6.5" height="2" rx="1" fill="var(--nav-bill, #16A34A)"/></svg>`,
+  his: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><circle cx="11" cy="11.5" r="7.8" fill="var(--nav-his-tint, #C7D2FE)"/><path d="M11 4.5a7 7 0 1 1-5.8 3.1" stroke="var(--nav-his, #4F46E5)" stroke-width="2" stroke-linecap="round"/><polyline points="4 4 5.2 7.8 9 7.8" fill="none" stroke="var(--nav-his, #4F46E5)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="11" cy="11.5" r="1.5" fill="var(--nav-his, #4F46E5)"/><path d="M11 8v3.5l2.5 1.5" stroke="var(--nav-his, #4F46E5)" stroke-width="1.8" stroke-linecap="round"/></svg>`,
+  reports: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><rect x="2.5" y="12" width="4.5" height="7.5" rx="1.8" fill="var(--nav-reports-tint, #FBCFE8)"/><rect x="8.8" y="7.5" width="4.5" height="12" rx="1.8" fill="var(--nav-reports, #DB2777)"/><rect x="15" y="3.5" width="4.5" height="16" rx="1.8" fill="var(--nav-reports-tint, #FBCFE8)"/><path d="M4.5 10.5L11 6L17.2 2.8" stroke="var(--nav-reports, #DB2777)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="17.2" cy="2.8" r="1.8" fill="var(--nav-reports, #DB2777)"/></svg>`,
+  users: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><path d="M11 2.2L18.5 5.2v5.5c0 5-3.5 8.5-7.5 10-4-1.5-7.5-5-7.5-10V5.2L11 2.2z" fill="var(--nav-users-tint, #CBD5E1)" stroke="var(--nav-users, #475569)" stroke-width="1.5" stroke-linejoin="round"/><circle cx="11" cy="9.5" r="2.3" fill="var(--nav-users, #475569)"/><path d="M7.5 15.8c0-2 1.6-3.2 3.5-3.2s3.5 1.2 3.5 3.2" stroke="var(--nav-users, #475569)" stroke-width="1.8" stroke-linecap="round"/></svg>`,
+  lock: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`,
+  lock24: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`,
+  check: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
+  checkCircle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`,
+  print: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>`,
+  download: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>`,
+  bell: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>`,
+  user: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`,
+  userPlus: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>`,
+  clipboard: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>`,
+  alert: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`,
+  chat: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`,
+  money: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>`,
+  phone: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>`,
+  bike: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="16" r="3"></circle><circle cx="19" cy="16" r="3"></circle><path d="M5 16l4-7h4l3 7"></path><path d="M12 9l3-4h3"></path></svg>`,
+  cpu: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>`,
+  crown: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z"></path></svg>`,
+  panelCollapse: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line><path d="M14 9l-3 3 3 3"></path></svg>`,
+  panelExpand: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line><path d="M11 9l3 3-3 3"></path></svg>`,
+  close: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
+  menu: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>`
+};
+
+/**
  * Short for "Price/Peso". Formats a numeric amount into Philippine Peso currency string.
  * @param {number|string} n - The numeric amount.
  * @returns {string} Formatted currency string (e.g., "₱1,450").
@@ -38,7 +112,8 @@ const ST = [
   "In Progress",
   "Checking",
   "Ready for Pickup",
-  "Completed"
+  "Completed",
+  "Cancelled"
 ];
 
 /**
@@ -231,7 +306,9 @@ function seed() {
         odo: 7200
       }
     ],
-    sales: []
+    sales: [],
+    audit: [],
+    commission: {}
   };
 }
 
@@ -256,6 +333,14 @@ if (!D) {
   let migrated = false;
   if (!Array.isArray(D.sales)) {
     D.sales = [];
+    migrated = true;
+  }
+  if (!Array.isArray(D.audit)) {
+    D.audit = [];
+    migrated = true;
+  }
+  if (!D.commission || typeof D.commission !== "object") {
+    D.commission = {};
     migrated = true;
   }
   let mechMigrated = false;
@@ -303,17 +388,17 @@ const ROLES = {
 
 // Default Primary & Admin Navigation pages each role can open.
 const DEFAULT_ROLE_NAV = {
-  admin:      ["dash", "cust", "insp", "rep", "pos", "cat", "bill", "his", "reports"],
-  superadmin: ["his", "reports", "users"],
-  mechanic:   ["dash", "insp", "rep"]
+  admin:      ["dash", "cust", "insp", "rep", "pos", "ql", "cat", "bill", "his", "reports"],
+  superadmin: ["dash", "cust", "insp", "rep", "pos", "ql", "cat", "bill", "his", "reports", "users"],
+  mechanic:   ["dash", "insp", "rep", "ql"]
 };
 const ROLE_NAV = DEFAULT_ROLE_NAV;
 
 /**
  * Returns allowed primary/admin navigation route keys for a role.
  * Reads custom permissions matrix from localStorage key "moto1_nav", falling back to defaults.
- * Automatically merges newly introduced default keys (e.g. "pos") into legacy matrices.
- * Super Admin always has "users" and Admin always has "dash", regardless of stored matrix.
+ * Automatically migrates legacy matrices (marker _v: 2) to grant full primary nav to Super Admin once.
+ * Super Admin always has "users", and Admin and Super Admin always have "dash", regardless of stored matrix.
  * @param {string} role - System role key.
  * @returns {Array<string>} Allowed route keys.
  */
@@ -328,28 +413,33 @@ function getRoleNav(role) {
     matrix = null;
   }
 
+  // Migration for _v: 2 (adds missing default pages to saved superadmin list once)
+  if (matrix && typeof matrix === "object" && (!matrix._v || matrix._v < 2)) {
+    try {
+      if (!Array.isArray(matrix.superadmin)) {
+        matrix.superadmin = [...DEFAULT_ROLE_NAV.superadmin];
+      } else {
+        DEFAULT_ROLE_NAV.superadmin.forEach((k) => {
+          if (!matrix.superadmin.includes(k)) {
+            matrix.superadmin.push(k);
+          }
+        });
+      }
+      matrix._v = 2;
+      localStorage.setItem("moto1_nav", JSON.stringify(matrix));
+    } catch (e) {}
+  }
+
   let list = (matrix && Array.isArray(matrix[role]))
     ? [...matrix[role]]
     : [...(DEFAULT_ROLE_NAV[role] || [])];
-
-  // Merge newly added default page keys (like "pos") missing from legacy saved matrices
-  if (matrix && (!matrix._v || matrix._v < 2)) {
-    if (role === "admin" && !list.includes("pos")) {
-      const repIdx = list.indexOf("rep");
-      if (repIdx !== -1) {
-        list.splice(repIdx + 1, 0, "pos");
-      } else {
-        list.push("pos");
-      }
-    }
-  }
 
   // Super Admin ALWAYS has access to User Management
   if (role === "superadmin" && !list.includes("users")) {
     list.push("users");
   }
-  // Admin ALWAYS has access to Dashboard
-  if (role === "admin" && !list.includes("dash")) {
+  // Admin & Super Admin ALWAYS have access to Dashboard
+  if ((role === "admin" || role === "superadmin") && !list.includes("dash")) {
     list.unshift("dash");
   }
 
@@ -415,7 +505,7 @@ function loadUsers() {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        list = parsed;
+        list = parsed.filter((u) => u && typeof u === "object" && u.email);
       }
     }
   } catch (e) {
@@ -528,6 +618,158 @@ function getCurrentUser() {
   };
 }
 
+/* ==========================================================
+   AUDIT LOG & SHARED SUPER ADMIN HELPERS
+   ========================================================== */
+
+/**
+ * Checks whether the current active user is Super Admin.
+ * Follows account switching instantly without full reload.
+ * @returns {boolean}
+ */
+function isSuper() {
+  const u = getCurrentUser();
+  return Boolean(u && (u.activeRole === "superadmin" || (!u.activeRole && u.role === "superadmin")));
+}
+
+/**
+ * Appends an audit entry to D.audit and saves to localStorage.
+ * Capped at newest 500 entries.
+ * @param {string} action - Action name (e.g. "Void sale", "Reverse transaction").
+ * @param {string} ref - Target entity reference (ID, plate, sale no).
+ * @param {string} note - Detailed reason or note.
+ */
+function logAudit(action, ref, note) {
+  if (!Array.isArray(D.audit)) D.audit = [];
+  const u = getCurrentUser();
+  const entry = {
+    id: uid(),
+    at: nowLocalTimestamp(),
+    by: u ? u.name : "System",
+    role: u ? (u.activeRole || u.role) : "system",
+    action: String(action || ""),
+    ref: String(ref || ""),
+    note: String(note || "")
+  };
+  D.audit.push(entry);
+  if (D.audit.length > 500) {
+    D.audit.splice(0, D.audit.length - 500);
+  }
+  save();
+}
+
+/**
+ * Shared modal for requiring a reason on sensitive Super Admin actions.
+ * @param {string} title
+ * @param {string} confirmLabel
+ * @param {(reason: string) => void} onConfirm
+ * @param {object} [opts]
+ */
+let _askReasonCallback = null;
+function askReason(title, confirmLabel, onConfirm, opts = {}) {
+  _askReasonCallback = onConfirm;
+  const md = $("pos-void-md");
+  const ov = $("pos-void-ov");
+  if (!md || !ov) return;
+
+  const placeholder = opts.placeholder || "Enter reason...";
+  const description = opts.description || "";
+  const isDestructive = opts.destructive !== false;
+
+  md.innerHTML = `
+    <div style="padding:18px 20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:10px">
+        <h3 id="pos-void-modal-title" style="margin:0;font-size:16px;color:var(--text);display:flex;align-items:center;gap:6px">
+          ${escHtml(title)}
+        </h3>
+        <button type="button" class="search-clear visible" onclick="closeReasonModal()" style="position:static" title="Close">✕</button>
+      </div>
+      ${description ? `<p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;line-height:1.4">${description}</p>` : ""}
+      <div style="margin-bottom:12px">
+        <label for="modal-reason-input" style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text-secondary)">Reason (required):</label>
+        <input
+          id="modal-reason-input"
+          type="text"
+          placeholder="${escHtml(placeholder)}"
+          style="width:100%;height:40px;border-radius:8px;border:1px solid var(--border);padding:0 10px;box-sizing:border-box;font-size:13px;outline:none"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();submitReason();}"
+        />
+        <div id="modal-reason-err" style="color:var(--danger, #DC2626);font-size:12px;font-weight:600;margin-top:4px;display:none">Please enter a reason.</div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button type="button" class="btn g" onclick="closeReasonModal()" style="min-height:40px">Cancel</button>
+        <button type="button" class="btn ${isDestructive ? "btn-destructive" : ""}" style="${isDestructive ? "background:#ffffff;color:var(--danger, #dc2626);border:1px solid var(--danger-border, #fca5a5);min-height:40px;" : "min-height:40px;"}" onclick="submitReason()">${escHtml(confirmLabel || "Confirm")}</button>
+      </div>
+    </div>
+  `;
+
+  ov.classList.add("on");
+  ov.focus();
+  setTimeout(() => {
+    const inp = $("modal-reason-input");
+    if (inp) inp.focus();
+  }, 50);
+}
+
+function closeReasonModal() {
+  const ov = $("pos-void-ov");
+  if (ov) ov.classList.remove("on");
+  _askReasonCallback = null;
+}
+
+function submitReason() {
+  const inp = $("modal-reason-input");
+  const err = $("modal-reason-err");
+  const val = inp ? inp.value.trim() : "";
+  if (!val) {
+    if (err) err.style.display = "block";
+    if (inp) {
+      inp.style.borderColor = "var(--danger, #DC2626)";
+      inp.focus();
+    }
+    return;
+  }
+  const cb = _askReasonCallback;
+  closeReasonModal();
+  if (typeof cb === "function") {
+    cb(val);
+  }
+}
+
+/**
+ * Checks whether a work order is countable (not reversed and not cancelled).
+ * @param {object} o - Work order object.
+ * @returns {boolean}
+ */
+function isCountableJob(o) {
+  if (!o) return false;
+  if (o.reversed || o.st === "Cancelled" || o.cancel) return false;
+  return true;
+}
+
+/**
+ * Checks whether a sale record is countable (not voided).
+ * @param {object} s - Sale object.
+ * @returns {boolean}
+ */
+function isCountableSale(s) {
+  if (!s) return false;
+  if (s.void) return false;
+  return true;
+}
+
+/**
+ * Generic countable checker for either work order or sale.
+ * @param {object} record
+ * @returns {boolean}
+ */
+function isCountable(record) {
+  if (!record) return false;
+  if (record.reversed || record.cancel || record.st === "Cancelled" || record.void) return false;
+  return true;
+}
+
+
 /**
  * Computes avatar initials from a display name (e.g. "Shop Owner" -> "SO", "Mike" -> "M").
  * @param {string} name - User display name.
@@ -561,12 +803,207 @@ function getUserRoleLabel(u) {
 
 function getRoleIconSvg(role) {
   if (role === "superadmin") {
-    return `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="19" y1="8" x2="19" y2="14"></line><line x1="16" y1="11" x2="22" y2="11"></line></svg>`;
+    return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><polygon points="18 4 19 6.5 21.5 6.5 19.5 8 20.3 10.5 18 9 15.7 10.5 16.5 8 14.5 6.5 17 6.5"></polygon></svg>`;
   }
   if (role === "admin") {
-    return `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18h18M4 18l2-10 5 5 5-5 2 10H4z"></path><circle cx="4" cy="7" r="1.5" fill="currentColor"></circle><circle cx="12" cy="7" r="1.5" fill="currentColor"></circle><circle cx="20" cy="7" r="1.5" fill="currentColor"></circle></svg>`;
+    return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18h18M4 18l2-10 5 5 5-5 2 10H4z"></path></svg>`;
   }
-  return `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>`;
+  return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>`;
+}
+
+/* ==========================================================
+   SIDEBAR TOGGLE & DRAWER NAVIGATION
+   ========================================================== */
+
+/**
+ * Desktop sidebar state ("open" or "collapsed"), loaded from localStorage "moto1_sidebar".
+ * Default is "open".
+ */
+let desktopSidebarState = "open";
+try {
+  const savedSidebar = localStorage.getItem("moto1_sidebar");
+  if (savedSidebar === "collapsed") {
+    desktopSidebarState = "collapsed";
+    if (typeof window !== "undefined" && window.innerWidth >= 900 && document.body) {
+      document.body.classList.add("sidebar--collapsed");
+    }
+  } else {
+    desktopSidebarState = "open";
+  }
+} catch (e) {}
+
+/** Mobile drawer visibility state. Not saved to localStorage. */
+let mobileDrawerOpen = false;
+
+/**
+ * Updates the sidebar toggle button icon, title, and aria attributes
+ * depending on screen size and current collapsed/drawer state.
+ */
+function updateSidebarToggleUI() {
+  const toggleBtn = $("btn-sidebar-toggle");
+  if (!toggleBtn) return;
+
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 900;
+  if (isMobile) {
+    toggleBtn.title = "Close menu";
+    toggleBtn.setAttribute("aria-label", "Close menu");
+    toggleBtn.setAttribute("aria-expanded", "true");
+    toggleBtn.innerHTML = ICONS.close;
+  } else {
+    const isCollapsed = desktopSidebarState === "collapsed";
+    toggleBtn.title = isCollapsed ? "Expand sidebar" : "Collapse sidebar";
+    toggleBtn.setAttribute("aria-label", isCollapsed ? "Expand sidebar" : "Collapse sidebar");
+    toggleBtn.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
+    toggleBtn.innerHTML = isCollapsed ? ICONS.panelExpand : ICONS.panelCollapse;
+  }
+}
+
+/**
+ * Toggles desktop sidebar between expanded and collapsed icon rail.
+ * Saves preference to localStorage under key "moto1_sidebar".
+ */
+function toggleSidebar() {
+  if (desktopSidebarState === "collapsed") {
+    desktopSidebarState = "open";
+    if (document.body) document.body.classList.remove("sidebar--collapsed");
+  } else {
+    desktopSidebarState = "collapsed";
+    if (document.body) document.body.classList.add("sidebar--collapsed");
+  }
+
+  try {
+    localStorage.setItem("moto1_sidebar", desktopSidebarState);
+  } catch (e) {}
+
+  updateSidebarToggleUI();
+  adjustSidebarPopupPosition();
+}
+
+/**
+ * Opens mobile/tablet slide-in drawer and locks page scrolling.
+ */
+function openSidebarDrawer() {
+  if (mobileDrawerOpen) return;
+  mobileDrawerOpen = true;
+
+  if (document.body) {
+    document.body.classList.add("drawer-open");
+    document.body.style.overflow = "hidden";
+  }
+
+  const menuBtn = $("btn-mobile-menu");
+  if (menuBtn) menuBtn.setAttribute("aria-expanded", "true");
+
+  updateSidebarToggleUI();
+
+  const toggleBtn = $("btn-sidebar-toggle");
+  if (toggleBtn) {
+    setTimeout(() => toggleBtn.focus(), 50);
+  }
+}
+
+/**
+ * Closes mobile/tablet slide-in drawer, unlocks page scrolling, and returns focus to menu button.
+ */
+function closeSidebarDrawer() {
+  closeAccountSwitcher();
+  if (!mobileDrawerOpen) return;
+  mobileDrawerOpen = false;
+
+  if (document.body) {
+    document.body.classList.remove("drawer-open");
+    document.body.style.overflow = "";
+  }
+
+  const menuBtn = $("btn-mobile-menu");
+  if (menuBtn) {
+    menuBtn.setAttribute("aria-expanded", "false");
+    try { menuBtn.focus(); } catch (e) {}
+  }
+
+  updateSidebarToggleUI();
+}
+
+/**
+ * Handles click on sidebar toggle button (closes drawer on mobile; toggles rail on desktop).
+ */
+function handleSidebarToggleClick() {
+  if (typeof window !== "undefined" && window.innerWidth < 900) {
+    closeSidebarDrawer();
+  } else {
+    toggleSidebar();
+  }
+}
+
+/**
+ * Traps Tab focus inside the mobile drawer while it is open.
+ * @param {KeyboardEvent} e
+ */
+function trapDrawerFocus(e) {
+  if (!mobileDrawerOpen || typeof window === "undefined" || window.innerWidth >= 900) return;
+  if (e.key !== "Tab") return;
+
+  const sidebar = $("sidebar");
+  if (!sidebar) return;
+
+  const focusable = sidebar.querySelectorAll(
+    'button:not([disabled]):not([style*="display: none"]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  );
+  if (!focusable || !focusable.length) return;
+
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+
+  if (e.shiftKey) {
+    if (document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    }
+  } else {
+    if (document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+}
+
+/**
+ * Handles window resize across the 900px breakpoint.
+ * Never leaves mobile drawer open or backdrop stuck on desktop resize.
+ */
+let lastWindowWidth = typeof window !== "undefined" ? window.innerWidth : 1024;
+function handleWindowResize() {
+  if (typeof window === "undefined") return;
+  const currentWidth = window.innerWidth;
+  if (currentWidth >= 900) {
+    // Desktop breakpoint
+    if (mobileDrawerOpen) {
+      mobileDrawerOpen = false;
+      if (document.body) {
+        document.body.classList.remove("drawer-open");
+        document.body.style.overflow = "";
+      }
+      const menuBtn = $("btn-mobile-menu");
+      if (menuBtn) menuBtn.setAttribute("aria-expanded", "false");
+    }
+    if (desktopSidebarState === "collapsed" && document.body) {
+      document.body.classList.add("sidebar--collapsed");
+    } else if (document.body) {
+      document.body.classList.remove("sidebar--collapsed");
+    }
+    updateSidebarToggleUI();
+  } else {
+    // Mobile / Tablet breakpoint (< 900px)
+    if (document.body) {
+      document.body.classList.remove("sidebar--collapsed");
+    }
+    updateSidebarToggleUI();
+  }
+  lastWindowWidth = currentWidth;
+  adjustSidebarPopupPosition();
+}
+if (typeof window !== "undefined") {
+  window.addEventListener("resize", handleWindowResize);
 }
 
 /**
@@ -588,21 +1025,105 @@ function renderSidebarUser() {
 }
 
 /**
- * Adjusts the sidebar popup max-height to ensure it is never cut off by viewport boundaries.
+ * Smart sidebar account switcher popup positioner.
+ * Positions popup with position: fixed relative to the viewport.
+ * Automatically chooses downward or upward opening depending on available space,
+ * caps natural height at 320px, handles collapsed rail right-side alignment,
+ * and sets popup--up / popup--down classes and data-popup-dir on the button.
  */
 function adjustSidebarPopupPosition() {
   const popup = $("sidebar-account-popup");
   const btn = $("btn-switch-account");
   if (!popup || popup.style.display === "none" || !btn) return;
 
+  const winW = typeof window !== "undefined" ? window.innerWidth : 1024;
+  const winH = typeof window !== "undefined" ? window.innerHeight : 800;
+
+  // Measure natural scroll height capped at 320px
+  popup.style.maxHeight = "320px";
+  const naturalH = Math.min(320, popup.scrollHeight || 260);
+
+  // Desktop collapsed rail mode (>= 900px)
+  if (typeof window !== "undefined" && document.body && document.body.classList.contains("sidebar--collapsed") && winW >= 900) {
+    const rect = btn.getBoundingClientRect();
+    const sidebarEl = $("sidebar");
+    const measuredW = sidebarEl && sidebarEl.getBoundingClientRect ? sidebarEl.getBoundingClientRect().width : 0;
+    const railWidth = Math.max(72, rect.right || 0, measuredW);
+    popup.style.position = "fixed";
+    popup.style.left = Math.round(railWidth + 8) + "px";
+    popup.style.width = "260px";
+    popup.style.zIndex = "260";
+
+    const maxH = Math.min(320, winH - 24);
+    popup.style.maxHeight = maxH + "px";
+    popup.style.overflowY = "auto";
+
+    let topPos = Math.round(rect.top);
+    if (topPos + naturalH > winH - 12) {
+      topPos = Math.max(12, winH - 12 - naturalH);
+    }
+    if (topPos < 12) topPos = 12;
+    popup.style.top = topPos + "px";
+    popup.style.bottom = "auto";
+
+    popup.classList.remove("popup--up");
+    popup.classList.add("popup--down");
+    btn.setAttribute("data-popup-dir", "down");
+    return;
+  }
+
+  // Expanded sidebar or mobile drawer mode
   const rect = btn.getBoundingClientRect();
-  const top = rect.bottom + 6;
-  const availHeight = Math.max(100, window.innerHeight - top - 16);
-  popup.style.maxHeight = availHeight + "px";
+  popup.style.position = "fixed";
+  popup.style.left = Math.round(rect.left) + "px";
+  popup.style.width = Math.round(rect.width) + "px";
+  popup.style.zIndex = "260";
+
+  // Available vertical space
+  const spaceBelow = Math.max(0, winH - rect.bottom - 12);
+  const spaceAbove = Math.max(0, rect.top - 12);
+
+  let dir = "down";
+  let availH = naturalH;
+
+  if (spaceBelow >= naturalH) {
+    dir = "down";
+    availH = naturalH;
+  } else if (spaceAbove >= naturalH) {
+    dir = "up";
+    availH = naturalH;
+  } else if (spaceBelow >= spaceAbove) {
+    dir = "down";
+    availH = spaceBelow;
+  } else {
+    dir = "up";
+    availH = spaceAbove;
+  }
+
+  if (dir === "down") {
+    popup.style.top = Math.round(rect.bottom + 6) + "px";
+    popup.style.bottom = "auto";
+    popup.style.maxHeight = Math.max(80, Math.round(availH)) + "px";
+    popup.style.overflowY = "auto";
+    popup.classList.remove("popup--up");
+    popup.classList.add("popup--down");
+    btn.setAttribute("data-popup-dir", "down");
+  } else {
+    popup.style.bottom = Math.round(winH - rect.top + 6) + "px";
+    popup.style.top = "auto";
+    popup.style.maxHeight = Math.max(80, Math.round(availH)) + "px";
+    popup.style.overflowY = "auto";
+    popup.classList.remove("popup--down");
+    popup.classList.add("popup--up");
+    btn.setAttribute("data-popup-dir", "up");
+  }
 }
 
-window.addEventListener("resize", adjustSidebarPopupPosition);
-window.addEventListener("scroll", adjustSidebarPopupPosition, true);
+if (typeof window !== "undefined") {
+  window.addEventListener("resize", adjustSidebarPopupPosition);
+  window.addEventListener("scroll", adjustSidebarPopupPosition, true);
+  window.addEventListener("orientationchange", adjustSidebarPopupPosition);
+}
 
 /**
  * Toggles the sidebar account switcher popup list.
@@ -628,8 +1149,81 @@ function toggleAccountSwitcher() {
 function closeAccountSwitcher() {
   const popup = $("sidebar-account-popup");
   const btn = $("btn-switch-account");
-  if (popup) popup.style.display = "none";
-  if (btn) btn.setAttribute("aria-expanded", "false");
+  if (popup) {
+    popup.style.display = "none";
+    if (popup.classList && popup.classList.remove) {
+      popup.classList.remove("popup--up");
+      popup.classList.remove("popup--down");
+    }
+  }
+  if (btn) {
+    btn.setAttribute("aria-expanded", "false");
+    if (typeof btn.removeAttribute === "function") {
+      btn.removeAttribute("data-popup-dir");
+    } else {
+      delete btn["data-popup-dir"];
+    }
+  }
+}
+
+/**
+ * Keyboard navigation handler for the Switch Account button and popup listbox.
+ * ArrowUp/ArrowDown cycle through accounts, Enter selects, Escape closes and returns focus to button.
+ * @param {KeyboardEvent} e - Keyboard event.
+ */
+function handleAccountSwitcherKeydown(e) {
+  const popup = $("sidebar-account-popup");
+  const btn = $("btn-switch-account");
+  const isOpen = popup && popup.style.display !== "none";
+
+  if (e.key === "Escape") {
+    if (isOpen) {
+      e.preventDefault();
+      closeAccountSwitcher();
+      if (btn) btn.focus();
+    }
+    return;
+  }
+
+  if (!isOpen) {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      toggleAccountSwitcher();
+      const items = popup ? popup.querySelectorAll(".sidebar-acc-item") : [];
+      if (items.length > 0) {
+        const active = popup.querySelector('.sidebar-acc-item[aria-selected="true"]') || items[0];
+        active.focus();
+      }
+    }
+    return;
+  }
+
+  const items = Array.from(popup ? popup.querySelectorAll(".sidebar-acc-item") : []);
+  if (!items.length) return;
+  const currentIdx = items.indexOf(document.activeElement);
+
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    const nextIdx = currentIdx < items.length - 1 ? currentIdx + 1 : 0;
+    items[nextIdx].focus();
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    const prevIdx = currentIdx > 0 ? currentIdx - 1 : items.length - 1;
+    items[prevIdx].focus();
+  } else if (e.key === "Home") {
+    e.preventDefault();
+    items[0].focus();
+  } else if (e.key === "End") {
+    e.preventDefault();
+    items[items.length - 1].focus();
+  } else if (e.key === "Enter" || e.key === " ") {
+    if (currentIdx >= 0) {
+      e.preventDefault();
+      items[currentIdx].click();
+    }
+  } else if (e.key === "Tab") {
+    closeAccountSwitcher();
+  }
 }
 
 /**
@@ -647,16 +1241,16 @@ function renderSidebarAccountPopup() {
   let html = `<div class="sidebar-acc-header">SWITCH ACCOUNT</div>`;
 
   html += users
-    .map((u) => {
+    .map((u, idx) => {
       const isCurrent = u.id === currentId;
-      const roleMeta = ROLES[u.role] || { label: u.role };
       return `
         <div
+          id="acc-opt-${idx}"
           class="sidebar-acc-item"
           role="option"
           aria-selected="${isCurrent ? "true" : "false"}"
           tabindex="0"
-          onmousedown="switchAccount('${u.id}')"
+          onclick="switchAccount('${u.id}')"
           onkeydown="if(event.key==='Enter'||event.key===' ')switchAccount('${u.id}')"
         >
           <div class="role-tile sm ${u.role}">
@@ -669,7 +1263,7 @@ function renderSidebarAccountPopup() {
           ${
             isCurrent
               ? `<span class="sidebar-acc-check" title="Active account">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="20 6 9 17 4 12"></polyline>
                   </svg>
                 </span>`
@@ -696,9 +1290,13 @@ function switchAccount(userId) {
   target.lastLogin = nowLocalTimestamp();
   saveUsers(users);
 
+  const allowed = getRoleNav(target.role);
+  const targetView = allowed.includes(view) ? view : (allowed.includes("dash") ? "dash" : (allowed[0] || ""));
+
   saveSession({
     userId: target.id,
     role: target.role,
+    view: targetView,
     at: Date.now()
   });
 
@@ -714,6 +1312,10 @@ function switchRole(newRole) {
   const s = getSession();
   if (!s) return;
   s.role = newRole;
+  const allowed = getRoleNav(newRole);
+  if (!allowed.includes(s.view)) {
+    s.view = allowed.includes("dash") ? "dash" : (allowed[0] || "");
+  }
   saveSession(s);
   syncViewForRole();
 }
@@ -779,7 +1381,7 @@ function renderLoginDropdown(filterText = "") {
   let html = `<div class="login-dd-header">SAVED ACCOUNTS</div>`;
 
   if (!filtered.length) {
-    html += `<div class="login-dd-empty">No saved account matches. Press Sign in to try this email.</div>`;
+    html += `<div class="login-dd-empty">No saved account matches. Press Sign In to try this email.</div>`;
   } else {
     html += filtered
       .map((u, idx) => {
@@ -900,13 +1502,13 @@ function onLoginEmailKeydown(e) {
 
 /**
  * Immediately logs in as the selected user account without password prompt.
- * Opens Dashboard directly.
+ * Opens Dashboard (or first allowed page) directly.
  * @param {string} userId - User ID to sign in.
  */
 function selectLoginUser(userId) {
   const users = loadUsers();
   const matched = users.find((u) => u.id === userId);
-  if (!matched) return;
+  if (!matched || matched.active === false) return;
 
   const errEl = $("login-err");
   if (errEl) {
@@ -916,16 +1518,32 @@ function selectLoginUser(userId) {
 
   closeLoginDropdown();
 
+  matched.lastLogin = nowLocalTimestamp();
+  saveUsers(users);
+
+  const allowed = getRoleNav(matched.role);
+  const targetPage = allowed.includes("dash") ? "dash" : (allowed[0] || "");
+
   saveSession({
     userId: matched.id,
     role: matched.role,
+    view: targetPage,
     at: Date.now()
   });
 
+  if (document.documentElement) document.documentElement.classList.add("has-session");
   document.body.classList.remove("logged-out");
   document.body.classList.add("logged-in");
 
-  syncViewForRole();
+  renderSidebarUser();
+  renderNav();
+
+  if (targetPage) {
+    go(targetPage);
+  } else {
+    view = "";
+    $("main").innerHTML = renderNoAccess();
+  }
 }
 
 /**
@@ -976,24 +1594,47 @@ function login() {
   matched.lastLogin = nowLocalTimestamp();
   saveUsers(users);
 
+  const allowed = getRoleNav(matched.role);
+  const targetPage = allowed.includes("dash") ? "dash" : (allowed[0] || "");
+
   saveSession({
     userId: matched.id,
     role: matched.role,
+    view: targetPage,
     at: Date.now()
   });
 
+  if (document.documentElement) document.documentElement.classList.add("has-session");
   document.body.classList.remove("logged-out");
   document.body.classList.add("logged-in");
 
-  syncViewForRole();
+  renderSidebarUser();
+  renderNav();
+
+  if (targetPage) {
+    go(targetPage);
+  } else {
+    view = "";
+    $("main").innerHTML = renderNoAccess();
+  }
 }
 
 /**
- * Logs out the current user, clears the active session, and shows the login screen.
+ * Logs out the current user, clears the active session, clears hash, and shows the login screen.
  */
 function logout() {
   clearSession();
   view = "dash";
+
+  // Clear URL hash
+  if (typeof window !== "undefined" && window.location && window.location.hash) {
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState(null, "", (window.location.pathname || "") + (window.location.search || ""));
+    } else {
+      window.location.hash = "";
+    }
+  }
+
   hisSearch = "";
   hisDate = "all";
   hisMech = "all";
@@ -1009,8 +1650,13 @@ function logout() {
     resetPosState();
   }
 
+  if (document.documentElement) document.documentElement.classList.remove("has-session");
   document.body.classList.remove("logged-in");
   document.body.classList.add("logged-out");
+
+  if (mobileDrawerOpen) {
+    closeSidebarDrawer();
+  }
 
   closeAccountSwitcher();
 
@@ -1037,7 +1683,7 @@ function renderNoAccess() {
   const u = getCurrentUser();
   const name = u ? u.name : "User";
   const roleLabel = u && ROLES[u.activeRole] ? ROLES[u.activeRole].label : "Workspace";
-  return `<div class="card no-access-card"><div style="font-size:36px;margin-bottom:12px">🔒</div><h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:var(--text-primary)">Welcome, ${name}</h1><p style="margin:0;font-size:14px;color:var(--text-muted);line-height:1.5">Your ${roleLabel} workspace isn't set up yet. Navigation for this role will be added soon.</p></div>`;
+  return `<div class="card no-access-card"><div style="display:flex;justify-content:center;margin-bottom:12px;color:var(--text-muted)">${ICONS.lock24}</div><h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:var(--text)">Welcome, ${name}</h1><p style="margin:0;font-size:14px;color:var(--text-muted);line-height:1.5">Your ${roleLabel} workspace isn't set up yet. Navigation for this role will be added soon.</p></div>`;
 }
 
 /**
@@ -1061,8 +1707,8 @@ function syncViewForRole() {
   const allowed = getRoleNav(u.activeRole);
   if (allowed.length > 0) {
     if (!allowed.includes(view)) {
-      if (u.activeRole === "superadmin" && allowed.includes("reports")) {
-        go("reports");
+      if (allowed.includes("dash")) {
+        go("dash");
       } else {
         go(allowed[0]);
       }
@@ -1091,7 +1737,13 @@ document.addEventListener("click", (e) => {
   }
 
   const switcher = $("sidebar-account-switcher");
-  if (switcher && !switcher.contains(e.target)) {
+  const popup = $("sidebar-account-popup");
+  if (
+    popup &&
+    popup.style.display !== "none" &&
+    !popup.contains(e.target) &&
+    (!switcher || !switcher.contains(e.target))
+  ) {
     closeAccountSwitcher();
   }
 
@@ -1103,10 +1755,36 @@ document.addEventListener("click", (e) => {
   }
 });
 
-// Global Escape listener to close popups
+// Global keydown listener for focus trap, Escape, and Ctrl+B / Cmd+B sidebar toggle
 document.addEventListener("keydown", (e) => {
+  trapDrawerFocus(e);
+
   if (e.key === "Escape") {
-    closeAccountSwitcher();
+    if (mobileDrawerOpen) {
+      closeSidebarDrawer();
+      e.preventDefault();
+      return;
+    }
+    const popup = $("sidebar-account-popup");
+    if (popup && popup.style.display !== "none") {
+      closeAccountSwitcher();
+      const btn = $("btn-switch-account");
+      if (btn) btn.focus();
+      e.preventDefault();
+      return;
+    }
+  }
+
+  // Ctrl+B (or Cmd+B) toggles sidebar on desktop (>= 900px), ignored while typing
+  if ((e.ctrlKey || e.metaKey) && (e.key === "b" || e.key === "B")) {
+    const el = document.activeElement;
+    const tag = el ? (el.tagName || "").toLowerCase() : "";
+    if (tag === "input" || tag === "textarea" || tag === "select") return;
+    if (el && el.isContentEditable) return;
+    if (typeof window !== "undefined" && window.innerWidth >= 900 && document.body && document.body.classList.contains("logged-in")) {
+      e.preventDefault();
+      toggleSidebar();
+    }
   }
 });
 
@@ -1253,6 +1931,14 @@ function lines(o) {
  */
 function getOrderTotals(o) {
   if (!o) return { labor: 0, parts: 0, discount: 0, total: 0 };
+  if (o.type === "QUICK LABOR" && typeof o.total === "number") {
+    return {
+      labor: Number(o.laborSubtotal) || 0,
+      parts: Number(o.partsSubtotal) || 0,
+      discount: 0,
+      total: Number(o.total) || 0
+    };
+  }
   const all = lines(o);
   let labor = 0;
   let parts = 0;
@@ -1313,6 +1999,9 @@ function getJobNumber(o) {
  * @returns {string} HTML span element string.
  */
 const badge = (s) => {
+  if (s === "Cancelled") {
+    return `<span class="badge-cancelled">CANCELLED</span>`;
+  }
   const label = s === "Ready for Pickup" ? "READY FOR BILLING" : (s || "").toUpperCase();
   return `<span class="bd ${cls(s)}">${escHtml(label)}</span>`;
 };
@@ -1435,15 +2124,16 @@ const V = [
   ["insp", "🔍", "Motorcycle Inspection"],
   ["rep", "🔧", "Active Repairs"],
   ["pos", "⚡", "Quick Sales"],
+  ["ql", "🧰", "Quick Labor"],
   ["cat", "📦", "Service & Parts Catalog"],
   ["bill", "💳", "Transactions & Billing"],
   ["his", "🕘", "Service History"],
-  ["reports", "📊", "Reports & Monitoring"],
+  ["reports", "📊", "Reports"],
   ["users", "🛡️", "User Management"]
 ];
 
 /** Route keys placed under the PRIMARY NAVIGATION section. */
-const PRIMARY_NAV_KEYS = ["dash", "cust", "insp", "rep", "pos", "cat", "bill", "his"];
+const PRIMARY_NAV_KEYS = ["dash", "cust", "insp", "rep", "pos", "ql", "cat", "bill", "his"];
 
 /** Route keys placed under the ADMINISTRATION & SUPPORT section. */
 const ADMIN_NAV_KEYS = ["reports", "users"];
@@ -1500,11 +2190,125 @@ let hisFrom = "";
 let hisTo = "";
 
 /**
+ * Tab definitions for the consolidated POS switcher bar.
+ * Ordered: Quick Sales, Quick Labor, Transactions & Billing.
+ */
+const POS_TABS = [
+  { id: "pos", label: "Quick Sales", shortLabel: "Sales", icon: "pos" },
+  { id: "ql", label: "Quick Labor", shortLabel: "Labor", icon: "ql" },
+  { id: "bill", label: "Transactions & Billing", shortLabel: "Billing", icon: "bill" }
+];
+
+/**
+ * Returns the POS_TABS the current role may open, read from the shared role-permissions map.
+ * @returns {Array<Object>} Permitted POS tab definitions.
+ */
+function getPosTabsForRole() {
+  return POS_TABS.filter((tab) => canOpen(tab.id));
+}
+
+/** Last POS screen ID opened during this session. */
+let posLastTab = "";
+
+/**
+ * Resolves which POS screen should open when the POS sidebar item is tapped.
+ * Returns posLastTab if permitted, else "pos" (Quick Sales) if permitted,
+ * else the first permitted POS tab, else null.
+ * @returns {string|null} Resolved screen ID.
+ */
+function resolvePosTab() {
+  const tabs = getPosTabsForRole();
+  if (!tabs.length) return null;
+  if (posLastTab && tabs.some((t) => t.id === posLastTab)) {
+    return posLastTab;
+  }
+  const quickSales = tabs.find((t) => t.id === "pos");
+  if (quickSales) {
+    return "pos";
+  }
+  return tabs[0].id;
+}
+
+/**
+ * Renders the consolidated 3-button switcher bar at the top of the main content area.
+ * Removes any existing switcher first to avoid duplicates.
+ * If fewer than 2 tabs are permitted for the active role, adds nothing.
+ * @param {string} activeId - The active POS screen ID ("pos", "ql", or "bill").
+ */
+function renderPosSwitcher(activeId) {
+  const existing = $("pos-switcher");
+  if (existing) {
+    existing.remove();
+  }
+
+  const tabs = getPosTabsForRole();
+  if (tabs.length < 2) {
+    return;
+  }
+
+  const mainEl = $("main-content-area") || $("main");
+  if (!mainEl) return;
+
+  const switcher = document.createElement("div");
+  switcher.id = "pos-switcher";
+  switcher.setAttribute("role", "tablist");
+  switcher.setAttribute("aria-label", "POS Section Switcher");
+
+  switcher.innerHTML = tabs
+    .map(
+      (t) => `
+        <button
+          type="button"
+          role="tab"
+          class="pos-tab ${t.id === activeId ? "pos-tab-active" : ""}"
+          data-screen="${t.id}"
+          aria-selected="${t.id === activeId ? "true" : "false"}"
+          onclick="loadView('${t.id}')"
+        >
+          <span>${ICONS[t.icon] || ""}</span>
+          <span class="pos-tab-label-full">${t.label}</span>
+          <span class="pos-tab-label-short">${t.shortLabel}</span>
+        </button>
+      `
+    )
+    .join("");
+
+  mainEl.insertBefore(switcher, mainEl.firstChild);
+
+  if (window.lucide && typeof lucide.createIcons === "function") {
+    lucide.createIcons();
+  }
+}
+
+/**
+ * Loads a view and triggers per-screen setup.
+ * Wraps go(v) for standard screen loading.
+ * @param {string} v - Screen ID to load.
+ */
+function loadView(v) {
+  go(v);
+}
+
+/**
  * Renders the primary and administration navigation lists based on permissions of the active role.
  * Shows each section label only when at least one of its routes is accessible.
  */
 function renderNav() {
-  const primaryAllowed = V.filter((x) => PRIMARY_NAV_KEYS.includes(x[0]) && canOpen(x[0]));
+  const isPosActive = ["pos", "ql", "bill"].includes(view);
+  const posTabs = getPosTabsForRole();
+  const showPos = posTabs.length > 0;
+
+  // Primary navigation: replace pos, ql, bill with ONE "POS" item in Quick Sales' position
+  const primaryItems = [
+    { id: "dash", icon: "dash", label: "Dashboard", allowed: canOpen("dash") },
+    { id: "cust", icon: "cust", label: "Customers & Motorcycles", allowed: canOpen("cust") },
+    { id: "insp", icon: "insp", label: "Motorcycle Inspection", allowed: canOpen("insp") },
+    { id: "rep",  icon: "rep",  label: "Active Repairs", allowed: canOpen("rep") },
+    { id: "pos",  icon: "posMenu", label: "POS", isPos: true, allowed: showPos },
+    { id: "cat",  icon: "cat",  label: "Service & Parts Catalog", allowed: canOpen("cat") },
+    { id: "his",  icon: "his",  label: "Service History", allowed: canOpen("his") }
+  ].filter((it) => it.allowed);
+
   const adminAllowed = V.filter((x) => ADMIN_NAV_KEYS.includes(x[0]) && canOpen(x[0]));
 
   const navEl = $("nav");
@@ -1513,7 +2317,7 @@ function renderNav() {
   const adminNavLabelEl = $("admin-nav-label");
 
   // 1. PRIMARY NAVIGATION section
-  if (!primaryAllowed.length) {
+  if (!primaryItems.length) {
     if (navLabelEl) navLabelEl.style.display = "none";
     if (navEl) {
       navEl.innerHTML = "";
@@ -1523,11 +2327,13 @@ function renderNav() {
     if (navLabelEl) navLabelEl.style.display = "";
     if (navEl) {
       navEl.style.display = "";
-      navEl.innerHTML = primaryAllowed
-        .map(
-          (x) =>
-            `<button class="${x[0] == view ? "on" : ""}" onclick="go('${x[0]}')"><span>${x[1]}</span>${x[2]}</button>`
-        )
+      navEl.innerHTML = primaryItems
+        .map((x) => {
+          if (x.isPos) {
+            return `<button class="nav-pos-item ${isPosActive ? "on" : ""}" data-route="pos" onclick="const t = resolvePosTab(); if (t) loadView(t);" title="${x.label}" aria-label="${x.label}"><span>${ICONS[x.icon]}</span><span class="nav-text">${x.label}</span></button>`;
+          }
+          return `<button class="nav-${x.id} ${x.id == view ? "on" : ""}" data-route="${x.id}" onclick="go('${x.id}')" title="${x.label}" aria-label="${x.label}"><span>${ICONS[x.icon] || ""}</span><span class="nav-text">${x.label}</span></button>`;
+        })
         .join("");
     }
   }
@@ -1546,7 +2352,7 @@ function renderNav() {
       adminNavEl.innerHTML = adminAllowed
         .map(
           (x) =>
-            `<button class="${x[0] == view ? "on" : ""}" onclick="go('${x[0]}')"><span>${x[1]}</span>${x[2]}</button>`
+            `<button class="nav-${x[0]} ${x[0] == view ? "on" : ""}" data-route="${x[0]}" onclick="go('${x[0]}')" title="${x[2]}" aria-label="${x[2]}"><span>${ICONS[x[0]] || x[1]}</span><span class="nav-text">${x[2]}</span></button>`
         )
         .join("");
     }
@@ -1559,6 +2365,11 @@ function renderNav() {
  * @param {string} v - Target view key ("dash", "cust", "insp", "rep", "cat", "his", "reports", "users").
  */
 function go(v) {
+  closeAccountSwitcher();
+  // Close mobile drawer on navigation
+  if (mobileDrawerOpen) {
+    closeSidebarDrawer();
+  }
   if (!canOpen(v)) return;
   if (view !== v) {
     userMgmtTab = "directory";
@@ -1593,6 +2404,26 @@ function go(v) {
   if (v === "insp" && inspDraftStep === 2) {
     autoGrowTextarea($("insp-diag-findings"));
   }
+  if (["pos", "ql", "bill"].includes(v)) {
+    posLastTab = v;
+    renderPosSwitcher(v);
+  }
+
+  // Persist current view in session immediately
+  const s = getSession();
+  if (s) {
+    s.view = v;
+    s.at = Date.now();
+    saveSession(s);
+  }
+
+  // Update URL hash as plain #name without breaking history
+  if (typeof window !== "undefined" && window.location) {
+    const curHash = (window.location.hash || "").replace(/^#/, "").trim();
+    if (curHash !== v) {
+      window.location.hash = v;
+    }
+  }
 }
 
 
@@ -1619,8 +2450,13 @@ const REP_CHIPS = [
  * @returns {Array<Object>} Filtered list of work orders.
  */
 function getFilteredRepairs(filter = repFilter) {
-  // Base set: all active (non-completed) work orders, including Ready for Pickup
-  const base = D.wo.filter((o) => o.st !== "Completed");
+  // Base set: all active (non-completed, non-cancelled) work orders, or cancelled jobs when filter is Cancelled
+  const base = (Array.isArray(D.wo) ? D.wo : []).filter((o) => {
+    if (filter === "Cancelled") {
+      return o.st === "Cancelled" || Boolean(o.cancel);
+    }
+    return o.st !== "Completed" && o.st !== "Cancelled" && !o.cancel;
+  });
   const q = repSearch.trim().toLowerCase().replace(/\s+/g, " ");
   const u = getCurrentUser();
   const isMech = u && u.activeRole === "mechanic";
@@ -1636,8 +2472,7 @@ function getFilteredRepairs(filter = repFilter) {
     }
 
     // 1. Status matching
-    const matchesStatus = filter === "all" || o.st === filter;
-    if (!matchesStatus) {
+    if (filter !== "all" && filter !== "Cancelled" && o.st !== filter) {
       return false;
     }
 
@@ -1664,10 +2499,15 @@ function getFilteredRepairs(filter = repFilter) {
 
 /**
  * Builds HTML for all filter chips with dynamic counts based on the current search text.
+ * Displays the Cancelled chip for Super Admin only.
  * @returns {string} HTML string of filter chip buttons.
  */
 function getRepChipsHtml() {
-  return REP_CHIPS.map((chip) => {
+  const chips = [...REP_CHIPS];
+  if (isSuper()) {
+    chips.push({ id: "cancelled", label: "Cancelled", status: "Cancelled", cls: "chip-cancelled" });
+  }
+  return chips.map((chip) => {
     const isSelected = repFilter === chip.status;
     const count = getFilteredRepairs(chip.status).length;
     return `<button type="button" class="chip ${chip.cls} ${
@@ -2058,14 +2898,16 @@ function getHisResultsHtml() {
           const truncSvcNames = svcNames.length > 45 ? svcNames.slice(0, 42) + "..." : svcNames;
           const displayNote = o.note || o.notes || o.findings || "—";
 
+          const isRev = Boolean(o.reversed);
           return `<tr>
             <td>
               <div style="font-weight:700;color:var(--text-primary)">${formatJobDate(dateVal)}</div>
               <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${formatJobTime(dateVal)}</div>
+              ${isRev ? `<div style="margin-top:4px"><span class="badge-reversed">REVERSED</span></div>` : ""}
             </td>
             <td>
               <button type="button" class="his-plate-btn" onclick="filterByPlate('${b.plate}')" title="Filter by plate ${b.plate}">
-                <span>${b.plate}</span> <span class="his-plate-icon">🕒</span>
+                <span>${b.plate}</span> <span class="his-plate-icon" style="display:inline-flex;align-items:center">${LINE_ICONS.his}</span>
               </button>
               <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">${b.make} ${b.model}</div>
               <div style="font-weight:600;font-size:13px;color:var(--text-primary);margin-top:2px">${c ? c.name : "—"}</div>
@@ -2078,10 +2920,15 @@ function getHisResultsHtml() {
               <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${escHtml(displayNote)}</div>
             </td>
             <td class="r" style="font-weight:700;color:var(--text-primary);font-size:14px">
-              ${P(total(o))}
+              ${isRev ? `<span class="text-struck">${P(total(o))}</span>` : P(total(o))}
             </td>
-            <td class="r">
+            <td class="r" style="white-space:nowrap">
               <button type="button" class="btn-rec" onclick="openRecord('${o.id}')">View Full Record</button>
+              ${isSuper() ? (isRev ? `
+                <button type="button" class="btn g sm" style="margin-left:6px" onclick="reopenJob('${o.id}')">Reopen Job</button>
+              ` : `
+                <button type="button" class="btn sm btn-destructive" style="margin-left:6px" onclick="askReverseJob('${o.id}')">Void / Reverse</button>
+              `) : ""}
             </td>
           </tr>`;
         }).join("")}
@@ -2147,7 +2994,7 @@ function dashMechanic() {
     const list = Array.isArray(o.complaints) ? o.complaints.filter(Boolean) : [];
     if (!list.length) return "—";
     return list.slice(0, 2).map((c) =>
-      `<span class="badge" style="background:#F1F5F9;color:#475569;font-size:11px;padding:2px 8px;border-radius:12px;margin-right:4px;display:inline-block">${escHtml(c)}</span>`
+      `<span class="badge" style="background:var(--bg-subtle);color:var(--text-muted);font-size:11px;padding:2px 8px;border-radius:12px;margin-right:4px;display:inline-block;border:1px solid var(--border)">${escHtml(c)}</span>`
     ).join("");
   };
 
@@ -2177,24 +3024,24 @@ function dashMechanic() {
   return `
     <div class="card top">
       <div>
-        <h1>Welcome back, ${escHtml(mechName || "Mechanic")} 👋</h1>
+        <h1>Welcome back, ${escHtml(mechName || "Mechanic")}</h1>
         <p>Mechanic | ${d}</p>
       </div>
       <span class="pill">● Saved on this device</span>
     </div>
 
     <div class="stats">
-      ${stat("🔧", "#DBEAFE", "MY ACTIVE JOBS", myActiveJobs.length, "Assigned to you")}
-      ${stat("⏳", "#FFEDD5", "UNASSIGNED JOBS", unassignedJobs.length, "Waiting to be taken")}
-      ${stat("📦", "#F3E8FF", "AWAITING PARTS", awaitingPartsJobs.length, "Waiting for parts or approval")}
-      ${stat("✅", "#D1FAE5", "DONE TODAY", doneTodayJobs.length, "Finished by you")}
+      ${stat(LINE_ICONS.rep, "", "MY ACTIVE JOBS", myActiveJobs.length, "Assigned to you")}
+      ${stat(LINE_ICONS.his, "", "UNASSIGNED JOBS", unassignedJobs.length, "Waiting to be taken")}
+      ${stat(LINE_ICONS.cat, "", "AWAITING PARTS", awaitingPartsJobs.length, "Waiting for parts or approval")}
+      ${stat(ICONS.checkCircle, "", "DONE TODAY", doneTodayJobs.length, "Finished by you")}
     </div>
 
     <div style="display:flex;flex-direction:column;gap:20px">
       <!-- My Job Queue Card -->
       <div class="card">
         <div class="hd" style="display:flex;justify-content:space-between;align-items:center">
-          <span>🔧 My Job Queue</span>
+          <span style="display:inline-flex;align-items:center;gap:6px">${LINE_ICONS.rep} My Job Queue</span>
           <button type="button" class="btn g sm" onclick="go('rep')">View all</button>
         </div>
         ${myQueueJobs.length ? `
@@ -2221,7 +3068,7 @@ function dashMechanic() {
 
       <!-- Unassigned Jobs Card -->
       <div class="card">
-        <div class="hd">📋 Unassigned Jobs</div>
+        <div class="hd" style="display:flex;align-items:center;gap:8px">${ICONS.clipboard} Unassigned Jobs</div>
         ${unassignedRecent.length ? `
           <div class="tw">
             <table>
@@ -2248,6 +3095,171 @@ function dashMechanic() {
 }
 
 /**
+ * Generates Super Admin-only dashboard cards:
+ * 1. Net Revenue Trend (last 7 local days as CSS bars with vs. previous 7 days % change).
+ * 2. Voids & Overrides (monthly count badges and 8 latest audit log entries).
+ * @returns {string} HTML string.
+ */
+function getSuperDashboardExtraHtml() {
+  const now = new Date();
+  const pad = (n) => (n < 10 ? "0" + n : String(n));
+  const formatYmd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+  // 1. Net Revenue Trend
+  const last7Days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+    last7Days.push({
+      dateStr: formatYmd(d),
+      label: d.toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric" }),
+      total: 0
+    });
+  }
+
+  // Prev 7 days
+  const prev7Days = [];
+  for (let i = 13; i >= 7; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+    prev7Days.push({
+      dateStr: formatYmd(d),
+      total: 0
+    });
+  }
+
+  // Sum completed non-reversed jobs and non-void sales
+  const countableJobs = (Array.isArray(D.wo) ? D.wo : []).filter((o) => o.st === "Completed" && isCountableJob(o));
+  const countableSales = (Array.isArray(D.sales) ? D.sales : []).filter(isCountableSale);
+
+  countableJobs.forEach((o) => {
+    const dStr = (o.done || o.at || "").slice(0, 10);
+    const day = last7Days.find((x) => x.dateStr === dStr);
+    if (day) day.total += total(o);
+    const prevDay = prev7Days.find((x) => x.dateStr === dStr);
+    if (prevDay) prevDay.total += total(o);
+  });
+
+  countableSales.forEach((s) => {
+    const dStr = (s.date || s.at || "").slice(0, 10);
+    const day = last7Days.find((x) => x.dateStr === dStr);
+    if (day) day.total += (Number(s.total) || 0);
+    const prevDay = prev7Days.find((x) => x.dateStr === dStr);
+    if (prevDay) prevDay.total += (Number(s.total) || 0);
+  });
+
+  const sum7 = last7Days.reduce((acc, d) => acc + d.total, 0);
+  const sumPrev7 = prev7Days.reduce((acc, d) => acc + d.total, 0);
+
+  let vsText = "-";
+  if (sumPrev7 > 0) {
+    const diff = sum7 - sumPrev7;
+    const pct = ((diff / sumPrev7) * 100).toFixed(1);
+    vsText = diff >= 0 ? `+${pct}%` : `${pct}%`;
+  }
+
+  const maxDaily = Math.max(...last7Days.map((d) => d.total), 1);
+
+  // 2. Voids & Overrides
+  const currentMonth = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+  const voidSalesCount = (Array.isArray(D.sales) ? D.sales : []).filter(
+    (s) => s.void && (s.voidAt || s.date || "").slice(0, 7) === currentMonth
+  ).length;
+  const reversedJobsCount = (Array.isArray(D.wo) ? D.wo : []).filter(
+    (o) => o.reversed && (o.reversed.at || o.done || "").slice(0, 7) === currentMonth
+  ).length;
+  const cancelledJobsCount = (Array.isArray(D.wo) ? D.wo : []).filter(
+    (o) => (o.st === "Cancelled" || o.cancel) && ((o.cancel && o.cancel.at) || o.at || "").slice(0, 7) === currentMonth
+  ).length;
+  const overridesCount = (Array.isArray(D.audit) ? D.audit : []).filter(
+    (a) => a.action === "Price override" && (a.at || "").slice(0, 7) === currentMonth
+  ).length;
+
+  const latestAudit = [...(Array.isArray(D.audit) ? D.audit : [])].reverse().slice(0, 8);
+  const canSeeHis = canOpen("his");
+
+  return `
+    <div class="grid2" style="margin-top:20px">
+      <!-- Card A: Net Revenue Trend -->
+      <div class="card" style="padding:18px 20px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+          <div>
+            <div style="font-weight:700;font-size:15px;color:var(--text)">Net Revenue Trend</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Last 7 local days (jobs + quick sales)</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-weight:800;font-size:16px;color:var(--text)">${P(sum7)}</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
+              vs previous 7 days: <b style="color:${vsText.startsWith('+') ? 'var(--success, #059669)' : (vsText.startsWith('-') ? 'var(--danger, #DC2626)' : 'var(--text)')}">${vsText}</b>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:flex-end;gap:10px;height:140px;padding-top:10px;border-bottom:1px solid var(--border)">
+          ${last7Days.map((d) => {
+            const barHeightPct = Math.round((d.total / maxDaily) * 100);
+            return `
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end" title="${d.label}: ${P(d.total)}">
+                <div style="font-size:10px;font-weight:700;color:var(--text-muted);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">${d.total > 0 ? P(d.total) : "0"}</div>
+                <div style="width:100%;max-width:32px;background:var(--primary, #2563EB);border-radius:4px 4px 0 0;height:${Math.max(barHeightPct, 4)}%"></div>
+                <div style="font-size:11px;color:var(--text-secondary);margin-top:6px;text-align:center">${d.label.split(",")[0]}</div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      </div>
+
+      <!-- Card B: Voids & Overrides -->
+      <div class="card" style="padding:18px 20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <div>
+            <div style="font-weight:700;font-size:15px;color:var(--text)">Voids &amp; Overrides</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Monthly counts &amp; audit history</div>
+          </div>
+          ${canSeeHis ? `<button type="button" class="btn g sm" onclick="go('his')">View in Service History</button>` : ""}
+        </div>
+
+        <!-- Monthly metric badges -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
+          <div style="padding:8px;background:var(--bg-surface-alt, #F8FAFC);border:1px solid var(--border);border-radius:6px;text-align:center">
+            <div style="font-size:11px;color:var(--text-muted);font-weight:600">Void Sales</div>
+            <div style="font-size:16px;font-weight:800;color:var(--danger, #DC2626);margin-top:2px">${voidSalesCount}</div>
+          </div>
+          <div style="padding:8px;background:var(--bg-surface-alt, #F8FAFC);border:1px solid var(--border);border-radius:6px;text-align:center">
+            <div style="font-size:11px;color:var(--text-muted);font-weight:600">Reversals</div>
+            <div style="font-size:16px;font-weight:800;color:var(--danger, #DC2626);margin-top:2px">${reversedJobsCount}</div>
+          </div>
+          <div style="padding:8px;background:var(--bg-surface-alt, #F8FAFC);border:1px solid var(--border);border-radius:6px;text-align:center">
+            <div style="font-size:11px;color:var(--text-muted);font-weight:600">Cancelled</div>
+            <div style="font-size:16px;font-weight:800;color:var(--text-secondary);margin-top:2px">${cancelledJobsCount}</div>
+          </div>
+          <div style="padding:8px;background:var(--bg-surface-alt, #F8FAFC);border:1px solid var(--border);border-radius:6px;text-align:center">
+            <div style="font-size:11px;color:var(--text-muted);font-weight:600">Overrides</div>
+            <div style="font-size:16px;font-weight:800;color:var(--primary, #2563EB);margin-top:2px">${overridesCount}</div>
+          </div>
+        </div>
+
+        <!-- Latest audit entries -->
+        <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:8px">Latest Audit Logs:</div>
+        <div style="max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:6px">
+          ${!latestAudit.length ? `<div style="font-size:13px;color:var(--text-muted);padding:8px 0">No audit records yet.</div>` : latestAudit.map((a) => `
+            <div style="font-size:12px;padding:6px 8px;background:var(--bg-surface-alt, #F8FAFC);border-radius:4px;border:1px solid var(--border);display:flex;justify-content:space-between;gap:8px">
+              <div>
+                <span style="font-weight:700;color:var(--text)">${escHtml(a.action)}</span>
+                ${a.ref ? `<span style="color:var(--text-muted)"> (${escHtml(a.ref)})</span>` : ""}
+                <div style="color:var(--text-secondary);margin-top:2px;font-style:italic">${escHtml(a.note || "No reason given")}</div>
+              </div>
+              <div style="text-align:right;white-space:nowrap;font-size:11px;color:var(--text-muted)">
+                <div>${escHtml(a.at)}</div>
+                <div>${escHtml(a.by)}</div>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/**
  * View renderers registry containing HTML generator functions for each screen.
  */
 const R = {
@@ -2261,12 +3273,13 @@ const R = {
       return dashMechanic();
     }
 
+    const countableWos = (Array.isArray(D.wo) ? D.wo : []).filter(isCountableJob);
     // Active jobs: work orders not yet completed or ready for pickup
-    const act = D.wo.filter((o) => o.st != "Completed" && o.st != "Ready for Pickup");
+    const act = countableWos.filter((o) => o.st != "Completed" && o.st != "Ready for Pickup");
     // Ready jobs: work orders awaiting customer settlement and vehicle pickup
-    const rdy = D.wo.filter((o) => o.st == "Ready for Pickup");
+    const rdy = countableWos.filter((o) => o.st == "Ready for Pickup");
     // Services finished today: work orders with done date matching today
-    const dn = D.wo.filter((o) => (o.done || "").slice(0, 10) == today());
+    const dn = countableWos.filter((o) => (o.done || "").slice(0, 10) == today());
 
     const d = new Date().toLocaleDateString("en-US", {
       weekday: "long",
@@ -2280,12 +3293,13 @@ const R = {
 
     const roleLabel = u ? (ROLES[u.activeRole]?.label || u.activeRole) : "Admin";
 
-    return `<div class="card top"><div><h1>Welcome back 👋</h1><p>${roleLabel} | ${d}</p></div><span class="pill">● Saved on this device</span></div>
- <div class="stats">${stat("🔧", "#DBEAFE", "ACTIVE REPAIRS", act.length, "In progress")}${stat("👛", "#FFEDD5", "PENDING PAYMENTS", rdy.length, "Ready for pickup")}${stat("✅", "#D1FAE5", "TODAY’S SERVICES", dn.length, "Jobs finished")}</div>
- <div class="grid2"><div class="card"><div class="hd">🔧 Priority Repair Queue<button class="btn g sm" onclick="go('rep')">View all</button></div>${tbl(D.wo.filter((o) => o.st != "Completed"))}</div>
- <div class="card"><div class="hd">🔔 Alerts &amp; Reminders</div>
+    return `<div class="card top"><div><h1>Welcome back</h1><p>${roleLabel} | ${d}</p></div><span class="pill">● Saved on this device</span></div>
+ <div class="stats">${stat(LINE_ICONS.rep, "", "ACTIVE REPAIRS", act.length, "In progress")}${stat(ICONS.money, "", "PENDING PAYMENTS", rdy.length, "Ready for pickup")}${stat(ICONS.checkCircle, "", "TODAY’S SERVICES", dn.length, "Jobs finished")}</div>
+ <div class="grid2"><div class="card"><div class="hd" style="display:flex;align-items:center;gap:8px"><span>${LINE_ICONS.rep}</span><span>Priority Repair Queue</span><button class="btn g sm" onclick="go('rep')" style="margin-left:auto">View all</button></div>${tbl(countableWos.filter((o) => o.st != "Completed"))}</div>
+ <div class="card"><div class="hd" style="display:flex;align-items:center;gap:8px"><span>${ICONS.bell}</span><span>Alerts &amp; Reminders</span></div>
  ${rdy.length ? `<div class="al or">Pending settlement<span>${rdy.length} repaired vehicle${rdy.length > 1 ? "s are" : " is"} waiting for customer payment &amp; pickup.</span></div>` : ""}
- ${!rdy.length ? `<div class="empty">All clear.</div>` : ""}</div></div>`;
+ ${!rdy.length ? `<div class="empty">All clear.</div>` : ""}</div></div>
+ ${isSuper() ? getSuperDashboardExtraHtml() : ""}`;
   },
 
   /**
@@ -2293,9 +3307,66 @@ const R = {
    * @returns {string} HTML string.
    */
   cust() {
-    return `<div class="card top"><div><h1>Customers &amp; Motorcycles</h1><p>Owners and the motorcycles they bring in</p></div><button class="btn" onclick="mCust()">+ Add customer / motorcycle</button></div>
- <div class="card tw"><table><tr><th>PLATE NO.</th><th>MOTORCYCLE</th><th>YEAR</th><th>ODOMETER</th><th>OWNER</th><th></th></tr>
- ${D.bk.map((b) => `<tr><td><b>${b.plate}</b></td><td>${b.make} ${b.model}</td><td>${b.year}</td><td>${b.odo.toLocaleString()} km</td><td>${own(b).name}<br><small style="color:var(--mu)">${own(b).phone}</small></td><td class="r"><button class="btn g sm" onclick="hisBike='${b.id}';go('his')">History</button> <button class="btn sm" onclick="mWO('${b.id}')">New work order</button></td></tr>`).join("")}</table></div>`;
+    const list = custShowArchived ? (D.bk || []) : (D.bk || []).filter((b) => !b.archived);
+    return `<div class="card top">
+      <div>
+        <h1>Customers &amp; Motorcycles</h1>
+        <p>Owners and the motorcycles they bring in</p>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        ${isSuper() ? `
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer">
+            <input type="checkbox" ${custShowArchived ? "checked" : ""} onchange="custShowArchived=this.checked;go('cust')">
+            Show archived
+          </label>
+        ` : ""}
+        <button class="btn" onclick="mCust()">+ Add customer / motorcycle</button>
+      </div>
+    </div>
+    <div class="card tw">
+      <table>
+        <thead>
+          <tr>
+            <th>PLATE NO.</th>
+            <th>MOTORCYCLE</th>
+            <th>YEAR</th>
+            <th>ODOMETER</th>
+            <th>OWNER</th>
+            <th class="r">ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${!list.length ? `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">No motorcycles registered.</td></tr>` : list.map((b) => {
+            const c = own(b);
+            const isArch = Boolean(b.archived);
+            return `
+              <tr style="${isArch ? "background:var(--bg-surface-alt, #F8FAFC);opacity:0.8" : ""}">
+                <td>
+                  <b>${escHtml(b.plate)}</b>
+                  ${isArch ? `<span class="badge-reversed" style="margin-left:4px">ARCHIVED</span>` : ""}
+                </td>
+                <td>${escHtml(b.make + " " + b.model)}</td>
+                <td>${b.year || "-"}</td>
+                <td>${(b.odo || 0).toLocaleString()} km</td>
+                <td>${escHtml(c ? c.name : "-")}<br><small style="color:var(--text-muted)">${escHtml(c ? c.phone : "")}</small></td>
+                <td class="r" style="white-space:nowrap">
+                  <button type="button" class="btn g sm" onclick="hisBike='${b.id}';go('his')">History</button>
+                  <button type="button" class="btn sm" onclick="mWO('${b.id}')">New work order</button>
+                  <button type="button" class="btn g sm" onclick="openEditBikeModal('${b.id}')">Edit</button>
+                  ${isSuper() ? (isArch ? `
+                    <button type="button" class="btn g sm" onclick="restoreBike('${b.id}')">Restore</button>
+                    <button type="button" class="btn sm btn-destructive" onclick="deleteBike('${b.id}')">Delete</button>
+                  ` : `
+                    <button type="button" class="btn sm btn-destructive" onclick="archiveBike('${b.id}')">Archive</button>
+                    <button type="button" class="btn sm btn-destructive" onclick="deleteBike('${b.id}')">Delete</button>
+                  `) : ""}
+                </td>
+              </tr>
+            `;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>`;
   },
 
   /**
@@ -2316,7 +3387,7 @@ const R = {
 
     return `<div class="card top"><div><h1>Active Repairs</h1><p>Move each job through the work order lifecycle</p></div><button class="btn" onclick="mWO()">+ New work order</button></div>
 <div class="rep-search-wrap">
-  <span class="search-icon" onclick="$('rep-search-input').focus()" title="Search">🔍</span>
+  <span class="search-icon" onclick="$('rep-search-input').focus()" title="Search">${LINE_ICONS.insp}</span>
   <input
     id="rep-search-input"
     type="text"
@@ -2372,6 +3443,27 @@ ${isMech ? `
   },
 
   /**
+   * Quick Labor view: fast-track logging and checkout for walk-in minor repairs and part replacements.
+   * @returns {string} HTML string.
+   */
+  ql() {
+    quickLaborCart = [];
+    quickLaborSearch = "";
+    quickLaborFilter = "all";
+    quickLaborMech = "";
+    quickLaborNote = "";
+    quickLaborMethod = "Cash";
+    quickLaborRef = "";
+    quickLaborTendered = 0;
+    quickLaborCustomOpen = false;
+    quickLaborCustomKind = "labor";
+    quickLaborClearConfirmActive = false;
+    if (quickLaborClearConfirmTimer) clearTimeout(quickLaborClearConfirmTimer);
+    quickLaborSuccessMsg = "";
+    return getQuickLaborViewHtml();
+  },
+
+  /**
    * Service & Parts Catalog view: Quick-Select Price Menu.
    * Displays labor services and parts in one unified price menu with live search.
    * @returns {string} HTML string.
@@ -2383,7 +3475,8 @@ ${isMech ? `
           <h1>Service &amp; Parts Catalog</h1>
           <p>Quick-select price menu used when recording services and items.</p>
         </div>
-        <div>
+        <div style="display:flex;align-items:center;gap:8px">
+          ${isSuper() ? `<button type="button" class="btn g" onclick="openCatCsvModal()">Import CSV</button>` : ""}
           <button type="button" class="btn" onclick="openAddCatalogModal()">+ Add Menu Item</button>
         </div>
       </div>
@@ -2410,6 +3503,7 @@ ${isMech ? `
    * @returns {string} HTML string.
    */
   bill() {
+    billFilter = "all";
     return getBillViewHtml();
   },
 
@@ -2427,7 +3521,7 @@ ${isMech ? `
 <div class="card his-toolbar-card">
   <div class="his-toolbar">
     <div class="his-search-wrap">
-      <span class="search-icon" onclick="$('his-search-input').focus()" title="Search">🔍</span>
+      <span class="search-icon" onclick="$('his-search-input').focus()" title="Search">${LINE_ICONS.insp}</span>
       <input
         id="his-search-input"
         type="text"
@@ -2462,7 +3556,7 @@ ${isMech ? `
         ${getUniqueMechanics().map((m) => `<option value="${m}" ${hisMech === m ? "selected" : ""}>${m}</option>`).join("")}
       </select>
       <button type="button" class="btn g his-btn-export" onclick="exportHisCsv()" title="Export filtered list to CSV">
-        <span>📥</span> Export List
+        <span style="display:inline-flex;align-items:center">${ICONS.download}</span> Export List
       </button>
     </div>
   </div>
@@ -2477,7 +3571,7 @@ ${isMech ? `
   },
 
   /**
-   * Reports & Monitoring view: shop performance, KPIs, and status analytics.
+   * Reports view: shop performance, sales, and job reports.
    * Accessible to Admin and Super Admin roles.
    * @returns {string} HTML string.
    */
@@ -2728,6 +3822,7 @@ function exportHisCsv() {
 
   const headers = [
     "Job ID",
+    "Status",
     "Completion Date",
     "Completion Time",
     "Plate Number",
@@ -2766,6 +3861,7 @@ function exportHisCsv() {
 
     return [
       escapeCsv(o.id),
+      escapeCsv(o.reversed ? "Reversed" : "Completed"),
       escapeCsv(compDate),
       escapeCsv(compTime === " — " ? "" : compTime),
       escapeCsv(plate),
@@ -2779,7 +3875,23 @@ function exportHisCsv() {
     ].join(",");
   });
 
-  const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\r\n");
+  const activeSum = list.reduce((sum, o) => o.reversed ? sum : sum + total(o), 0);
+  const totalRow = [
+    escapeCsv("TOTAL (active)"),
+    escapeCsv(""),
+    escapeCsv(""),
+    escapeCsv(""),
+    escapeCsv(""),
+    escapeCsv(""),
+    escapeCsv(""),
+    escapeCsv(""),
+    escapeCsv(""),
+    escapeCsv(""),
+    escapeCsv(""),
+    activeSum
+  ].join(",");
+
+  const csvContent = "\uFEFF" + [headers.join(","), ...rows, totalRow].join("\r\n");
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -2867,8 +3979,15 @@ function openRecord(id) {
 
     <div class="rec-section-title">
       <span>This Job (#${o.id})</span>
-      <span class="bd completed">COMPLETED</span>
+      ${o.reversed ? `<span class="badge-reversed">REVERSED</span>` : `<span class="bd completed">COMPLETED</span>`}
     </div>
+
+    ${o.reversed ? `
+      <div style="background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#991B1B">
+        <b>TRANSACTION REVERSED:</b> ${escHtml(o.reversed.reason || "Reversed")}
+        <div style="font-size:11px;color:#7F1D1D;margin-top:2px">${escHtml(o.reversed.at)} · by ${escHtml(o.reversed.by || "Super Admin")}</div>
+      </div>
+    ` : ""}
 
     <div class="rec-job-meta">
       <div>
@@ -2910,7 +4029,7 @@ function openRecord(id) {
               const label = c.part && !c.desc.startsWith(c.part) ? `${c.part}: ${c.desc}` : (c.desc || "");
               return `
                 <div style="font-size:12px;display:flex;align-items:baseline;gap:6px">
-                  <span style="display:inline-block;padding:1px 5px;border-radius:4px;background:#FEE2E2;color:#B91C1C;font-weight:700;font-size:11px">${escHtml(c.code)}</span>
+                  <span style="display:inline-block;padding:1px 5px;border-radius:4px;background:var(--danger-soft);color:var(--danger);border:1px solid var(--danger-border);font-weight:700;font-size:11px">${escHtml(c.code)}</span>
                   <span>· ${escHtml(label)}</span>
                 </div>
               `;
@@ -2935,7 +4054,7 @@ function openRecord(id) {
 
     <div class="rec-bill-tot">
       <span>Total Cost</span>
-      <span>${P(total(o))}</span>
+      <span>${o.reversed ? `<span class="text-struck">${P(total(o))}</span>` : P(total(o))}</span>
     </div>
 
     <div class="rec-section-title">
@@ -2966,8 +4085,9 @@ function openRecord(id) {
                 <b>${formatJobDate(wDate)}</b>
                 <span class="rec-tl-time">${formatJobTime(wDate)}</span>
                 ${isCur ? `<span class="rec-tl-badge">Current Record</span>` : ""}
+                ${w.reversed ? `<span class="badge-reversed" style="margin-left:4px">REVERSED</span>` : ""}
               </div>
-              <div class="rec-tl-tot">${P(total(w))}</div>
+              <div class="rec-tl-tot">${w.reversed ? `<span class="text-struck">${P(total(w))}</span>` : P(total(w))}</div>
             </div>
             <div class="rec-tl-body">
               <div><b>Services:</b> ${wSvcs || "—"}</div>
@@ -2979,8 +4099,13 @@ function openRecord(id) {
       }).join("")}
     </div>
 
-    <div class="rec-footer">
-      <button type="button" class="btn g" onclick="window.print()">🖨️ Print Record</button>
+    <div class="rec-footer" style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">
+      ${isSuper() ? (o.reversed ? `
+        <button type="button" class="btn g" onclick="closeRecord(); reopenJob('${o.id}')">Reopen Job</button>
+      ` : `
+        <button type="button" class="btn btn-destructive" onclick="closeRecord(); askReverseJob('${o.id}')">Void / Reverse</button>
+      `) : ""}
+      <button type="button" class="btn g" onclick="window.print()"><span style="display:inline-flex;align-items:center;margin-right:6px">${ICONS.print}</span>Print Record</button>
       <button type="button" class="btn" onclick="closeRecord()">Close</button>
     </div>
   `;
@@ -2990,6 +4115,29 @@ function openRecord(id) {
   $("rec-ov").classList.add("on");
   document.body.style.overflow = "hidden";
   $("rec-ov").focus();
+}
+
+/**
+ * Prompts for required reason before reversing a completed work order (Super Admin only).
+ * Sets wo.reversed and logs audit entry.
+ * @param {string} woId - Work order ID.
+ */
+function askReverseJob(woId) {
+  if (!isSuper()) return;
+  const o = g("wo", woId);
+  if (!o) return;
+  askReason(`Void / Reverse Job #${o.id}`, "Reverse Transaction", (reason) => {
+    const u = getCurrentUser();
+    o.reversed = {
+      reason,
+      at: nowLocalTimestamp(),
+      by: u ? u.name : "Super Admin"
+    };
+    logAudit("Reverse transaction", o.id, reason);
+    save();
+    if (view === "his") renderHisResults();
+    else go(view);
+  }, { description: `Reversing this completed transaction removes its revenue from reports and dashboard while preserving the audit record.` });
 }
 
 /**
@@ -3071,6 +4219,10 @@ if (posVoidOvEl) {
  */
 document.onkeydown = (e) => {
   if (e.key == "Escape") {
+    if (mobileDrawerOpen) {
+      closeSidebarDrawer();
+      return;
+    }
     if ($("pos-void-ov") && $("pos-void-ov").classList.contains("on")) {
       closePosVoidModal();
       return;
@@ -3099,11 +4251,15 @@ document.onkeydown = (e) => {
   }
 };
 
+/** State toggle for showing archived customers/motorcycles (Super Admin only). */
+let custShowArchived = false;
+
 /**
  * Opens the "Add customer / motorcycle" modal.
  */
 function mCust() {
-  M(`<h2>Add customer / motorcycle</h2><label>Owner</label><select id="fc" onchange="$('nw').style.display=this.value?'none':'block'"><option value="">New customer…</option>${D.cu.map((c) => `<option value="${c.id}">${c.name}</option>`).join("")}</select>
+  const activeCustomers = (Array.isArray(D.cu) ? D.cu : []).filter((c) => !c.archived);
+  M(`<h2>Add customer / motorcycle</h2><label>Owner</label><select id="fc" onchange="$('nw').style.display=this.value?'none':'block'"><option value="">New customer…</option>${activeCustomers.map((c) => `<option value="${c.id}">${escHtml(c.name)}</option>`).join("")}</select>
  <div id="nw"><label>Full name</label><input id="fn"><label>Phone</label><input id="fp"></div>
  <div class="row"><div><label>Make</label><input id="fm"></div><div><label>Model</label><input id="fo"></div><div><label>Year</label><input id="fy" type="number"></div><div><label>Plate number</label><input id="fl"></div></div>
  <label>Current odometer (km)</label><input id="fk" type="number">${acts("addC()")}`);
@@ -3116,14 +4272,14 @@ function addC() {
   let cid = v("fc");
   if (!cid) {
     if (!v("fn")) {
-      return alert("Enter the owner name.");
+      return;
     }
     cid = uid();
     D.cu.push({ id: cid, name: v("fn"), phone: v("fp") });
   }
 
   if (!v("fl") || !v("fm")) {
-    return alert("Enter at least the make and plate number.");
+    return;
   }
 
   D.bk.push({
@@ -3139,14 +4295,175 @@ function addC() {
   fin();
 }
 
+/**
+ * Opens the Edit Motorcycle / Customer modal.
+ * Locks the plate number as read-only for Admin if motorcycle has existing work orders.
+ * @param {string} bid - Motorcycle ID.
+ */
+function openEditBikeModal(bid) {
+  const b = g("bk", bid);
+  if (!b) return;
+  const c = own(b);
+  const hasJobs = (Array.isArray(D.wo) ? D.wo : []).some((o) => o.bid === b.id);
+  const canEditPlate = isSuper() || !hasJobs;
 
+  M(`
+    <h2>Edit Motorcycle / Customer</h2>
+    <div style="margin-bottom:12px">
+      <label>Owner Name</label>
+      <input id="edit-c-name" value="${escHtml(c ? c.name : "")}" style="width:100%;height:38px;padding:0 8px;margin-bottom:8px;border-radius:6px;border:1px solid var(--border)" />
+      <label>Owner Phone</label>
+      <input id="edit-c-phone" value="${escHtml(c ? c.phone : "")}" style="width:100%;height:38px;padding:0 8px;border-radius:6px;border:1px solid var(--border)" />
+    </div>
+    <div class="row" style="margin-bottom:12px">
+      <div>
+        <label>Make</label>
+        <input id="edit-b-make" value="${escHtml(b.make || "")}" style="width:100%;height:38px;padding:0 8px;border-radius:6px;border:1px solid var(--border)" />
+      </div>
+      <div>
+        <label>Model</label>
+        <input id="edit-b-model" value="${escHtml(b.model || "")}" style="width:100%;height:38px;padding:0 8px;border-radius:6px;border:1px solid var(--border)" />
+      </div>
+      <div>
+        <label>Year</label>
+        <input id="edit-b-year" type="number" value="${b.year || ""}" style="width:100%;height:38px;padding:0 8px;border-radius:6px;border:1px solid var(--border)" />
+      </div>
+    </div>
+    <div style="margin-bottom:12px">
+      <label>Plate Number</label>
+      <input
+        id="edit-b-plate"
+        value="${escHtml(b.plate || "")}"
+        ${!canEditPlate ? "readonly disabled style='width:100%;height:38px;padding:0 8px;background:var(--bg-surface-alt, #F8FAFC);color:var(--text-muted);border-radius:6px;border:1px solid var(--border)'" : "style='width:100%;height:38px;padding:0 8px;border-radius:6px;border:1px solid var(--border)'"}
+      />
+      ${!canEditPlate ? `<small style="display:block;color:var(--text-muted);margin-top:4px;font-style:italic">Plate is locked after the first job.</small>` : ""}
+    </div>
+    <div style="margin-bottom:16px">
+      <label>Current Odometer (km)</label>
+      <input id="edit-b-odo" type="number" value="${b.odo || 0}" style="width:100%;height:38px;padding:0 8px;border-radius:6px;border:1px solid var(--border)" />
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button type="button" class="btn g" onclick="cm()">Cancel</button>
+      <button type="button" class="btn" onclick="saveEditBike('${b.id}')">Save Changes</button>
+    </div>
+  `);
+}
+
+/**
+ * Saves edits to motorcycle and owner records.
+ * Prompts for audit reason if Super Admin changed a locked plate number.
+ * @param {string} bid - Motorcycle ID.
+ */
+function saveEditBike(bid) {
+  const b = g("bk", bid);
+  if (!b) return;
+  const c = own(b);
+  const oldPlate = b.plate;
+  const newPlate = (v("edit-b-plate") || "").trim().toUpperCase();
+  const hasJobs = (Array.isArray(D.wo) ? D.wo : []).some((o) => o.bid === b.id);
+
+  if (c) {
+    c.name = v("edit-c-name") || c.name;
+    c.phone = v("edit-c-phone") || c.phone;
+  }
+  b.make = v("edit-b-make") || b.make;
+  b.model = v("edit-b-model") || b.model;
+  b.year = +v("edit-b-year") || b.year;
+  b.odo = +v("edit-b-odo") || b.odo;
+
+  if (newPlate && newPlate !== oldPlate) {
+    if (hasJobs) {
+      if (!isSuper()) {
+        cm();
+        go("cust");
+        return;
+      }
+      cm();
+      askReason(`Edit Locked Plate ${oldPlate} → ${newPlate}`, "Confirm Plate Change", (reason) => {
+        b.plate = newPlate;
+        logAudit("Edit plate", newPlate, `Plate changed from ${oldPlate} to ${newPlate}: ${reason}`);
+        save();
+        go("cust");
+      });
+      return;
+    } else {
+      b.plate = newPlate;
+    }
+  }
+
+  save();
+  cm();
+  go("cust");
+}
+
+/**
+ * Soft deletes / archives a motorcycle record with required reason (Super Admin only).
+ * @param {string} bid - Motorcycle ID.
+ */
+function archiveBike(bid) {
+  if (!isSuper()) return;
+  const b = g("bk", bid);
+  if (!b) return;
+  askReason(`Archive Motorcycle ${b.plate}`, "Archive", (reason) => {
+    b.archived = true;
+    b.archivedAt = nowLocalTimestamp();
+    b.archivedReason = reason;
+    const u = getCurrentUser();
+    b.archivedBy = u ? u.name : "Super Admin";
+    logAudit("Archive motorcycle", b.plate, reason);
+    save();
+    go("cust");
+  }, { description: "Archived records are hidden from lists, intake, and search, but remain attached to past work orders." });
+}
+
+/**
+ * Restores an archived motorcycle record (Super Admin only).
+ * @param {string} bid - Motorcycle ID.
+ */
+function restoreBike(bid) {
+  if (!isSuper()) return;
+  const b = g("bk", bid);
+  if (!b) return;
+  b.archived = false;
+  delete b.archivedAt;
+  delete b.archivedBy;
+  logAudit("Restore motorcycle", b.plate, "Restored");
+  save();
+  go("cust");
+}
+
+/**
+ * Hard deletes a motorcycle record if it has NO history; refuses otherwise (Super Admin only).
+ * @param {string} bid - Motorcycle ID.
+ */
+function deleteBike(bid) {
+  if (!isSuper()) return;
+  const b = g("bk", bid);
+  if (!b) return;
+  const hasHistory = (Array.isArray(D.wo) ? D.wo : []).some((o) => o.bid === b.id);
+  if (hasHistory) {
+    askReason("Cannot Delete Motorcycle", "OK", () => {}, {
+      description: "Has service history. Archive it instead.",
+      destructive: false
+    });
+    return;
+  }
+  askReason(`Delete Motorcycle ${b.plate}`, "Delete", (reason) => {
+    D.bk = (D.bk || []).filter((x) => x.id !== b.id);
+    logAudit("Delete motorcycle", b.plate, reason);
+    save();
+    go("cust");
+  });
+}
 
 /**
  * Opens the "New work order" modal.
+ * Excludes archived motorcycles from picker.
  * @param {string} [bid] - Optional motorcycle ID to pre-select.
  */
 function mWO(bid) {
-  M(`<h2>New work order</h2><label>Motorcycle</label><select id="wb">${D.bk.map((b) => `<option value="${b.id}" ${b.id == bid ? "selected" : ""}>${bn(b)} — ${own(b).name}</option>`).join("")}</select>
+  const activeBikes = (Array.isArray(D.bk) ? D.bk : []).filter((b) => !b.archived);
+  M(`<h2>New work order</h2><label>Motorcycle</label><select id="wb">${activeBikes.map((b) => `<option value="${b.id}" ${b.id == bid ? "selected" : ""}>${bn(b)} — ${own(b).name}</option>`).join("")}</select>
  <label>Services</label>${D.sv.map((s) => `<label class="chk"><input type="checkbox" name="ws" value="${s.id}">${s.name} — ${P(total({ sv: [s.id] }))}</label>`).join("")}
  <div class="row"><div><label>Mechanic</label><input id="wm" value="Hiyo"></div><div><label>Odometer in (km)</label><input id="wk" type="number"></div></div>
  <label>Customer complaint / notes</label><textarea id="wn" rows="2"></textarea>${acts("addW()")}`);
@@ -3162,7 +4479,19 @@ function addW() {
     .map((x) => x.value);
 
   if (!sv.length) {
-    return alert("Pick at least one service.");
+    let errEl = $("wo-err");
+    if (!errEl) {
+      errEl = document.createElement("div");
+      errEl.id = "wo-err";
+      errEl.style.color = "var(--danger, #DC2626)";
+      errEl.style.fontSize = "13px";
+      errEl.style.fontWeight = "600";
+      errEl.style.marginTop = "8px";
+      const act = document.querySelector(".md .acts") || $("md");
+      if (act) act.parentNode.insertBefore(errEl, act);
+    }
+    errEl.textContent = "Please pick at least one service.";
+    return;
   }
 
   const o = {
@@ -3232,7 +4561,8 @@ function getCatalogItems(kindFilter = "all") {
         kind: "labor",
         type: "sv",
         name: s.name || "Unnamed service",
-        price: Number(s.labor) || 0
+        price: Number(s.labor) || 0,
+        costPrice: s.costPrice !== undefined ? s.costPrice : null
       });
     });
   }
@@ -3244,7 +4574,8 @@ function getCatalogItems(kindFilter = "all") {
         type: "pt",
         name: p.name || "Unnamed part",
         price: Number(p.cost) || 0,
-        sku: p.sku || ""
+        sku: p.sku || "",
+        costPrice: p.costPrice !== undefined ? p.costPrice : null
       });
     });
   }
@@ -3256,10 +4587,17 @@ function getCatalogItems(kindFilter = "all") {
  * Returns HTML string for the unified catalog price menu table.
  * @returns {string}
  */
+/**
+ * Returns HTML string for the unified catalog price menu table.
+ * For Super Admin: adds Cost and Margin columns, and Delete action.
+ * For Admin: Delete is hidden, and Cost/Margin columns are hidden.
+ * @returns {string}
+ */
 function getCatTableHtml() {
   const q = catSearch.trim().toLowerCase();
   const all = getCatalogItems("all");
   const filtered = q ? all.filter((it) => it.name.toLowerCase().includes(q)) : all;
+  const isSuperUser = isSuper();
 
   return `
     <div class="tw">
@@ -3269,28 +4607,41 @@ function getCatTableHtml() {
             <th>ITEM / SERVICE NAME</th>
             <th>CATEGORY</th>
             <th class="r">DEFAULT REFERENCE PRICE</th>
+            ${isSuperUser ? `<th class="r">COST</th><th class="r">MARGIN</th>` : ""}
             <th class="r" style="width:140px">ACTIONS</th>
           </tr>
         </thead>
         <tbody>
           ${
             !filtered.length
-              ? `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px">No menu items found.</td></tr>`
-              : filtered.map((it) => `
-                <tr>
-                  <td><b>${escHtml(it.name)}</b></td>
-                  <td>
-                    <span class="cat-badge ${it.kind}">
-                      ${it.kind === "labor" ? "Labor / Service" : "Part / Fluid"}
-                    </span>
-                  </td>
-                  <td class="r"><b>${P(it.price)}</b></td>
-                  <td class="r" style="white-space:nowrap">
-                    <button type="button" class="btn g sm" onclick="openEditCatalogModal('${it.type}', '${it.id}')">Edit</button>
-                    <button type="button" class="btn d sm" style="margin-left:6px" onclick="deleteCatalogItem('${it.type}', '${it.id}')">Delete</button>
-                  </td>
-                </tr>
-              `).join("")
+              ? `<tr><td colspan="${isSuperUser ? 6 : 4}" style="text-align:center;color:var(--text-muted);padding:24px">No menu items found.</td></tr>`
+              : filtered.map((it) => {
+                  const hasCost = it.costPrice !== undefined && it.costPrice !== null && it.costPrice !== "";
+                  const costVal = Number(it.costPrice) || 0;
+                  const marginVal = (Number(it.price) || 0) - costVal;
+                  const marginPct = (Number(it.price) || 0) > 0 ? ((marginVal / Number(it.price)) * 100).toFixed(1) + "%" : "-";
+                  return `
+                    <tr>
+                      <td><b>${escHtml(it.name)}</b></td>
+                      <td>
+                        <span class="cat-badge ${it.kind}">
+                          ${it.kind === "labor" ? "Labor / Service" : "Part / Fluid"}
+                        </span>
+                      </td>
+                      <td class="r"><b>${P(it.price)}</b></td>
+                      ${isSuperUser ? `
+                        <td class="r">${hasCost ? P(costVal) : "-"}</td>
+                        <td class="r">${hasCost ? `${P(marginVal)} <small style="color:var(--text-muted)">(${marginPct})</small>` : "-"}</td>
+                      ` : ""}
+                      <td class="r" style="white-space:nowrap">
+                        <button type="button" class="btn g sm" onclick="openEditCatalogModal('${it.type}', '${it.id}')">Edit</button>
+                        ${isSuperUser ? `
+                          <button type="button" class="btn sm btn-destructive" style="margin-left:6px" onclick="askDeleteCatalogItem('${it.type}', '${it.id}', '${escHtml(it.name)}')">Delete</button>
+                        ` : ""}
+                      </td>
+                    </tr>
+                  `;
+                }).join("")
           }
         </tbody>
       </table>
@@ -3330,6 +4681,7 @@ function openEditCatalogModal(type, id) {
 
 /**
  * Renders modal dialog for adding or editing a price menu item.
+ * Includes optional Cost Price (₱) input for Super Admin only.
  * @param {"add"|"edit"} mode
  * @param {"sv"|"pt"} [type]
  * @param {string} [id]
@@ -3339,16 +4691,17 @@ function renderCatalogModal(mode, type, id) {
   if (mode === "edit") {
     if (type === "sv") {
       const s = g("sv", id);
-      if (s) item = { id: s.id, type: "sv", kind: "labor", name: s.name, price: s.labor || 0 };
+      if (s) item = { id: s.id, type: "sv", kind: "labor", name: s.name, price: s.labor || 0, costPrice: s.costPrice };
     } else if (type === "pt") {
       const p = g("pt", id);
-      if (p) item = { id: p.id, type: "pt", kind: "part", name: p.name, price: p.cost || 0, sku: p.sku || "" };
+      if (p) item = { id: p.id, type: "pt", kind: "part", name: p.name, price: p.cost || 0, sku: p.sku || "", costPrice: p.costPrice };
     }
   }
 
   const kind = item ? item.kind : catModalKind;
   const name = item ? item.name : "";
   const price = item ? item.price : "";
+  const cost = item && item.costPrice !== undefined && item.costPrice !== null ? item.costPrice : "";
 
   M(`
     <h2>${mode === "edit" ? "Edit Menu Item" : "Add Menu Item"}</h2>
@@ -3377,7 +4730,7 @@ function renderCatalogModal(mode, type, id) {
       type="text"
       placeholder="${kind === 'labor' ? 'e.g. Change oil' : 'e.g. Engine oil 10W-40'}"
       value="${escHtml(name)}"
-      style="height:42px;font-size:14px;margin-bottom:12px"
+      style="height:42px;font-size:14px;margin-bottom:12px;width:100%;box-sizing:border-box"
     />
     <label for="cat-modal-price">Default Reference Price (₱)</label>
     <input
@@ -3387,8 +4740,20 @@ function renderCatalogModal(mode, type, id) {
       min="0"
       placeholder="0.00"
       value="${price !== '' ? price : ''}"
-      style="height:42px;font-size:14px;margin-bottom:16px"
+      style="height:42px;font-size:14px;margin-bottom:12px;width:100%;box-sizing:border-box"
     />
+    ${isSuper() ? `
+      <label for="cat-modal-cost">Cost Price (₱) <small style="color:var(--text-muted);font-weight:normal">(optional)</small></label>
+      <input
+        id="cat-modal-cost"
+        type="number"
+        step="any"
+        min="0"
+        placeholder="0.00"
+        value="${cost !== '' ? cost : ''}"
+        style="height:42px;font-size:14px;margin-bottom:16px;width:100%;box-sizing:border-box"
+      />
+    ` : `<div style="margin-bottom:4px"></div>`}
     <div class="acts">
       <button type="button" class="btn g" onclick="fin()">Cancel</button>
       <button type="button" class="btn" onclick="saveCatalogModalItem('${mode}', '${type || ""}', '${id || ""}')">
@@ -3407,35 +4772,49 @@ function renderCatalogModal(mode, type, id) {
 function saveCatalogModalItem(mode, type, id) {
   const nameInp = $("cat-modal-name");
   const priceInp = $("cat-modal-price");
+  const costInp = $("cat-modal-cost");
 
   const rawName = nameInp ? nameInp.value.trim() : "";
   const name = rawName || "Unnamed item";
   const price = priceInp ? Math.max(0, Number(priceInp.value) || 0) : 0;
+  const costPrice = (isSuper() && costInp && costInp.value.trim() !== "") ? Math.max(0, Number(costInp.value) || 0) : null;
   const targetKind = catModalKind;
 
   if (mode === "add") {
     if (targetKind === "labor") {
       if (!Array.isArray(D.sv)) D.sv = [];
-      D.sv.push({ id: uid(), name, labor: price, parts: [] });
+      D.sv.push({ id: uid(), name, labor: price, parts: [], costPrice });
     } else {
       if (!Array.isArray(D.pt)) D.pt = [];
-      D.pt.push({ id: uid(), sku: "", name, cost: price });
+      D.pt.push({ id: uid(), sku: "", name, cost: price, costPrice });
     }
   } else if (mode === "edit") {
     if (type === "sv" && targetKind === "labor") {
       const s = g("sv", id);
-      if (s) { s.name = name; s.labor = price; }
+      if (s) {
+        s.name = name;
+        s.labor = price;
+        if (isSuper()) s.costPrice = costPrice;
+      }
     } else if (type === "pt" && targetKind === "part") {
       const p = g("pt", id);
-      if (p) { p.name = name; p.cost = price; }
+      if (p) {
+        p.name = name;
+        p.cost = price;
+        if (isSuper()) p.costPrice = costPrice;
+      }
     } else if (type === "sv" && targetKind === "part") {
+      const old = g("sv", id);
+      const cp = isSuper() ? costPrice : (old ? old.costPrice : null);
       D.sv = D.sv.filter((s) => s.id !== id);
       if (!Array.isArray(D.pt)) D.pt = [];
-      D.pt.push({ id: uid(), sku: "", name, cost: price });
+      D.pt.push({ id: uid(), sku: "", name, cost: price, costPrice: cp });
     } else if (type === "pt" && targetKind === "labor") {
+      const old = g("pt", id);
+      const cp = isSuper() ? costPrice : (old ? old.costPrice : null);
       D.pt = D.pt.filter((p) => p.id !== id);
       if (!Array.isArray(D.sv)) D.sv = [];
-      D.sv.push({ id: uid(), name, labor: price, parts: [] });
+      D.sv.push({ id: uid(), name, labor: price, parts: [], costPrice: cp });
     }
   }
 
@@ -3445,6 +4824,20 @@ function saveCatalogModalItem(mode, type, id) {
     const wrap = $("cat-table-wrap");
     if (wrap) wrap.innerHTML = getCatTableHtml();
   }
+}
+
+/**
+ * Prompts for required reason before deleting a catalog item (Super Admin only).
+ * @param {"sv"|"pt"} type
+ * @param {string} id
+ * @param {string} name
+ */
+function askDeleteCatalogItem(type, id, name) {
+  if (!isSuper()) return;
+  askReason(`Delete Menu Item "${name}"`, "Delete Item", (reason) => {
+    deleteCatalogItem(type, id);
+    logAudit("Delete catalog item", name, reason);
+  });
 }
 
 /**
@@ -3459,6 +4852,162 @@ function deleteCatalogItem(type, id) {
     D.pt = D.pt.filter((p) => p.id !== id);
   }
   save();
+  if (view === "cat") {
+    const wrap = $("cat-table-wrap");
+    if (wrap) wrap.innerHTML = getCatTableHtml();
+  }
+}
+
+/** State container for live CSV import preview */
+let catCsvParsed = { valid: [], skipped: [] };
+
+/**
+ * Opens CSV import modal for bulk loading catalog items (Super Admin only).
+ */
+function openCatCsvModal() {
+  if (!isSuper()) return;
+  catCsvParsed = { valid: [], skipped: [] };
+  M(`
+    <h2>Import Catalog Items (CSV)</h2>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;line-height:1.4">
+      Paste comma-separated rows in the format: <code>name, category, price, cost</code>.<br>
+      Category accepts <b>labor</b> or <b>part</b> (case-insensitive). Header row is optional.
+    </p>
+    <div style="margin-bottom:12px">
+      <textarea
+        id="cat-csv-input"
+        rows="6"
+        placeholder="e.g.&#10;Engine Oil 10W-40, part, 350, 220&#10;Brake Pad Replacement, labor, 250, 0"
+        style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:6px;padding:8px;font-size:13px;font-family:monospace"
+        oninput="onCatCsvInput(this.value)"
+      ></textarea>
+    </div>
+    <div id="cat-csv-preview" style="font-size:13px;margin-bottom:16px;padding:10px;background:var(--bg-surface-alt, #F8FAFC);border:1px solid var(--border);border-radius:6px">
+      <div style="color:var(--text-muted)">Paste CSV rows above to see live preview.</div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button type="button" class="btn g" onclick="cm()">Cancel</button>
+      <button type="button" class="btn" id="cat-csv-import-btn" disabled onclick="importCatCsv()">Import</button>
+    </div>
+  `);
+}
+
+/**
+ * Parses pasted CSV text and provides live preview counts and skip reasons.
+ * @param {string} text - Raw CSV text.
+ */
+function onCatCsvInput(text) {
+  const lines = (text || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const existingNames = new Set(getCatalogItems("all").map((it) => it.name.trim().toLowerCase()));
+
+  const valid = [];
+  const skipped = [];
+
+  lines.forEach((line, lineIdx) => {
+    const lower = line.toLowerCase();
+    if (lower.startsWith("name,") || lower.startsWith('"name",') || lower === "name,category,price,cost") {
+      return;
+    }
+
+    const parts = line.split(",").map((p) => p.trim().replace(/^["']|["']$/g, ""));
+    const name = parts[0] || "";
+    const rawCat = (parts[1] || "").toLowerCase();
+    const priceStr = parts[2] || "";
+    const costStr = parts[3] || "";
+
+    if (!name) {
+      skipped.push(`Row ${lineIdx + 1}: empty name`);
+      return;
+    }
+
+    if (rawCat !== "labor" && rawCat !== "part" && rawCat !== "service" && rawCat !== "fluid") {
+      skipped.push(`Row ${lineIdx + 1} ("${name}"): unknown category "${parts[1] || ''}"`);
+      return;
+    }
+
+    const price = parseFloat(priceStr);
+    if (isNaN(price) || price < 0) {
+      skipped.push(`Row ${lineIdx + 1} ("${name}"): invalid price "${priceStr}"`);
+      return;
+    }
+
+    const cost = costStr !== "" ? parseFloat(costStr) : null;
+    if (costStr !== "" && (isNaN(cost) || cost < 0)) {
+      skipped.push(`Row ${lineIdx + 1} ("${name}"): invalid cost "${costStr}"`);
+      return;
+    }
+
+    if (existingNames.has(name.toLowerCase())) {
+      skipped.push(`Row ${lineIdx + 1} ("${name}"): exact duplicate name in catalog`);
+      return;
+    }
+
+    if (valid.some((v) => v.name.toLowerCase() === name.toLowerCase())) {
+      skipped.push(`Row ${lineIdx + 1} ("${name}"): duplicate name in batch`);
+      return;
+    }
+
+    const kind = (rawCat === "labor" || rawCat === "service") ? "labor" : "part";
+    valid.push({ name, kind, price, costPrice: cost });
+  });
+
+  catCsvParsed = { valid, skipped };
+
+  const prevEl = $("cat-csv-preview");
+  const btn = $("cat-csv-import-btn");
+
+  if (prevEl) {
+    if (!lines.length) {
+      prevEl.innerHTML = `<div style="color:var(--text-muted)">Paste CSV rows above to see live preview.</div>`;
+    } else {
+      let previewHtml = `<b>${valid.length} row${valid.length === 1 ? '' : 's'} ready</b>`;
+      if (skipped.length > 0) {
+        previewHtml += `, <span style="color:var(--danger, #DC2626)">${skipped.length} skipped</span>`;
+        previewHtml += `<div style="margin-top:6px;max-height:80px;overflow-y:auto;font-size:12px;color:var(--danger, #DC2626)">${skipped.map((s) => `• ${escHtml(s)}`).join("<br>")}</div>`;
+      }
+      prevEl.innerHTML = previewHtml;
+    }
+  }
+
+  if (btn) {
+    btn.disabled = valid.length === 0;
+  }
+}
+
+/**
+ * Imports valid rows into catalog and logs audit entry (Super Admin only).
+ */
+function importCatCsv() {
+  if (!isSuper()) return;
+  const { valid } = catCsvParsed;
+  if (!valid || !valid.length) return;
+
+  if (!Array.isArray(D.sv)) D.sv = [];
+  if (!Array.isArray(D.pt)) D.pt = [];
+
+  valid.forEach((item) => {
+    if (item.kind === "labor") {
+      D.sv.push({
+        id: uid(),
+        name: item.name,
+        labor: item.price,
+        parts: [],
+        costPrice: item.costPrice
+      });
+    } else {
+      D.pt.push({
+        id: uid(),
+        sku: "",
+        name: item.name,
+        cost: item.price,
+        costPrice: item.costPrice
+      });
+    }
+  });
+
+  logAudit("Catalog import", "", `${valid.length} items`);
+  save();
+  cm();
   if (view === "cat") {
     const wrap = $("cat-table-wrap");
     if (wrap) wrap.innerHTML = getCatTableHtml();
@@ -4395,8 +5944,15 @@ function renderInspModal(id) {
       <div><b>Customer:</b> ${c ? escHtml(c.name + (c.phone ? " (" + c.phone + ")" : "")) : "Walk-in Customer"}</div>
       <div><b>Odometer:</b> ${((o.odo !== undefined ? o.odo : b ? b.odo : 0) || 0).toLocaleString()} km</div>
       <div>
-        <b>Assigned Mechanic:</b> ${escHtml(o.mech || "Unassigned")}
-        ${isMech && isUnassigned ? `<button type="button" class="btn-take-job" style="margin-left:8px" onclick="takeJob('${o.id}')">Take this job</button>` : ""}
+        <b>Assigned Mechanic:</b>
+        ${!isMech ? `
+          <select style="height:32px;font-size:12px;padding:2px 6px;border-radius:6px;border:1px solid var(--border);margin-left:6px" onchange="setJobLeadMechanic('${o.id}', this.value)">
+            <option value="" ${isUnassigned ? "selected" : ""}>Unassigned</option>
+            ${loadUsers().filter(u => u.role === "mechanic" && u.active !== false).map(m => `
+              <option value="${escHtml(m.name)}" ${(!isUnassigned && o.mech && o.mech.trim().toLowerCase() === m.name.toLowerCase()) ? "selected" : ""}>${escHtml(m.name)}</option>
+            `).join("")}
+          </select>
+        ` : `${escHtml(o.mech || "Unassigned")} ${isUnassigned ? `<button type="button" class="btn-take-job" style="margin-left:8px" onclick="takeJob('${o.id}')">Take this job</button>` : ""}`}
         ${isAssignedToOther ? `<div style="font-size:12px;color:var(--text-muted);margin-top:2px;font-style:italic">Assigned to ${escHtml(o.mech)}</div>` : ""}
       </div>
       <div><b>Date In:</b> ${formatJobDate(o.at)}</div>
@@ -4427,7 +5983,7 @@ function renderInspModal(id) {
     const canBill = canOpen("bill");
     html += `
       <div class="card" style="padding:16px;text-align:center;margin-bottom:16px;background:var(--bg-surface-alt);border:1px solid var(--border)">
-        <div style="font-size:24px;margin-bottom:4px">📋</div>
+        <div style="display:flex;justify-content:center;margin-bottom:4px;color:var(--text-muted)">${ICONS.clipboard}</div>
         <h4 style="margin:0 0 4px">Vehicle Ready for Billing &amp; Pickup</h4>
         <p style="color:var(--text-muted);font-size:13px;margin:0 0 12px">All repairs finished. Vehicle awaiting settlement in Transactions &amp; Billing.</p>
         ${canBill
@@ -4457,7 +6013,12 @@ function renderInspModal(id) {
   html += `
     <div class="card" style="padding:16px;margin-bottom:16px;background:var(--bg-surface-alt);border:1px solid var(--border)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div style="font-weight:700;font-size:13px;color:var(--text-primary)">Inspection &amp; Diagnosis Results</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="font-weight:700;font-size:13px;color:var(--text-primary)">Inspection &amp; Diagnosis Results</div>
+          ${isSuper() && o.st !== "Completed" && o.st !== "Cancelled" ? `
+            <button type="button" class="btn g sm" style="min-height:28px;padding:2px 8px;font-size:11px" onclick="openEditDiagnosisModal('${o.id}')">Edit diagnosis</button>
+          ` : ""}
+        </div>
         <div style="display:flex;gap:6px">
           <span class="phys-count-pill ok">OK ${okCount}</span>
           ${watchCount > 0 ? `<span class="phys-count-pill watch">Watch ${watchCount}</span>` : ""}
@@ -4509,7 +6070,7 @@ function renderInspModal(id) {
               const label = c.part && !c.desc.startsWith(c.part) ? `${c.part}: ${c.desc}` : (c.desc || "");
               return `
                 <div style="font-size:13px;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap">
-                  <span style="display:inline-block;padding:2px 6px;border-radius:4px;background:#FEE2E2;color:#B91C1C;font-weight:700;font-size:11px">${escHtml(c.code)}</span>
+                  <span style="display:inline-block;padding:2px 6px;border-radius:4px;background:var(--danger-soft);color:var(--danger);border:1px solid var(--danger-border);font-weight:700;font-size:11px">${escHtml(c.code)}</span>
                   ${c.err ? `<span class="obd-err-code-pill" style="font-size:11px;padding:1px 6px">${escHtml(c.err)}</span>` : ""}
                   <span>${escHtml(label)}</span>
                 </div>
@@ -4545,13 +6106,245 @@ function renderInspModal(id) {
 
   // Footer Actions
   html += `
-    <div class="insp-footer" style="position:static;padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px">
+    <div class="insp-footer" style="position:static;padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap">
+      ${isSuper() && o.st !== "Completed" && o.st !== "Cancelled" ? `
+        <button type="button" class="btn sm btn-destructive" onclick="forceCancelJob('${o.id}')">Force-Cancel Repair</button>
+      ` : ""}
+      ${isSuper() && (o.st === "Completed" || o.st === "Cancelled" || o.reversed) ? `
+        <button type="button" class="btn g sm" onclick="reopenJob('${o.id}')">Reopen Job</button>
+      ` : ""}
       <button type="button" class="btn g" onclick="closeInspModal()">Close</button>
-      ${isDone ? `<button type="button" class="btn" onclick="openReceipt('${o.id}')">🖨️ View Digital Receipt</button>` : ""}
+      ${isDone ? `<button type="button" class="btn" onclick="openReceipt('${o.id}')"><span style="display:inline-flex;align-items:center;margin-right:6px">${ICONS.print}</span>View Digital Receipt</button>` : ""}
     </div>
   `;
 
   md.innerHTML = html;
+}
+
+/**
+ * Sets the lead mechanic for a work order immediately (Admin & Super Admin).
+ * @param {string} woId - Work order ID.
+ * @param {string} newMech - Selected mechanic name or empty for Unassigned.
+ */
+function setJobLeadMechanic(woId, newMech) {
+  const o = g("wo", woId);
+  if (!o) return;
+  const oldMech = o.mech || "Unassigned";
+  o.mech = newMech || "Unassigned";
+  logAudit("Assign mechanic", o.id, `${oldMech} -> ${o.mech}`);
+  save();
+  renderInspModal(o.id);
+  if (view === "rep") renderRepResults();
+  if (view === "dash") $("main").innerHTML = R.dash();
+}
+
+/**
+ * Opens Edit Diagnosis modal for Super Admin to edit findings, fix items, and OBD codes.
+ * @param {string} woId - Work order ID.
+ */
+function openEditDiagnosisModal(woId) {
+  if (!isSuper()) return;
+  const o = g("wo", woId);
+  if (!o) return;
+
+  const insp = o.inspection || {};
+  const inspItems = insp.items || {};
+  const obdCodes = (insp.obd && Array.isArray(insp.obd.codes)) ? insp.obd.codes : [];
+
+  const fixItems = [];
+  INSPECTION_CHECKLIST.forEach((cat) => {
+    cat.items.forEach((item) => {
+      const stateObj = inspItems[`${cat.key}.${item.key}`];
+      if (stateObj && stateObj.s === "fix") {
+        fixItems.push({
+          key: `${cat.key}.${item.key}`,
+          catName: cat.name,
+          label: item.label,
+          note: stateObj.note || ""
+        });
+      }
+    });
+  });
+
+  M(`
+    <h2>Edit Diagnosis — Job #${o.id}</h2>
+    <div style="margin-bottom:14px">
+      <label for="edit-diag-findings" style="font-size:12px;font-weight:700;display:block;margin-bottom:4px">Findings &amp; Diagnosis Verification</label>
+      <textarea id="edit-diag-findings" rows="3" style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:6px;padding:8px;font-size:13px">${escHtml(o.findings || "")}</textarea>
+    </div>
+
+    <div style="margin-bottom:14px">
+      <div style="font-size:12px;font-weight:700;margin-bottom:6px">Fix Items:</div>
+      ${!fixItems.length ? `<div style="font-size:12px;color:var(--text-muted);font-style:italic">No Fix items recorded.</div>` : `
+        <div style="display:flex;flex-direction:column;gap:8px;max-height:160px;overflow-y:auto">
+          ${fixItems.map((fi) => {
+            const safeKey = fi.key.replace(/\./g, "_");
+            return `
+              <div style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-surface-alt, #F8FAFC);display:flex;flex-direction:column;gap:4px">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <span style="font-size:12px;font-weight:700">${escHtml(fi.label)} <small style="color:var(--text-muted)">(${escHtml(fi.catName)})</small></span>
+                  <label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer">
+                    <input type="checkbox" id="fix-toggle-${safeKey}" />
+                    <span>Toggle to OK</span>
+                  </label>
+                </div>
+                <input id="fix-note-${safeKey}" type="text" placeholder="Note" value="${escHtml(fi.note)}" style="height:30px;font-size:12px;padding:0 6px;border:1px solid var(--border);border-radius:4px" />
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `}
+    </div>
+
+    <div style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;margin-bottom:6px">ECU / OBD Codes:</div>
+      ${!obdCodes.length ? `<div style="font-size:12px;color:var(--text-muted);font-style:italic">No OBD trouble codes logged.</div>` : `
+        <div id="edit-obd-codes-wrap" style="display:flex;flex-direction:column;gap:6px;max-height:140px;overflow-y:auto">
+          ${obdCodes.map((code, idx) => `
+            <div id="edit-obd-row-${idx}" data-idx="${idx}" class="edit-obd-entry" style="display:flex;align-items:center;justify-content:space-between;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-surface-alt, #F8FAFC);font-size:12px">
+              <div>
+                <b style="color:var(--danger, #DC2626)">${escHtml(code.code)}</b> ${escHtml(code.part ? code.part + ': ' : '')}${escHtml(code.desc || '')}
+              </div>
+              <button type="button" class="btn sm" style="padding:1px 6px;min-height:24px;color:var(--danger, #DC2626);background:#fff;border:1px solid var(--border)" onclick="document.getElementById('edit-obd-row-${idx}').remove()" title="Remove code">✕</button>
+            </div>
+          `).join("")}
+        </div>
+      `}
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button type="button" class="btn g" onclick="cm()">Cancel</button>
+      <button type="button" class="btn" onclick="saveEditDiagnosis('${o.id}')">Save Changes</button>
+    </div>
+  `);
+}
+
+/**
+ * Saves diagnosis edits with required audit reason (Super Admin only).
+ * @param {string} woId - Work order ID.
+ */
+function saveEditDiagnosis(woId) {
+  if (!isSuper()) return;
+  const o = g("wo", woId);
+  if (!o) return;
+
+  const newFindings = $("edit-diag-findings") ? $("edit-diag-findings").value : (o.findings || "");
+
+  // Snapshot toggle and note state before closing modal
+  const toggledKeys = [];
+  const updatedNotes = {};
+  if (o.inspection && o.inspection.items) {
+    INSPECTION_CHECKLIST.forEach((cat) => {
+      cat.items.forEach((item) => {
+        const key = `${cat.key}.${item.key}`;
+        const safeKey = key.replace(/\./g, "_");
+        const toggleEl = $(`fix-toggle-${safeKey}`);
+        const noteEl = $(`fix-note-${safeKey}`);
+        if (toggleEl && toggleEl.checked) toggledKeys.push(key);
+        if (noteEl) updatedNotes[key] = noteEl.value.trim();
+      });
+    });
+  }
+
+  // Snapshot remaining OBD codes
+  let remainingCodes = null;
+  const wrap = $("edit-obd-codes-wrap");
+  if (wrap && o.inspection && o.inspection.obd && Array.isArray(o.inspection.obd.codes)) {
+    remainingCodes = [];
+    const entries = wrap.querySelectorAll(".edit-obd-entry");
+    entries.forEach((el) => {
+      const idx = parseInt(el.getAttribute("data-idx"), 10);
+      if (!isNaN(idx) && o.inspection.obd.codes[idx]) {
+        remainingCodes.push(o.inspection.obd.codes[idx]);
+      }
+    });
+  }
+
+  cm();
+  askReason(`Edit Diagnosis for Job #${o.id}`, "Save Diagnosis", (reason) => {
+    o.findings = newFindings;
+
+    if (o.inspection && o.inspection.items) {
+      toggledKeys.forEach((k) => {
+        delete o.inspection.items[k];
+      });
+      Object.keys(updatedNotes).forEach((k) => {
+        if (o.inspection.items[k]) {
+          o.inspection.items[k].note = updatedNotes[k];
+        }
+      });
+    }
+
+    if (remainingCodes !== null && o.inspection && o.inspection.obd) {
+      o.inspection.obd.codes = remainingCodes;
+    }
+
+    logAudit("Edit diagnosis", o.id, reason);
+    save();
+    renderInspModal(o.id);
+  }, { destructive: false });
+}
+
+/**
+ * Force-cancels an active repair work order with required reason (Super Admin only).
+ * @param {string} woId - Work order ID.
+ */
+function forceCancelJob(woId) {
+  if (!isSuper()) return;
+  const o = g("wo", woId);
+  if (!o) return;
+  askReason(`Force-Cancel Repair #${o.id}`, "Force-Cancel", (reason) => {
+    o.st = "Cancelled";
+    const u = getCurrentUser();
+    o.cancel = {
+      reason,
+      at: nowLocalTimestamp(),
+      by: u ? u.name : "Super Admin"
+    };
+    logAudit("Force-cancel repair", o.id, reason);
+    save();
+    closeInspModal();
+    if (view === "rep") {
+      repFilter = "Cancelled";
+      renderRepChips();
+      renderRepResults();
+    } else {
+      go(view);
+    }
+  });
+}
+
+/**
+ * Reopens a Completed or Cancelled repair work order with required reason (Super Admin only).
+ * Completed -> "In Progress", previous payment saved to wo.prevPay, wo.pay and wo.done cleared.
+ * Cancelled -> "Awaiting Parts/Approval", wo.cancel cleared.
+ * @param {string} woId - Work order ID.
+ */
+function reopenJob(woId) {
+  if (!isSuper()) return;
+  const o = g("wo", woId);
+  if (!o) return;
+
+  askReason(`Reopen Job #${o.id}`, "Reopen Job", (reason) => {
+    if (o.st === "Completed" || o.reversed) {
+      o.st = "In Progress";
+      if (o.pay) {
+        o.prevPay = { ...o.pay };
+      }
+      delete o.pay;
+      delete o.done;
+      delete o.reversed;
+    } else if (o.st === "Cancelled" || o.cancel) {
+      o.st = "Awaiting Parts/Approval";
+      delete o.cancel;
+    }
+
+    logAudit("Reopen job", o.id, reason);
+    save();
+    closeInspModal();
+    closeRecord();
+    go(view);
+  }, { destructive: false });
 }
 
 /**
@@ -4634,7 +6427,7 @@ function getInspStep1Html() {
         <!-- Returning Vehicle Summary Badge Card -->
         <div class="row" style="margin-bottom:16px;gap:16px;align-items:flex-end">
           <div class="vehicle-summary-badge" style="flex:1">
-            <div style="font-size:28px;margin-right:12px;line-height:1">🏍️</div>
+            <div style="display:flex;align-items:center;margin-right:12px;line-height:1;color:var(--accent)">${ICONS.bike}</div>
             <div style="flex:1;min-width:0">
               <div style="font-size:15px;font-weight:700;color:var(--text-primary);line-height:1.3">
                 ${escHtml([inspDraft.make, inspDraft.model].filter(Boolean).join(" "))}${inspDraft.plate ? ` • ${escHtml(inspDraft.plate)}` : ""}${inspDraft.year ? ` • ${inspDraft.year}` : ""}
@@ -4766,8 +6559,10 @@ function onIntakeSearch(val) {
   }
 
   const matches = [];
-  D.bk.forEach((b) => {
+  (Array.isArray(D.bk) ? D.bk : []).forEach((b) => {
+    if (b.archived) return;
     const c = own(b);
+    if (c && c.archived) return;
     const plate = (b.plate || "").toLowerCase();
     const phone = c && c.phone ? c.phone.toLowerCase() : "";
     const name = c && c.name ? c.name.toLowerCase() : "";
@@ -5143,27 +6938,27 @@ function getMotorcycleMapSvgHtml() {
       <circle cx="290" cy="140" r="24" stroke="#64748B" stroke-width="3" stroke-dasharray="4 2" fill="none" />
       <rect x="298" y="125" width="10" height="18" rx="3" fill="#DC2626" />
       <path d="M70 140 L135 130" stroke="#64748B" stroke-width="6" stroke-linecap="round" />
-      <path d="M100 135 L135 88" stroke="#D97706" stroke-width="5" stroke-linecap="round" />
-      <path d="M108 123 L127 98" stroke="#F59E0B" stroke-width="7" stroke-dasharray="3 4" stroke-linecap="round" />
-      <path d="M70 140 L150 142" stroke="#475569" stroke-width="3" stroke-dasharray="5 3" />
+      <path d="M100 135 L135 88" stroke="#64748B" stroke-width="5" stroke-linecap="round" />
+      <path d="M108 123 L127 98" stroke="#94A3B8" stroke-width="7" stroke-dasharray="3 4" stroke-linecap="round" />
+      <path d="M70 140 L150 142" stroke="#64748B" stroke-width="3" stroke-dasharray="5 3" />
       <circle cx="150" cy="142" r="10" fill="#64748B" />
-      <path d="M165 140 Q150 162 110 160 L50 148" stroke="#475569" stroke-width="6" stroke-linecap="round" />
-      <path d="M85 155 L45 147" stroke="#334155" stroke-width="10" stroke-linecap="round" />
+      <path d="M165 140 Q150 162 110 160 L50 148" stroke="#64748B" stroke-width="6" stroke-linecap="round" />
+      <path d="M85 155 L45 147" stroke="#0F172A" stroke-width="10" stroke-linecap="round" />
       <rect x="140" y="105" width="62" height="45" rx="10" fill="#E2E8F0" stroke="#94A3B8" stroke-width="3" />
       <line x1="148" y1="116" x2="194" y2="116" stroke="#94A3B8" stroke-width="2" />
       <line x1="148" y1="124" x2="194" y2="124" stroke="#94A3B8" stroke-width="2" />
       <line x1="152" y1="132" x2="190" y2="132" stroke="#94A3B8" stroke-width="2" />
       <circle cx="178" cy="132" r="8" fill="#CBD5E1" stroke="#94A3B8" stroke-width="2" />
-      <path d="M135 130 L160 85 L242 54" stroke="#475569" stroke-width="6" stroke-linecap="round" />
-      <path d="M160 85 L140 105" stroke="#475569" stroke-width="5" stroke-linecap="round" />
-      <path d="M202 105 L242 54" stroke="#475569" stroke-width="5" stroke-linecap="round" />
+      <path d="M135 130 L160 85 L242 54" stroke="#64748B" stroke-width="6" stroke-linecap="round" />
+      <path d="M160 85 L140 105" stroke="#64748B" stroke-width="5" stroke-linecap="round" />
+      <path d="M202 105 L242 54" stroke="#64748B" stroke-width="5" stroke-linecap="round" />
       <path d="M290 140 L242 54" stroke="#64748B" stroke-width="6" stroke-linecap="round" />
       <path d="M285 140 L238 54" stroke="#CBD5E1" stroke-width="3" stroke-linecap="round" />
-      <path d="M242 54 L236 36" stroke="#334155" stroke-width="4" stroke-linecap="round" />
-      <line x1="228" y1="36" x2="246" y2="38" stroke="#1E293B" stroke-width="5" stroke-linecap="round" />
-      <path d="M246 54 L258 56 L254 68 Z" fill="#FBBF24" stroke="#D97706" stroke-width="2" />
+      <path d="M242 54 L236 36" stroke="#0F172A" stroke-width="4" stroke-linecap="round" />
+      <line x1="228" y1="36" x2="246" y2="38" stroke="#0F172A" stroke-width="5" stroke-linecap="round" />
+      <path d="M246 54 L258 56 L254 68 Z" fill="#E2E8F0" stroke="#64748B" stroke-width="2" />
       <path d="M180 58 C195 44, 230 46, 240 56 C232 72, 195 76, 180 72 Z" fill="#E2E8F0" stroke="#94A3B8" stroke-width="3" />
-      <path d="M115 76 C135 70, 165 70, 182 72 C180 82, 130 84, 115 76 Z" fill="#334155" stroke="#1E293B" stroke-width="2" />
+      <path d="M115 76 C135 70, 165 70, 182 72 C180 82, 130 84, 115 76 Z" fill="#0F172A" stroke="#0F172A" stroke-width="2" />
       <path d="M115 76 L75 92 C65 106, 60 115, 58 122" stroke="#94A3B8" stroke-width="4" stroke-linecap="round" />
       <rect x="70" y="88" width="6" height="8" rx="2" fill="#DC2626" />
     </svg>
@@ -5350,7 +7145,7 @@ function getZonePanelHtml(zoneKey) {
 
     ${complaints.length > 0 ? `
       <div class="zone-complaint-alert">
-        <span>⚠️</span>
+        <span style="display:inline-flex;align-items:center;color:var(--danger)">${ICONS.alert}</span>
         <span>Customer reported: <b>${escHtml(complaints.join(", "))}</b></span>
       </div>
     ` : ""}
@@ -5543,7 +7338,7 @@ function getInspStep2Html() {
 
             <!-- Compact Run Scan button -->
             <button type="button" class="btn-elm-scan-compact" id="btn-run-ecu-scan" onclick="runEcuScan()">
-              🖲️ Run ECU/OBD Scan
+              <span style="display:inline-flex;align-items:center;margin-right:6px">${ICONS.cpu}</span>Run ECU/OBD Scan
             </button>
 
             <!-- Scan Results Area -->
@@ -6009,7 +7804,7 @@ function runEcuScan() {
     isObdScanning = false;
     const b = $("btn-run-ecu-scan");
     if (b) {
-      b.innerHTML = `🖲️ Run ECU/OBD Scan`;
+      b.innerHTML = `<span style="display:inline-flex;align-items:center;margin-right:6px">${ICONS.cpu}</span>Run ECU/OBD Scan`;
     }
     obdScanResults = pickRandomEcuSamples(4);
     renderObdScanResultsArea();
@@ -7426,7 +9221,6 @@ function getJobCardStageControlHtml(o) {
         <button
           type="button"
           class="btn sm"
-          style="background:#047857;color:#fff"
           onclick="closeInspModal(); go('bill');"
         >
           Go to Transactions &amp; Billing →
@@ -8610,12 +10404,13 @@ function matchesBillSearch(o, q) {
   const b = bike(o.bid);
   const c = b ? own(b) : null;
   const plate = b && b.plate ? b.plate.toLowerCase() : "";
-  const name = c && c.name ? c.name.toLowerCase() : "";
+  const name = c && c.name ? c.name.toLowerCase() : (o.customer ? o.customer.toLowerCase() : "");
   const phone = c && c.phone ? c.phone.toLowerCase() : "";
   const txnId = getTxnId(o).toLowerCase();
-  const jo = getJobNumber(o).toLowerCase();
+  const jo = (o.type === "QUICK LABOR") ? "" : getJobNumber(o).toLowerCase();
   const wid = o.id ? o.id.toLowerCase() : "";
-  const model = b ? `${b.make || ""} ${b.model || ""}`.toLowerCase() : "";
+  const model = b ? `${b.make || ""} ${b.model || ""}`.toLowerCase() : (o.vehicleLine ? o.vehicleLine.toLowerCase() : "");
+  const mech = o.mech ? o.mech.toLowerCase() : "";
 
   return (
     plate.includes(q) ||
@@ -8624,13 +10419,14 @@ function matchesBillSearch(o, q) {
     txnId.includes(q) ||
     jo.includes(q) ||
     wid.includes(q) ||
-    model.includes(q)
+    model.includes(q) ||
+    mech.includes(q)
   );
 }
 
 /**
  * Filters all work orders for Transactions & Billing based on active filter and search text.
- * @param {string} [filter=billFilter] - "all", "advances", "settlement", "completed".
+ * @param {string} [filter=billFilter] - "all", "adv", "final", "done" (also accepts legacy "advances", "settlement", "completed").
  * @returns {Array<Object>} Filtered list of work orders.
  */
 function getFilteredBillOrders(filter = billFilter) {
@@ -8638,11 +10434,11 @@ function getFilteredBillOrders(filter = billFilter) {
   return D.wo.filter((o) => {
     if (filter === "all") {
       if (o.st === "Completed") return false;
-    } else if (filter === "advances") {
+    } else if (filter === "adv" || filter === "advances") {
       if (o.st === "Completed" || o.st === "Ready for Pickup") return false;
-    } else if (filter === "settlement") {
+    } else if (filter === "final" || filter === "settlement") {
       if (o.st !== "Ready for Pickup") return false;
-    } else if (filter === "completed") {
+    } else if (filter === "done" || filter === "completed") {
       if (o.st !== "Completed") return false;
     }
 
@@ -8668,7 +10464,7 @@ function getBillViewHtml() {
 
     <!-- Live Search Toolbar -->
     <div class="rep-search-wrap">
-      <span class="search-icon" onclick="$('bill-search-input').focus()" title="Search">🔍</span>
+      <span class="search-icon" onclick="$('bill-search-input').focus()" title="Search">${LINE_ICONS.insp}</span>
       <input
         id="bill-search-input"
         type="text"
@@ -8688,7 +10484,7 @@ function getBillViewHtml() {
     </div>
 
     <!-- Filter Chips with Dynamic Counts -->
-    <div id="bill-chips" class="rep-chips">${getBillChipsHtml()}</div>
+    <div id="bill-chips" class="bill-chips">${getBillChipsHtml()}</div>
 
     <!-- Transactions Table Container -->
     <div id="bill-results" class="card">${getBillResultsHtml()}</div>
@@ -8735,9 +10531,13 @@ function clearBillSearch() {
 
 /**
  * Sets active filter chip tab in Transactions & Billing.
- * @param {string} f - Filter key.
+ * Updates the chip row (including counts) and the results container, but never the search input.
+ * @param {string} f - Filter key ("all" | "adv" | "final" | "done").
  */
 function setBillFilter(f) {
+  if (f === "advances") f = "adv";
+  if (f === "settlement") f = "final";
+  if (f === "completed") f = "done";
   billFilter = f;
   const chipsEl = $("bill-chips");
   if (chipsEl) chipsEl.innerHTML = getBillChipsHtml();
@@ -8758,24 +10558,29 @@ function refreshBillView() {
 }
 
 /**
- * Builds HTML for Transactions & Billing filter chips with dynamic counts.
+ * Builds HTML for Transactions & Billing filter chips with dynamic counts and distinct color styling.
  * @returns {string} HTML string.
  */
 function getBillChipsHtml() {
   const chips = [
-    { key: "all", label: "All Active", cls: "chip-all" },
-    { key: "advances", label: "Pending Advances", cls: "chip-adv" },
-    { key: "settlement", label: "Pending Final Settlement", cls: "chip-ready" },
-    { key: "completed", label: "Completed Transactions", cls: "chip-completed" }
+    { key: "all", label: "All Active", modifier: "all" },
+    { key: "adv", label: "Pending Advances", modifier: "adv" },
+    { key: "final", label: "Pending Final Settlement", modifier: "final" },
+    { key: "done", label: "Completed Transactions", modifier: "done" }
   ];
 
   return chips
     .map((c) => {
-      const isSelected = billFilter === c.key;
+      const isSelected = billFilter === c.key ||
+        (c.key === "adv" && billFilter === "advances") ||
+        (c.key === "final" && billFilter === "settlement") ||
+        (c.key === "done" && billFilter === "completed");
       const count = getFilteredBillOrders(c.key).length;
-      return `<button type="button" class="chip ${c.cls} ${
-        isSelected ? "on" : ""
-      }" onclick="setBillFilter('${c.key}')">${c.label} (${count})</button>`;
+      return `<button type="button" id="bill-chip-${c.modifier}" class="bill-chip bill-chip--${c.modifier}${
+        isSelected ? " is-selected" : ""
+      }" aria-pressed="${isSelected ? "true" : "false"}" onclick="setBillFilter('${c.key}')">${
+        isSelected ? '<span class="bill-chip-check" aria-hidden="true">✓ </span>' : ""
+      }${c.label} <span class="bill-chip-count">(${count})</span></button>`;
     })
     .join("");
 }
@@ -8835,23 +10640,30 @@ function getBillResultsHtml() {
                 actionsHtml = `<button type="button" class="btn sm btn-adv-pay" onclick="openAdvanceModal('${o.id}')">+ Advance Payment</button>`;
               }
 
+              const isQuickLabor = o.type === "QUICK LABOR";
+              const typeBadge = isQuickLabor ? "QUICK LABOR" : "REPAIR SERVICE";
+              const typeClass = isQuickLabor ? "badge-txn-type ql" : "badge-txn-type";
+              const dateLine = isQuickLabor
+                ? formatJobDate(o.done || o.at)
+                : `${jo} · ${formatJobDate(o.done || o.at)}`;
+
               return `
                 <tr>
                   <td>
                     <b>${txnId}</b>
-                    <br><span class="badge-txn-type">REPAIR SERVICE</span>
-                    <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${jo} · ${formatJobDate(o.done || o.at)}</div>
+                    <br><span class="${typeClass}">${typeBadge}</span>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${dateLine}</div>
                   </td>
                   <td>
-                    <b>${c ? escHtml(c.name) : "Walk-in Customer"}</b>
+                    <b>${c ? escHtml(c.name) : (o.customer ? escHtml(o.customer) : "Walk-in Customer")}</b>
                     <div style="font-size:12px;color:var(--text-secondary)">${c && c.phone ? escHtml(c.phone) : "—"}</div>
-                    <div style="font-size:12px;font-weight:600;margin-top:2px">${b ? escHtml(b.plate) : "NO PLATE"} · ${b ? escHtml(b.make + " " + b.model) : "Unknown"}</div>
-                    <div style="font-size:11px;color:var(--text-muted)">${((o.odo !== undefined ? o.odo : b ? b.odo : 0) || 0).toLocaleString()} km · Assigned: ${escHtml(o.mech || "Unassigned")}</div>
+                    <div style="font-size:12px;font-weight:600;margin-top:2px">${b ? escHtml(b.plate) : (o.vehicleLine ? escHtml(o.vehicleLine) : "Walk-in Motorcycle")}${b ? ` · ${escHtml(b.make + " " + b.model)}` : ""}</div>
+                    <div style="font-size:11px;color:var(--text-muted)">${o.odo !== undefined ? `${o.odo.toLocaleString()} km · ` : b && b.odo ? `${b.odo.toLocaleString()} km · ` : ""}Assigned: ${escHtml(o.mech || "Unassigned")}</div>
                   </td>
                   <td>
                     <div style="font-weight:700;font-size:14px">${P(brk.total)} <span style="font-size:11px;font-weight:500;color:var(--text-muted)">${totalLabel}</span></div>
-                    ${advances > 0 ? `<div style="font-size:11px;color:#047857">Advances: ${P(advances)}</div>` : ""}
-                    ${o.st !== "Completed" ? `<div style="font-size:12px;font-weight:700;color:${balanceDue > 0 ? "var(--text-primary)" : "#047857"};margin-top:2px">Due: ${P(balanceDue)}</div>` : ""}
+                    ${advances > 0 ? `<div style="font-size:11px;color:var(--success)">Advances: ${P(advances)}</div>` : ""}
+                    ${o.st !== "Completed" ? `<div style="font-size:12px;font-weight:700;color:${balanceDue > 0 ? "var(--text)" : "var(--success)"};margin-top:2px">Due: ${P(balanceDue)}</div>` : ""}
                   </td>
                   <td>
                     ${payStatus.pillHtml}
@@ -8947,7 +10759,7 @@ function renderAdvanceModalContent(o) {
       <div style="background:var(--bg-surface-alt);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div><b>Customer:</b> ${c ? escHtml(c.name) : "Walk-in Customer"}</div>
         <div><b>Estimate Total:</b> ${P(brk.total)}</div>
-        <div><b>Previous Advances:</b> <span style="color:#047857;font-weight:700">${P(advancesTotal)}</span></div>
+        <div><b>Previous Advances:</b> <span style="color:var(--success);font-weight:700">${P(advancesTotal)}</span></div>
         <div><b>Remaining Balance:</b> <span style="font-weight:700">${P(remaining)}</span></div>
       </div>
 
@@ -9184,7 +10996,7 @@ function renderSettleBalanceModalContent(o) {
 
         <!-- Advances Section -->
         <div style="margin-top:12px;padding:10px;border-radius:8px;background:#F8FAFC;border:1px solid var(--border)">
-          <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#047857">
+          <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--success)">
             <span>Previous Advance Payments</span>
             <span id="settle-adv-total">-${P(advancesTotal)}</span>
           </div>
@@ -9218,7 +11030,7 @@ function renderSettleBalanceModalContent(o) {
                 <button
                   type="button"
                   class="btn g sm"
-                  style="flex:1;${method === m ? "background:#2563EB;color:#FFFFFF;border-color:#2563EB;font-weight:700" : ""}"
+                  style="flex:1;${method === m ? "background:var(--accent);color:#FFFFFF;border-color:var(--accent);font-weight:700" : ""}"
                   onclick="setSettlePaymentMethod('${o.id}', '${m}')"
                 >${m}</button>
               `
@@ -9241,11 +11053,11 @@ function renderSettleBalanceModalContent(o) {
           </div>
 
           <!-- Live Change / Short Status -->
-          <div id="settle-change-display" style="padding:12px;border-radius:8px;background:${isSufficient ? "#F0FDF4" : "#FEF2F2"};border:1px solid ${isSufficient ? "#BBF7D0" : "#FECACA"};margin-top:12px">
+          <div id="settle-change-display" style="padding:12px;border-radius:8px;background:${isSufficient ? "var(--success-soft)" : "var(--danger-soft)"};border:1px solid ${isSufficient ? "var(--success-border)" : "var(--danger-border)"};margin-top:12px">
             ${
               isSufficient
-                ? `<div style="color:#166534;font-size:14px;font-weight:700">Change: <b>${P(diff)}</b></div>`
-                : `<div style="color:#DC2626;font-size:14px;font-weight:700">Short by ${P(Math.abs(diff))}</div>`
+                ? `<div style="color:var(--success);font-size:14px;font-weight:700">Change: <b>${P(diff)}</b></div>`
+                : `<div style="color:var(--danger);font-size:14px;font-weight:700">Short by ${P(Math.abs(diff))}</div>`
             }
           </div>
         </div>
@@ -9257,7 +11069,7 @@ function renderSettleBalanceModalContent(o) {
             onclick="openReceipt('${o.id}')"
             style="width:100%;text-align:center;box-sizing:border-box"
           >
-            🖨️ Print / View Digital Receipt
+            <span style="display:inline-flex;align-items:center;margin-right:6px">${ICONS.print}</span>Print / View Digital Receipt
           </button>
         </div>
       </div>
@@ -9356,11 +11168,11 @@ function updateSettleTenderedCalc(balanceDue, tendered) {
   const isSufficient = tendered >= balanceDue;
 
   if (displayEl) {
-    displayEl.style.background = isSufficient ? "#F0FDF4" : "#FEF2F2";
-    displayEl.style.borderColor = isSufficient ? "#BBF7D0" : "#FECACA";
+    displayEl.style.background = isSufficient ? "var(--success-soft)" : "var(--danger-soft)";
+    displayEl.style.borderColor = isSufficient ? "var(--success-border)" : "var(--danger-border)";
     displayEl.innerHTML = isSufficient
-      ? `<div style="color:#166534;font-size:14px;font-weight:700">Change: <b>${P(diff)}</b></div>`
-      : `<div style="color:#DC2626;font-size:14px;font-weight:700">Short by ${P(Math.abs(diff))}</div>`;
+      ? `<div style="color:var(--success);font-size:14px;font-weight:700">Change: <b>${P(diff)}</b></div>`
+      : `<div style="color:var(--danger);font-size:14px;font-weight:700">Short by ${P(Math.abs(diff))}</div>`;
   }
 
   if (helperEl) {
@@ -9468,25 +11280,32 @@ function openReceipt(woId) {
   if (!md) return;
 
   md.innerHTML = `
+    ${o.reversed ? `
+      <div style="background:#FEF2F2;border:2px solid #EF4444;border-radius:8px;padding:12px;margin-bottom:16px;text-align:center">
+        <div style="color:#DC2626;font-size:16px;font-weight:900;letter-spacing:0.08em;margin-bottom:4px">*** REVERSED ***</div>
+        <div style="font-size:12px;color:#991B1B"><b>Reason:</b> ${escHtml(o.reversed.reason || "Transaction reversed")}</div>
+        <div style="font-size:11px;color:#7F1D1D;margin-top:2px">${escHtml(o.reversed.at)} · by ${escHtml(o.reversed.by || "Super Admin")}</div>
+      </div>
+    ` : ""}
     <div style="text-align:center;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:16px">
-      <div style="font-size:28px">🏍️</div>
-      <h2 style="margin:4px 0 2px;font-size:22px;color:#0F172A">MotoShop</h2>
+      <div style="display:flex;justify-content:center;margin-bottom:4px;color:var(--text)">${ICONS.bike}</div>
+      <h2 style="margin:4px 0 2px;font-size:22px;color:var(--text)">MotoShop</h2>
       <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em">Official Repair &amp; Service Receipt</div>
-      <div style="font-size:13px;font-weight:700;color:var(--primary);margin-top:6px">${jo}</div>
+      <div style="font-size:13px;font-weight:700;color:var(--accent);margin-top:6px">${o.type === "QUICK LABOR" ? getTxnId(o) : jo}</div>
       <div style="font-size:11px;color:var(--text-muted)">${formatJobDate(pay.paidAt || today())} · ${formatJobTime(pay.paidAt || "")}</div>
     </div>
 
     <!-- Vehicle & Customer Meta -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;font-size:12px;background:#F8FAFC;padding:12px;border-radius:8px;border:1px solid var(--border)">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;font-size:12px;background:var(--bg-subtle);padding:12px;border-radius:8px;border:1px solid var(--border)">
       <div>
         <div style="color:var(--text-muted);font-weight:600">CUSTOMER</div>
-        <div style="font-weight:700;color:var(--text-primary)">${c ? escHtml(c.name) : "—"}</div>
-        <div style="color:var(--text-secondary)">${c ? escHtml(c.phone) : ""}</div>
+        <div style="font-weight:700;color:var(--text-primary)">${c ? escHtml(c.name) : (o.customer ? escHtml(o.customer) : "Walk-in Customer")}</div>
+        <div style="color:var(--text-secondary)">${c ? escHtml(c.phone) : "—"}</div>
       </div>
       <div>
         <div style="color:var(--text-muted);font-weight:600">MOTORCYCLE</div>
-        <div style="font-weight:700;color:var(--text-primary)">${b ? escHtml(b.plate) : "—"}</div>
-        <div style="color:var(--text-secondary)">${b ? escHtml(b.make + " " + b.model) : ""} · ${(o.odo || (b ? b.odo : 0) || 0).toLocaleString()} km</div>
+        <div style="font-weight:700;color:var(--text-primary)">${b ? escHtml(b.plate) : (o.vehicleLine ? escHtml(o.vehicleLine) : "Walk-in Motorcycle")}</div>
+        <div style="color:var(--text-secondary)">${b ? `${escHtml(b.make + " " + b.model)} · ${(o.odo || b.odo || 0).toLocaleString()} km` : ""}</div>
       </div>
       <div>
         <div style="color:var(--text-muted);font-weight:600">MECHANIC</div>
@@ -9530,7 +11349,7 @@ function openReceipt(woId) {
       </div>
       ${
         brk.discount
-          ? `<div style="display:flex;justify-content:space-between;color:#059669">
+          ? `<div style="display:flex;justify-content:space-between;color:var(--success)">
               <span>Discount</span>
               <span>-${P(brk.discount)}</span>
             </div>`
@@ -9538,11 +11357,11 @@ function openReceipt(woId) {
       }
       <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:800;border-top:1px solid var(--border);padding-top:6px;margin-top:4px">
         <span>Total Paid</span>
-        <span>${P(brk.total)}</span>
+        <span>${o.reversed ? `<span class="text-struck">${P(brk.total)}</span>` : P(brk.total)}</span>
       </div>
     </div>
 
-    <div style="background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:14px;font-size:12px">
+    <div style="background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:14px;font-size:12px">
       <div style="display:flex;justify-content:space-between">
         <span>Payment Method:</span>
         <b>${escHtml(pay.method || "Cash")}</b>
@@ -9563,7 +11382,7 @@ function openReceipt(woId) {
 
     <div class="rcpt-no-print" style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px;border-top:1px solid var(--border);padding-top:14px">
       <button type="button" class="btn g" onclick="closeReceipt()">Close</button>
-      <button type="button" class="btn" onclick="window.print()">🖨️ Print Receipt</button>
+      <button type="button" class="btn" onclick="window.print()"><span style="display:inline-flex;align-items:center;margin-right:6px">${ICONS.print}</span>Print Receipt</button>
     </div>
   `;
 
@@ -9672,12 +11491,12 @@ function getFilteredUsers() {
  */
 function getUserRoleBadge(role) {
   if (role === "superadmin") {
-    return `<span class="um-role-badge superadmin">🛡️ SUPER ADMIN</span>`;
+    return `<span class="um-role-badge superadmin"><span style="display:inline-flex;align-items:center">${LINE_ICONS.users}</span> SUPER ADMIN</span>`;
   }
   if (role === "admin") {
-    return `<span class="um-role-badge admin">👑 ADMIN</span>`;
+    return `<span class="um-role-badge admin"><span style="display:inline-flex;align-items:center">${ICONS.crown}</span> ADMIN</span>`;
   }
-  return `<span class="um-role-badge mechanic">🔧 MECHANIC</span>`;
+  return `<span class="um-role-badge mechanic"><span style="display:inline-flex;align-items:center">${LINE_ICONS.rep}</span> MECHANIC</span>`;
 }
 
 /**
@@ -9775,8 +11594,8 @@ function getUserTableRowsHtml() {
           ${canToggleStatus ? `
             <button type="button" class="um-action-btn" onclick="toggleUserActive('${u.id}')" title="${isActive ? "Deactivate user" : "Reactivate user"}" aria-label="${isActive ? "Deactivate user" : "Reactivate user"}">
               ${isActive
-                ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="22" y1="11" x2="16" y2="11"></line></svg>`
-                : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#047857" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><polyline points="16 11 18 13 22 9"></polyline></svg>`
+                ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="22" y1="11" x2="16" y2="11"></line></svg>`
+                : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><polyline points="16 11 18 13 22 9"></polyline></svg>`
               }
             </button>
           ` : ""}
@@ -9871,7 +11690,7 @@ function renderUserModal() {
     </div>
 
     <div style="padding:20px;display:flex;flex-direction:column;gap:14px">
-      <div id="user-form-error" style="display:none;color:#DC2626;font-size:13px;background:#FEE2E2;border:1px solid #FCA5A5;padding:8px 12px;border-radius:8px"></div>
+      <div id="user-form-error" style="display:none;color:var(--danger);font-size:13px;background:var(--danger-soft);border:1px solid var(--danger-border);padding:8px 12px;border-radius:8px"></div>
 
       <div>
         <label style="display:block;font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:6px">Full Name</label>
@@ -10162,7 +11981,7 @@ function getPermissionsMatrixHtml() {
             const icon = route[1];
             const label = route[2];
 
-            const isSuperLocked = key === "users";
+            const isSuperLocked = key === "users" || key === "dash";
             const isAdminLocked = key === "dash";
 
             const hasSuper = superNav.includes(key);
@@ -10173,12 +11992,12 @@ function getPermissionsMatrixHtml() {
               <tr>
                 <td>
                   <div style="display:flex;align-items:center;gap:10px;font-weight:700">
-                    <span style="font-size:16px">${icon}</span>
+                    <span style="display:inline-flex;align-items:center;color:var(--text)">${ICONS[key] || icon}</span>
                     <span>${label}</span>
                   </div>
                 </td>
                 <td>
-                  <label class="matrix-check-wrap" title="${isSuperLocked ? "Super Admin must always have access to User Management." : ""}">
+                  <label class="matrix-check-wrap" title="${isSuperLocked ? (key === "users" ? "Super Admin must always have access to User Management." : "Super Admin must always have access to Dashboard.") : ""}">
                     <input
                       type="checkbox"
                       class="matrix-check"
@@ -10186,7 +12005,7 @@ function getPermissionsMatrixHtml() {
                       ${isSuperLocked ? "disabled" : ""}
                       onchange="toggleMatrixPermission('superadmin', '${key}', this.checked)"
                     />
-                    ${isSuperLocked ? `<span style="font-size:12px" title="Locked permission">🔒</span>` : ""}
+                    ${isSuperLocked ? `<span style="display:inline-flex;align-items:center;color:var(--text-muted)" title="Locked permission">${ICONS.lock}</span>` : ""}
                   </label>
                 </td>
                 <td>
@@ -10198,7 +12017,7 @@ function getPermissionsMatrixHtml() {
                       ${isAdminLocked ? "disabled" : ""}
                       onchange="toggleMatrixPermission('admin', '${key}', this.checked)"
                     />
-                    ${isAdminLocked ? `<span style="font-size:12px" title="Locked permission">🔒</span>` : ""}
+                    ${isAdminLocked ? `<span style="display:inline-flex;align-items:center;color:var(--text-muted)" title="Locked permission">${ICONS.lock}</span>` : ""}
                   </label>
                 </td>
                 <td>
@@ -10242,7 +12061,7 @@ function getPermissionsMatrixHtml() {
  * @param {boolean} checked - Desired state.
  */
 function toggleMatrixPermission(role, pageKey, checked) {
-  if (role === "superadmin" && pageKey === "users") return;
+  if (role === "superadmin" && (pageKey === "users" || pageKey === "dash")) return;
   if (role === "admin" && pageKey === "dash") return;
 
   const currentNav = {
@@ -10320,7 +12139,7 @@ function getUsersViewHtml() {
         aria-selected="${isDirectory ? "true" : "false"}"
         onclick="setUserMgmtTab('directory')"
       >
-        <span>👥</span> User Directory
+        <span style="display:inline-flex;align-items:center">${LINE_ICONS.cust}</span> User Directory
       </button>
       <button
         type="button"
@@ -10330,7 +12149,7 @@ function getUsersViewHtml() {
         aria-selected="${!isDirectory ? "true" : "false"}"
         onclick="setUserMgmtTab('matrix')"
       >
-        <span>🛡️</span> Permissions Matrix
+        <span style="display:inline-flex;align-items:center">${LINE_ICONS.users}</span> Permissions Matrix
       </button>
     </div>
 
@@ -10339,7 +12158,7 @@ function getUsersViewHtml() {
       <div class="um-toolbar">
         <div class="um-toolbar-left">
           <div class="um-search-wrap">
-            <span class="um-search-icon">🔍</span>
+            <span class="um-search-icon" style="display:inline-flex;align-items:center">${LINE_ICONS.insp}</span>
             <input
               id="user-search-input"
               class="um-search-input"
@@ -10365,7 +12184,7 @@ function getUsersViewHtml() {
         </div>
 
         <button type="button" class="btn-add-user" onclick="openAddUserModal()">
-          <span>👤+</span> Add New User
+          <span style="display:inline-flex;align-items:center">${ICONS.userPlus}</span> Add New User
         </button>
       </div>
 
@@ -10394,7 +12213,7 @@ function getUsersViewHtml() {
 
 
 /* ==========================================================
-   REPORTS & MONITORING
+   REPORTS
    ========================================================== */
 
 /** Currently selected report filter period ("today", "7days", "month", "lastMonth", "year", "all"). */
@@ -10425,13 +12244,125 @@ function setReportPeriod(period) {
 }
 
 /**
+ * Helper to get the catalog cost price for an item name (case-insensitive).
+ * Items without a cost price return 0.
+ * @param {string} name - Item name.
+ * @returns {number}
+ */
+function getCatalogItemCost(name) {
+  if (!name) return 0;
+  const target = String(name).trim().toLowerCase();
+  const allItems = getCatalogItems("all");
+  const found = allItems.find((it) => it.name && it.name.trim().toLowerCase() === target);
+  if (found && found.costPrice !== null && found.costPrice !== undefined && !isNaN(found.costPrice) && Number(found.costPrice) > 0) {
+    return Number(found.costPrice);
+  }
+  return 0;
+}
+
+/**
+ * Computes total cost of parts sold in the period from completed jobs and Quick Sales.
+ * Items without a catalog cost price are counted as 0 cost.
+ * @param {string} period - Active report period.
+ * @returns {number}
+ */
+function getPeriodPartsCost(period = reportPeriod) {
+  const metrics = getReportMetrics(period);
+  const periodSales = (Array.isArray(D.sales) ? D.sales : []).filter(
+    (s) => isCountableSale(s) && inDateRange(s.at ? s.at.slice(0, 10) : "", period)
+  );
+
+  let totalCost = 0;
+
+  // 1. Completed jobs parts
+  metrics.completedJobs.forEach((o) => {
+    const orderLines = lines(o);
+    orderLines.forEach((l) => {
+      if (l.kind === "part" && l.src !== "own") {
+        const itemCost = getCatalogItemCost(l.rawName || l.n);
+        const qty = Math.max(1, Number(l.qty) || 1);
+        totalCost += (qty * itemCost);
+      }
+    });
+  });
+
+  // 2. Quick Sales parts
+  periodSales.forEach((s) => {
+    if (Array.isArray(s.items)) {
+      s.items.forEach((it) => {
+        const itemCost = getCatalogItemCost(it.name);
+        const qty = Math.max(1, Number(it.qty) || 1);
+        totalCost += (qty * itemCost);
+      });
+    }
+  });
+
+  return totalCost;
+}
+
+/**
+ * Sanitizes a string for use in an HTML element id.
+ * @param {string} str
+ * @returns {string}
+ */
+function sanitizeHtmlId(str) {
+  return String(str || "").replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+
+/**
+ * Updates a mechanic's commission rate in D.commission, saves, and updates the UI without full re-render.
+ * Enforces Super Admin role inside the action function.
+ * @param {string} mechName - Mechanic display name.
+ * @param {string|number} newRate - Commission rate percentage (0-100).
+ */
+function updateMechanicCommissionRate(mechName, newRate) {
+  if (!isSuper()) return;
+  if (!D.commission) D.commission = {};
+  const rate = Math.min(100, Math.max(0, Number(newRate) || 0));
+  D.commission[mechName] = rate;
+  save();
+
+  const metrics = getReportMetrics(reportPeriod);
+  const users = loadUsers();
+  const activeMechs = users.filter((u) => u.role === "mechanic" && u.active !== false);
+
+  let totalLabor = 0;
+  let totalComm = 0;
+
+  activeMechs.forEach((m) => {
+    const mName = m.name.trim();
+    const compJobs = metrics.completedJobs.filter((o) => o.mech && o.mech.trim().toLowerCase() === mName.toLowerCase());
+    let laborRev = 0;
+    compJobs.forEach((o) => {
+      lines(o).forEach((l) => {
+        if (l.kind === "labor") {
+          laborRev += (l.a || 0);
+        }
+      });
+    });
+    const curRate = (D.commission && D.commission[mName] !== undefined) ? Number(D.commission[mName]) : 0;
+    const comm = Math.round(laborRev * (curRate / 100));
+    totalLabor += laborRev;
+    totalComm += comm;
+
+    const commCell = document.getElementById(`comm-amt-${sanitizeHtmlId(mName)}`);
+    if (commCell) commCell.textContent = P(comm);
+  });
+
+  const totLaborCell = document.getElementById("comm-tot-labor");
+  if (totLaborCell) totLaborCell.innerHTML = `<b>${P(totalLabor)}</b>`;
+  const totCommCell = document.getElementById("comm-tot-comm");
+  if (totCommCell) totCommCell.innerHTML = `<b>${P(totalComm)}</b>`;
+}
+
+/**
  * Computes performance metrics for the active report period.
+ * Ignores reversed and cancelled jobs.
  * @param {string} period - Active filter period.
  * @returns {Object} Calculated metrics.
  */
 function getReportMetrics(period = reportPeriod) {
-  const completedInPeriod = D.wo.filter((o) => o.st === "Completed" && inDateRange(o.done || o.at, period));
-  const openJobs = D.wo.filter((o) => o.st !== "Completed");
+  const completedInPeriod = D.wo.filter((o) => isCountableJob(o) && o.st === "Completed" && inDateRange(o.done || o.at, period));
 
   let revenue = 0;
   let labor = 0;
@@ -10457,7 +12388,6 @@ function getReportMetrics(period = reportPeriod) {
     labor,
     parts,
     completed: completedCount,
-    inShop: openJobs.length,
     avgValue,
     completedJobs: completedInPeriod
   };
@@ -10465,6 +12395,8 @@ function getReportMetrics(period = reportPeriod) {
 
 /**
  * Exports report summary numbers and completed jobs into a clean CSV file with UTF-8 BOM.
+ * For Super Admin: includes Gross Profit and Mechanic Commission breakdown.
+ * Excludes reversed, cancelled, and void records.
  */
 function exportReportCsv() {
   const metrics = getReportMetrics(reportPeriod);
@@ -10472,7 +12404,7 @@ function exportReportCsv() {
   const todayStr = today();
 
   const periodSales = (Array.isArray(D.sales) ? D.sales : []).filter(
-    (s) => !s.void && inDateRange(s.at ? s.at.slice(0, 10) : "", reportPeriod)
+    (s) => isCountableSale(s) && inDateRange(s.at ? s.at.slice(0, 10) : "", reportPeriod)
   );
   const posSalesTotal = periodSales.reduce((acc, s) => acc + (Number(s.total) || 0), 0);
   const posSalesCount = periodSales.length;
@@ -10480,7 +12412,7 @@ function exportReportCsv() {
   const escapeCsv = (str) => `"${String(str || "").replace(/"/g, '""')}"`;
 
   const summaryLines = [
-    ["Shop Performance Report", ""],
+    ["Reports", ""],
     ["Period", periodLabel],
     ["Generated On", todayStr],
     ["Total Revenue (PHP)", metrics.revenue],
@@ -10489,9 +12421,43 @@ function exportReportCsv() {
     ["Quick Sales Total", posSalesTotal],
     ["Quick Sales Count", posSalesCount],
     ["Jobs Completed", metrics.completed],
-    ["Jobs in Shop", metrics.inShop],
     ["Average Job Value (PHP)", Math.round(metrics.avgValue)]
-  ].map((row) => row.map(escapeCsv).join(","));
+  ];
+
+  if (isSuper()) {
+    const totalRev = metrics.revenue + posSalesTotal;
+    const partsCost = getPeriodPartsCost(reportPeriod);
+    const grossProfit = totalRev - partsCost;
+
+    summaryLines.push(["Gross Profit (PHP)", grossProfit]);
+
+    const users = loadUsers();
+    const activeMechs = users.filter((u) => u.role === "mechanic" && u.active !== false);
+    let totalComm = 0;
+    const mechRowsForCsv = [];
+
+    activeMechs.forEach((m) => {
+      const mName = m.name.trim();
+      const compJobs = metrics.completedJobs.filter((o) => o.mech && o.mech.trim().toLowerCase() === mName.toLowerCase());
+      let laborRev = 0;
+      compJobs.forEach((o) => {
+        lines(o).forEach((l) => {
+          if (l.kind === "labor") {
+            laborRev += (l.a || 0);
+          }
+        });
+      });
+      const rate = (D.commission && D.commission[mName] !== undefined) ? Number(D.commission[mName]) : 0;
+      const comm = Math.round(laborRev * (rate / 100));
+      totalComm += comm;
+      mechRowsForCsv.push([`Commission: ${mName} (${rate}%)`, comm]);
+    });
+
+    summaryLines.push(["Total Mechanic Commission (PHP)", totalComm]);
+    mechRowsForCsv.forEach((row) => summaryLines.push(row));
+  }
+
+  const encodedSummary = summaryLines.map((row) => row.map(escapeCsv).join(","));
 
   const jobHeaders = [
     "Job ID",
@@ -10544,7 +12510,7 @@ function exportReportCsv() {
   });
 
   const fullContent = "\uFEFF" + [
-    ...summaryLines,
+    ...encodedSummary,
     "",
     jobHeaders.map(escapeCsv).join(","),
     ...jobRows
@@ -10561,47 +12527,36 @@ function exportReportCsv() {
 }
 
 /**
- * Builds HTML for report KPI cards, horizontal status bars, mechanic table, top complaints, and recent activity.
+ * Builds HTML for report KPI cards, mechanic table, top complaints, and fault codes.
+ * For Super Admin: includes GROSS PROFIT KPI card and Mechanic Commission card.
  * @returns {string} HTML string.
  */
 function getReportResultsHtml() {
   const metrics = getReportMetrics(reportPeriod);
 
-  // 1. Jobs by Status calculation
-  const mandatoryStatuses = ["In Progress", "Checking", "Ready for Pickup"];
-  const statusCounts = ST.map((st) => {
-    const cnt = D.wo.filter((o) => o.st === st).length;
-    return { status: st, count: cnt };
-  }).filter((x) => x.count > 0 || mandatoryStatuses.includes(x.status));
-
-  const maxStatusCount = Math.max(...statusCounts.map((x) => x.count), 1);
-
-  // 2. Mechanic Performance calculation
+  // 1. Mechanic Performance calculation
   const users = loadUsers();
   const activeMechs = users.filter((u) => u.role === "mechanic" && u.active !== false);
   const mechRows = activeMechs.map((m) => {
     const mName = m.name.trim();
-    const inProg = D.wo.filter((o) => o.st === "In Progress" && o.mech && o.mech.trim().toLowerCase() === mName.toLowerCase()).length;
     const compJobs = metrics.completedJobs.filter((o) => o.mech && o.mech.trim().toLowerCase() === mName.toLowerCase());
     const rev = compJobs.reduce((sum, o) => sum + total(o), 0);
-    return { name: mName, inProg, completed: compJobs.length, revenue: rev };
+    return { name: mName, completed: compJobs.length, revenue: rev };
   });
 
   // Unassigned row
-  const unassignedInProg = D.wo.filter((o) => o.st === "In Progress" && (!o.mech || !o.mech.trim() || o.mech.trim().toLowerCase() === "unassigned")).length;
   const unassignedCompJobs = metrics.completedJobs.filter((o) => !o.mech || !o.mech.trim() || o.mech.trim().toLowerCase() === "unassigned");
   const unassignedRev = unassignedCompJobs.reduce((sum, o) => sum + total(o), 0);
   mechRows.push({
     name: "Unassigned",
-    inProg: unassignedInProg,
     completed: unassignedCompJobs.length,
     revenue: unassignedRev
   });
 
   mechRows.sort((a, b) => b.completed - a.completed || b.revenue - a.revenue);
 
-  // 3. Top Customer Complaints
-  const jobsCreatedInPeriod = D.wo.filter((o) => inDateRange(o.at, reportPeriod));
+  // 2. Top Customer Complaints
+  const jobsCreatedInPeriod = D.wo.filter((o) => isCountableJob(o) && inDateRange(o.at, reportPeriod));
   const complaintCounts = {};
   jobsCreatedInPeriod.forEach((o) => {
     const list = Array.isArray(o.complaints) ? o.complaints : (o.complaint ? [o.complaint] : []);
@@ -10616,7 +12571,7 @@ function getReportResultsHtml() {
     .slice(0, 5);
   const maxComplaint = Math.max(...topComplaints.map((x) => x.count), 1);
 
-  // 4. Most Frequent Fault Codes
+  // 3. Most Frequent Fault Codes
   const codeCounts = {};
   const codeLabels = {};
   metrics.completedJobs.forEach((o) => {
@@ -10636,13 +12591,8 @@ function getReportResultsHtml() {
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
 
-  // 5. Recent Activity: 8 most recently completed jobs
-  const recentCompleted = [...D.wo.filter((o) => o.st === "Completed")]
-    .sort((a, c) => (c.done || c.at || "").localeCompare(a.done || a.at || ""))
-    .slice(0, 8);
-
   const periodSales = (Array.isArray(D.sales) ? D.sales : []).filter(
-    (s) => !s.void && inDateRange(s.at ? s.at.slice(0, 10) : "", reportPeriod)
+    (s) => isCountableSale(s) && inDateRange(s.at ? s.at.slice(0, 10) : "", reportPeriod)
   );
   const posSalesTotal = periodSales.reduce((acc, s) => acc + (Number(s.total) || 0), 0);
   const posSalesCount = periodSales.length;
@@ -10650,56 +12600,128 @@ function getReportResultsHtml() {
   const stat = (i, bg, l, n, t) =>
     `<div class="card st"><div class="ic" style="background:${bg}">${i}</div><div><small>${l}</small><b>${n}</b>${t}</div></div>`;
 
-  return `
-    <!-- KPI Row -->
-    <div class="reports-kpi-grid">
-      ${stat("💰", "#DBEAFE", "REVENUE", P(metrics.revenue), "Paid in period")}
-      ${stat("🔧", "#D1FAE5", "LABOR EARNINGS", P(metrics.labor), "From services")}
-      ${stat("📦", "#FEF3C7", "PARTS BILLED", P(metrics.parts), "From items/fluids")}
-      ${stat("⚡", "#E0F2FE", "QUICK SALES", P(posSalesTotal), `${posSalesCount} sale${posSalesCount === 1 ? "" : "s"}`)}
-      ${stat("✅", "#E0E7FF", "JOBS COMPLETED", metrics.completed, "In period")}
-      ${stat("⏳", "#FFEDD5", "JOBS IN SHOP", metrics.inShop, "Currently open")}
-      ${stat("📊", "#F3E8FF", "AVERAGE JOB VALUE", P(Math.round(metrics.avgValue)), "Per completed job")}
-    </div>
+  // Super Admin extras: Gross Profit and Mechanic Commission
+  let grossProfitCard = "";
+  let mechanicCommissionCard = "";
 
-    <!-- Analytics Cards Grid -->
-    <div class="reports-grid">
-      <!-- Jobs by Status -->
-      <div class="card">
-        <div class="hd" style="margin-bottom:16px">📋 Jobs by Status</div>
-        <div>
-          ${statusCounts.map((item) => {
-            const displayLabel = item.status === "Ready for Pickup" ? "Ready for Billing" : item.status;
-            const pct = Math.max(item.count > 0 ? (item.count / maxStatusCount) * 100 : 0, 0);
-            return `
-              <div class="report-bar-row">
-                <div class="report-bar-header">
-                  <div style="display:flex;align-items:center;gap:6px">
-                    ${badge(item.status)}
-                    <span style="font-weight:600;font-size:13px">${displayLabel}</span>
-                  </div>
-                  <b>${item.count}</b>
-                </div>
-                <div class="report-bar-track">
-                  <div class="report-bar-fill" style="width:${pct}%;background:#2563EB"></div>
-                </div>
-              </div>
-            `;
-          }).join("")}
+  if (isSuper()) {
+    const totalRevenue = metrics.revenue + posSalesTotal;
+    const partsCost = getPeriodPartsCost(reportPeriod);
+    const grossProfit = totalRevenue - partsCost;
+
+    grossProfitCard = stat(
+      ICONS.money,
+      "",
+      "GROSS PROFIT",
+      P(grossProfit),
+      `<span style="display:block;font-size:11px;color:var(--text-muted);margin-top:2px;line-height:1.2">Items without a cost price are counted as 0 cost.</span>`
+    );
+
+    let totalCommLabor = 0;
+    let totalCommAmt = 0;
+    const commRows = activeMechs.map((m) => {
+      const mName = m.name.trim();
+      const compJobs = metrics.completedJobs.filter((o) => o.mech && o.mech.trim().toLowerCase() === mName.toLowerCase());
+      let laborRev = 0;
+      compJobs.forEach((o) => {
+        lines(o).forEach((l) => {
+          if (l.kind === "labor") {
+            laborRev += (l.a || 0);
+          }
+        });
+      });
+      const rate = (D.commission && D.commission[mName] !== undefined) ? Number(D.commission[mName]) : 0;
+      const comm = Math.round(laborRev * (rate / 100));
+      totalCommLabor += laborRev;
+      totalCommAmt += comm;
+      return { name: mName, labor: laborRev, rate, commission: comm };
+    });
+
+    mechanicCommissionCard = `
+      <!-- Mechanic Commission Card (Super Admin only) -->
+      <div class="card reports-grid-wide">
+        <div class="hd" style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span>${ICONS.user}</span>
+          <span>Mechanic Commission</span>
         </div>
-      </div>
-
-      <!-- Mechanic Performance -->
-      <div class="card">
-        <div class="hd" style="margin-bottom:16px">🔧 Mechanic Performance</div>
-        ${mechRows.some((r) => r.inProg > 0 || r.completed > 0 || r.revenue > 0) ? `
+        <p style="margin:0 0 16px 0;font-size:13px;color:var(--text-secondary)">Commission earned on labor revenue from completed jobs in the selected period.</p>
+        ${commRows.length ? `
           <div class="tw">
             <table>
               <thead>
                 <tr>
                   <th>MECHANIC</th>
-                  <th>IN PROGRESS</th>
-                  <th>COMPLETED</th>
+                  <th class="r">LABOR REVENUE</th>
+                  <th style="text-align:right;width:120px">RATE %</th>
+                  <th class="r">COMMISSION</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${commRows.map((r) => `
+                  <tr>
+                    <td><b>${escHtml(r.name)}</b></td>
+                    <td class="r" id="comm-labor-${sanitizeHtmlId(r.name)}" style="font-weight:600">${P(r.labor)}</td>
+                    <td style="text-align:right">
+                      <div style="display:inline-flex;align-items:center;gap:4px">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="1"
+                          value="${r.rate}"
+                          class="inp"
+                          style="width:65px;padding:4px 8px;text-align:right;font-size:13px"
+                          id="comm-rate-input-${sanitizeHtmlId(r.name)}"
+                          oninput="updateMechanicCommissionRate('${escHtml(r.name)}', this.value)"
+                        />
+                        <span style="font-size:12px;color:var(--text-secondary)">%</span>
+                      </div>
+                    </td>
+                    <td class="r" id="comm-amt-${sanitizeHtmlId(r.name)}" style="font-weight:700">${P(r.commission)}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+              <tfoot>
+                <tr style="border-top:2px solid var(--border);font-weight:700;background:var(--bg-subtle)">
+                  <td>Total</td>
+                  <td class="r" id="comm-tot-labor">${P(totalCommLabor)}</td>
+                  <td></td>
+                  <td class="r" id="comm-tot-comm" style="font-weight:700">${P(totalCommAmt)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        ` : `
+          <div class="empty">No active mechanics found.</div>
+        `}
+      </div>
+    `;
+  }
+
+  return `
+    <!-- KPI Row -->
+    <div class="reports-kpi-grid">
+      ${stat(ICONS.money, "", "REVENUE", P(metrics.revenue), "Paid in period")}
+      ${grossProfitCard}
+      ${stat(LINE_ICONS.rep, "", "LABOR EARNINGS", P(metrics.labor), "From services")}
+      ${stat(LINE_ICONS.cat, "", "PARTS BILLED", P(metrics.parts), "From items/fluids")}
+      ${stat(LINE_ICONS.pos, "", "QUICK SALES", P(posSalesTotal), `${posSalesCount} sale${posSalesCount === 1 ? "" : "s"}`)}
+      ${stat(ICONS.checkCircle, "", "JOBS COMPLETED", metrics.completed, "In period")}
+      ${stat(LINE_ICONS.reports, "", "AVERAGE JOB VALUE", P(Math.round(metrics.avgValue)), "Per completed job")}
+    </div>
+
+    <!-- Analytics Cards Grid -->
+    <div class="reports-grid">
+      <!-- Mechanic Performance (spans full width of 2-col grid) -->
+      <div class="card reports-grid-wide">
+        <div class="hd" style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span>${LINE_ICONS.rep}</span><span>Mechanic Performance</span></div>
+        ${mechRows.some((r) => r.completed > 0 || r.revenue > 0) ? `
+          <div class="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th>MECHANIC</th>
+                  <th>JOBS COMPLETED</th>
                   <th class="r">REVENUE</th>
                 </tr>
               </thead>
@@ -10707,7 +12729,6 @@ function getReportResultsHtml() {
                 ${mechRows.map((r) => `
                   <tr>
                     <td><b>${escHtml(r.name)}</b></td>
-                    <td>${r.inProg}</td>
                     <td><b>${r.completed}</b></td>
                     <td class="r" style="font-weight:700">${P(r.revenue)}</td>
                   </tr>
@@ -10720,9 +12741,11 @@ function getReportResultsHtml() {
         `}
       </div>
 
+      ${mechanicCommissionCard}
+
       <!-- Top Customer Complaints -->
       <div class="card">
-        <div class="hd" style="margin-bottom:16px">💬 Top Customer Complaints</div>
+        <div class="hd" style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span>${ICONS.chat}</span><span>Top Customer Complaints</span></div>
         ${topComplaints.length ? `
           <div>
             ${topComplaints.map((c) => {
@@ -10734,7 +12757,7 @@ function getReportResultsHtml() {
                     <b>${c.count}</b>
                   </div>
                   <div class="report-bar-track">
-                    <div class="report-bar-fill" style="width:${pct}%;background:#059669"></div>
+                    <div class="report-bar-fill" style="width:${pct}%;background:var(--accent)"></div>
                   </div>
                 </div>
               `;
@@ -10747,13 +12770,13 @@ function getReportResultsHtml() {
 
       <!-- Most Frequent Fault Codes -->
       <div class="card">
-        <div class="hd" style="margin-bottom:16px">⚡ Most Frequent Fault Codes</div>
+        <div class="hd" style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span>${LINE_ICONS.pos}</span><span>Most Frequent Fault Codes</span></div>
         ${topCodes.length ? `
           <div style="display:flex;flex-direction:column;gap:8px">
             ${topCodes.map((c) => `
-              <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px">
                 <div style="display:flex;align-items:center;gap:8px">
-                  <span style="display:inline-block;padding:2px 6px;border-radius:4px;background:#FEE2E2;color:#B91C1C;font-weight:700;font-size:11px">${escHtml(c.code)}</span>
+                  <span style="display:inline-block;padding:2px 6px;border-radius:4px;background:var(--danger-soft);color:var(--danger);border:1px solid var(--danger-border);font-weight:700;font-size:11px">${escHtml(c.code)}</span>
                   <span style="font-size:13px;color:var(--text-secondary)">${escHtml(c.label || "Trouble code")}</span>
                 </div>
                 <b>${c.count}</b>
@@ -10764,71 +12787,20 @@ function getReportResultsHtml() {
           <div class="empty">No fault codes recorded.</div>
         `}
       </div>
-
-      <!-- Recent Activity (Full width) -->
-      <div class="card" style="grid-column: 1 / -1">
-        <div class="hd" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-          <span>🕒 Recent Completed Activity</span>
-          ${canOpen("his") ? `
-            <button type="button" class="btn g sm" onclick="go('his')">View in Service History →</button>
-          ` : ""}
-        </div>
-        ${recentCompleted.length ? `
-          <div class="tw">
-            <table>
-              <thead>
-                <tr>
-                  <th>JOB NO.</th>
-                  <th>PLATE &amp; VEHICLE</th>
-                  <th>CUSTOMER</th>
-                  <th>MECHANIC</th>
-                  <th>COMPLETED</th>
-                  <th class="r">TOTAL</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${recentCompleted.map((o) => {
-                  const b = bike(o.bid);
-                  const c = b ? own(b) : null;
-                  const dateVal = o.done || o.at || "";
-                  return `
-                    <tr>
-                      <td><b>${escHtml(getJobNumber(o))}</b></td>
-                      <td>
-                        <b>${b ? escHtml(b.plate) : "NO PLATE"}</b>
-                        <br><small style="color:var(--text-muted)">${b ? escHtml(b.make + " " + b.model) : "Unknown"}</small>
-                      </td>
-                      <td>${c ? escHtml(c.name) : "—"}</td>
-                      <td>${escHtml(o.mech || "Unassigned")}</td>
-                      <td>
-                        <div>${formatJobDate(dateVal)}</div>
-                        <small style="color:var(--text-muted)">${formatJobTime(dateVal)}</small>
-                      </td>
-                      <td class="r" style="font-weight:700">${P(total(o))}</td>
-                    </tr>
-                  `;
-                }).join("")}
-              </tbody>
-            </table>
-          </div>
-        ` : `
-          <div class="empty">No recent completed activity.</div>
-        `}
-      </div>
     </div>
   `;
 }
 
 /**
- * Generates the full HTML markup for the Reports & Monitoring view.
+ * Generates the full HTML markup for the Reports view.
  * @returns {string} HTML markup string.
  */
 function getReportsViewHtml() {
   return `
     <div class="card top">
       <div>
-        <h1>Reports &amp; Monitoring</h1>
-        <p>Shop performance, job status, and activity at a glance.</p>
+        <h1>Reports</h1>
+        <p>Sales and job reports for the selected period.</p>
       </div>
     </div>
 
@@ -10852,7 +12824,7 @@ function getReportsViewHtml() {
       </div>
 
       <button type="button" class="btn g his-btn-export" onclick="exportReportCsv()" title="Export report to CSV">
-        <span>📥</span> Export Report
+        <span style="display:inline-flex;align-items:center">${ICONS.download}</span> Export Report
       </button>
     </div>
 
@@ -10874,7 +12846,7 @@ let posCart = [];
 /** Optional customer name or phone for active sale. */
 let posCustomer = "";
 
-/** Selected payment method: "Cash" | "GCash". */
+/** Selected payment method: "Cash" | "GCash" | "Maya". */
 let posMethod = "Cash";
 
 /** Amount tendered by customer for cash transactions. */
@@ -10883,10 +12855,7 @@ let posTendered = 0;
 /** Flag indicating whether tendered was explicitly entered by cashier. */
 let posTenderedManual = false;
 
-/** Discount amount (in PHP) applied to active sale. */
-let posDiscount = 0;
-
-/** Payment reference number for GCash transactions. */
+/** Payment reference number for GCash/Maya transactions. */
 let posRef = "";
 
 /** Active tab in right column: "cart" | "today". */
@@ -11007,7 +12976,6 @@ function resetPosState() {
   posMethod = "Cash";
   posTendered = 0;
   posTenderedManual = false;
-  posDiscount = 0;
   posRef = "";
   posTab = "cart";
   posSearch = "";
@@ -11031,13 +12999,11 @@ function getPosSubtotal() {
 }
 
 /**
- * Returns validated discount amount capped at subtotal.
+ * Returns validated discount amount (always 0 for active sales).
  * @returns {number} Discount in PHP.
  */
 function getPosDiscount() {
-  const subtotal = getPosSubtotal();
-  const disc = Number(posDiscount) || 0;
-  return Math.min(Math.max(0, disc), subtotal);
+  return 0;
 }
 
 /**
@@ -11045,9 +13011,7 @@ function getPosDiscount() {
  * @returns {number} Total in PHP.
  */
 function getPosTotal() {
-  const subtotal = getPosSubtotal();
-  const disc = getPosDiscount();
-  return Math.max(0, subtotal - disc);
+  return getPosSubtotal();
 }
 
 /**
@@ -11261,7 +13225,7 @@ function getPosGridHtml() {
       <div class="pos-tiles-grid">
         ${customTileHtml}
       </div>
-      <div class="empty" style="padding:40px 16px;text-align:center;background:#FFFFFF;border:1px dashed #CBD5E1;border-radius:12px;margin-top:12px">
+      <div class="empty" style="padding:40px 16px;text-align:center;background:#FFFFFF;border:1px dashed var(--border);border-radius:12px;margin-top:12px">
         No catalog items matched "<b>${escHtml(posSearch)}</b>". You can add it as a custom item above.
       </div>
     `;
@@ -11326,6 +13290,7 @@ function addCatalogItemToPosCart(catId, kind) {
       kind: it.kind,
       name: it.name,
       price: Number(it.price) || 0,
+      origPrice: Number(it.price) || 0,
       qty: 1
     });
   }
@@ -11414,9 +13379,23 @@ function getTodaySalesCount() {
 function getCashCalcHtml(total, tendered) {
   const diff = (Number(tendered) || 0) - total;
   if (diff >= 0) {
-    return `<span>Change:</span><b style="color:var(--success, #16A34A);font-size:14px">${P(diff)}</b>`;
+    return `<span>Change:</span><b style="color:var(--success);font-size:14px">${P(diff)}</b>`;
   }
-  return `<span style="color:var(--danger, #DC2626);font-weight:600">Short:</span><b style="color:var(--danger, #DC2626);font-size:14px">${P(Math.abs(diff))}</b>`;
+  return `<span style="color:var(--danger);font-weight:600">Short by:</span><b style="color:var(--danger);font-size:14px">${P(Math.abs(diff))}</b>`;
+}
+
+/**
+ * Returns short muted explanation when POS charge button is disabled.
+ * @param {number} total - Current cart total.
+ * @returns {string} Reason text or empty string.
+ */
+function getPosChargeReason(total) {
+  if (posCart.length === 0) return "Cart is empty";
+  if (posMethod === "Cash" && (Number(posTendered) || 0) < total) {
+    const diff = total - (Number(posTendered) || 0);
+    return `Short by ${P(diff)}`;
+  }
+  return "";
 }
 
 /**
@@ -11424,8 +13403,6 @@ function getCashCalcHtml(total, tendered) {
  * @returns {string} HTML string.
  */
 function getPosRightPanelHtml() {
-  const subtotal = getPosSubtotal();
-  const disc = getPosDiscount();
   const total = getPosTotal();
   const isCashShort = posMethod === "Cash" && (Number(posTendered) || 0) < total;
   const isChargeDisabled = posCart.length === 0 || isCashShort;
@@ -11456,12 +13433,15 @@ function getPosRightPanelHtml() {
             : posCart.map((item) => {
                 const lineTotal = (Number(item.qty) || 1) * (Number(item.price) || 0);
                 const isLabor = item.kind === "labor";
+                const isOverridden = item.ref && item.origPrice !== undefined && Number(item.price) !== Number(item.origPrice);
+                const isPriceReadOnly = !isSuper() && Boolean(item.ref);
                 return `
                   <div class="pos-cart-line" id="pos-cart-line-${item.id}">
                     <div class="pos-cart-line-top">
-                      <div style="flex:1;min-width:0">
-                        <span class="cat-badge ${item.kind}" style="margin-right:4px">${isLabor ? 'Labor' : 'Part'}</span>
+                      <div style="flex:1;min-width:0;display:flex;align-items:center;flex-wrap:wrap;gap:4px">
+                        <span class="cat-badge ${item.kind}">${isLabor ? 'Labor' : 'Part'}</span>
                         <b style="font-size:13px;color:var(--text-primary)">${escHtml(item.name)}</b>
+                        <span id="pos-override-tag-${item.id}" class="badge-override" style="font-size:10px;padding:1px 4px;${isOverridden ? '' : 'display:none'}">OVERRIDE</span>
                       </div>
                       <button type="button" class="pos-line-del-btn" onclick="removePosCartLine('${item.id}')" title="Remove item">✕</button>
                     </div>
@@ -11472,13 +13452,14 @@ function getPosRightPanelHtml() {
                         <button type="button" class="pos-qty-btn" onclick="updatePosCartQty('${item.id}', 1)" title="Increase quantity">+</button>
                       </div>
                       <div style="display:flex;align-items:center;gap:4px">
-                        <span style="font-size:11px;color:var(--text-muted)">@ ₱</span>
+                        <span style="font-size:11px;color:var(--text-muted)">@ \u20B1</span>
                         <input
                           type="number"
                           min="0"
                           step="1"
                           class="pos-price-input"
                           value="${item.price}"
+                          ${isPriceReadOnly ? "readonly disabled style='background:var(--bg-surface-alt, #F8FAFC);color:var(--text-muted)'" : ""}
                           oninput="updatePosCartPrice('${item.id}', this.value)"
                         />
                       </div>
@@ -11494,27 +13475,6 @@ function getPosRightPanelHtml() {
 
       <!-- Totals Block -->
       <div class="pos-totals-block">
-        <div class="pos-totals-row">
-          <span style="color:var(--text-secondary)">Subtotal</span>
-          <span style="font-weight:700" id="pos-subtotal-val">${P(subtotal)}</span>
-        </div>
-        <div class="pos-totals-row">
-          <span style="color:var(--text-secondary)">Discount (PHP)</span>
-          <div style="display:flex;align-items:center;gap:4px">
-            <span style="font-size:11px;color:var(--text-muted)">- ₱</span>
-            <input
-              id="pos-discount-input"
-              type="number"
-              min="0"
-              max="${subtotal}"
-              step="1"
-              value="${posDiscount > 0 ? posDiscount : ''}"
-              placeholder="0"
-              oninput="onPosDiscountInput(this.value)"
-              style="width:80px;height:28px;border-radius:6px;border:1px solid #CBD5E1;padding:0 6px;text-align:right;font-size:12px;font-weight:700"
-            />
-          </div>
-        </div>
         <div class="pos-totals-row grand-total">
           <span>Total</span>
           <span id="pos-total-val">${P(total)}</span>
@@ -11524,9 +13484,10 @@ function getPosRightPanelHtml() {
       <!-- Payment Method Toggle -->
       <div style="margin-top:14px">
         <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:6px">Payment Method</label>
-        <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:6px">
-          <button type="button" class="btn g sm ${posMethod === 'Cash' ? 'on' : ''}" style="${posMethod === 'Cash' ? 'background:#2563EB;color:#FFF;border-color:#2563EB;font-weight:700' : ''}" onclick="setPosMethod('Cash')">💵 Cash</button>
-          <button type="button" class="btn g sm ${posMethod === 'GCash' ? 'on' : ''}" style="${posMethod === 'GCash' ? 'background:#2563EB;color:#FFF;border-color:#2563EB;font-weight:700' : ''}" onclick="setPosMethod('GCash')">📱 GCash</button>
+        <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:6px">
+          <button type="button" class="btn g sm ${posMethod === 'Cash' ? 'on' : ''}" style="${posMethod === 'Cash' ? 'background:var(--accent);color:#FFF;border-color:var(--accent);font-weight:700' : ''}" onclick="setPosMethod('Cash')"><span style="display:inline-flex;align-items:center;margin-right:4px">${ICONS.money}</span>Cash</button>
+          <button type="button" class="btn g sm ${posMethod === 'GCash' ? 'on' : ''}" style="${posMethod === 'GCash' ? 'background:var(--accent);color:#FFF;border-color:var(--accent);font-weight:700' : ''}" onclick="setPosMethod('GCash')"><span style="display:inline-flex;align-items:center;margin-right:4px">${ICONS.phone}</span>GCash</button>
+          <button type="button" class="btn g sm ${posMethod === 'Maya' ? 'on' : ''}" style="${posMethod === 'Maya' ? 'background:var(--accent);color:#FFF;border-color:var(--accent);font-weight:700' : ''}" onclick="setPosMethod('Maya')"><span style="display:inline-flex;align-items:center;margin-right:4px">${LINE_ICONS.bill}</span>Maya</button>
         </div>
       </div>
 
@@ -11534,9 +13495,9 @@ function getPosRightPanelHtml() {
       ${
         posMethod === "Cash"
           ? `
-            <div style="margin-top:12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px">
+            <div style="margin-top:12px;background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-                <label for="pos-tendered-input" style="font-size:12px;font-weight:700;color:var(--text-secondary)">Tendered (PHP):</label>
+                <label for="pos-tendered-input" style="font-size:12px;font-weight:700;color:var(--text-secondary)">Amount Received (PHP):</label>
                 <input
                   id="pos-tendered-input"
                   type="number"
@@ -11545,14 +13506,8 @@ function getPosRightPanelHtml() {
                   placeholder="0"
                   value="${posTendered > 0 ? posTendered : ''}"
                   oninput="onPosTenderedInput(this.value)"
-                  style="width:100px;height:32px;border-radius:6px;border:1px solid #CBD5E1;padding:0 8px;text-align:right;font-size:13px;font-weight:700"
+                  style="width:100px;height:32px;border-radius:6px;border:1px solid var(--border);padding:0 8px;text-align:right;font-size:13px;font-weight:700"
                 />
-              </div>
-              <div class="pos-quick-tender-row">
-                <button type="button" class="pos-quick-tender-btn" onclick="setPosQuickTender('Exact')">Exact</button>
-                <button type="button" class="pos-quick-tender-btn" onclick="setPosQuickTender(100)">₱100</button>
-                <button type="button" class="pos-quick-tender-btn" onclick="setPosQuickTender(500)">₱500</button>
-                <button type="button" class="pos-quick-tender-btn" onclick="setPosQuickTender(1000)">₱1,000</button>
               </div>
               <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:12px" id="pos-cash-calc-row">
                 ${getCashCalcHtml(total, posTendered)}
@@ -11560,9 +13515,9 @@ function getPosRightPanelHtml() {
             </div>
           `
           : `
-            <div style="margin-top:12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px">
+            <div style="margin-top:12px;background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
               <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px">
-                Digital payment via <b>GCash</b>. Exact amount (${P(total)}) billed.
+                Digital payment via <b>${escHtml(posMethod)}</b>. Exact amount (${P(total)}) billed.
               </div>
               <label for="pos-ref-input" style="font-size:11px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Reference No. (optional):</label>
               <input
@@ -11571,7 +13526,7 @@ function getPosRightPanelHtml() {
                 placeholder="e.g. 1002938472"
                 value="${escHtml(posRef)}"
                 oninput="posRef=this.value"
-                style="width:100%;height:32px;border-radius:6px;border:1px solid #CBD5E1;padding:0 8px;font-size:13px;box-sizing:border-box"
+                style="width:100%;height:32px;border-radius:6px;border:1px solid var(--border);padding:0 8px;font-size:13px;box-sizing:border-box"
               />
             </div>
           `
@@ -11587,6 +13542,7 @@ function getPosRightPanelHtml() {
       >
         Charge ${P(total)}
       </button>
+      <div id="pos-charge-reason" style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:4px;min-height:16px">${getPosChargeReason(total)}</div>
     </div>
   `;
 }
@@ -11610,12 +13566,7 @@ function renderPosCart() {
  * Synchronizes DOM summary elements without destroying input focus.
  */
 function syncPosCartSummaryDom() {
-  const subtotal = getPosSubtotal();
-  const disc = getPosDiscount();
   const total = getPosTotal();
-
-  const subtotalEl = $("pos-subtotal-val");
-  if (subtotalEl) subtotalEl.textContent = P(subtotal);
 
   const totalEl = $("pos-total-val");
   if (totalEl) totalEl.textContent = P(total);
@@ -11625,11 +13576,17 @@ function syncPosCartSummaryDom() {
     cashCalcRow.innerHTML = getCashCalcHtml(total, posTendered);
   }
 
-  const isChargeDisabled = posCart.length === 0 || (posMethod === "Cash" && (Number(posTendered) || 0) < total);
+  const isCashShort = posMethod === "Cash" && (Number(posTendered) || 0) < total;
+  const isChargeDisabled = posCart.length === 0 || isCashShort;
   const chargeBtn = $("pos-charge-btn");
   if (chargeBtn) {
     chargeBtn.disabled = isChargeDisabled;
     chargeBtn.textContent = `Charge ${P(total)}`;
+  }
+
+  const reasonEl = $("pos-charge-reason");
+  if (reasonEl) {
+    reasonEl.textContent = getPosChargeReason(total);
   }
 
   updatePosMobileBar();
@@ -11668,6 +13625,12 @@ function updatePosCartPrice(lineId, newPrice) {
   const totEl = $(`pos-line-tot-${lineId}`);
   if (totEl) {
     totEl.textContent = P((Number(line.qty) || 1) * line.price);
+  }
+
+  const tag = $(`pos-override-tag-${lineId}`);
+  if (tag) {
+    const isOverridden = line.ref && line.origPrice !== undefined && Number(line.price) !== Number(line.origPrice);
+    tag.style.display = isOverridden ? "inline-flex" : "none";
   }
 
   syncPosCartSummaryDom();
@@ -11715,7 +13678,6 @@ function handlePosClearCart() {
   posClearConfirmActive = false;
   if (posClearConfirmTimer) clearTimeout(posClearConfirmTimer);
   posCart = [];
-  posDiscount = 0;
   posTendered = 0;
   posTenderedManual = false;
   posRef = "";
@@ -11725,30 +13687,12 @@ function handlePosClearCart() {
 }
 
 /**
- * Sets payment method for active sale ("Cash" or "GCash").
+ * Sets payment method for active sale ("Cash", "GCash", or "Maya").
  * @param {string} m - Method name.
  */
 function setPosMethod(m) {
-  if (m !== "Cash" && m !== "GCash") return;
+  if (m !== "Cash" && m !== "GCash" && m !== "Maya") return;
   posMethod = m;
-  renderPosCart();
-}
-
-/**
- * Sets quick tender amount from predefined quick cash buttons.
- * @param {string|number} val - "Exact" or numeric cash value.
- */
-function setPosQuickTender(val) {
-  const total = getPosTotal();
-  if (val === "Exact") {
-    posTendered = total;
-  } else {
-    const num = parseFloat(val);
-    if (!isNaN(num)) {
-      posTendered = num;
-    }
-  }
-  posTenderedManual = true;
   renderPosCart();
 }
 
@@ -11764,16 +13708,6 @@ function onPosTenderedInput(val) {
 }
 
 /**
- * Handles cashier input into discount field.
- * @param {string} val - Input amount.
- */
-function onPosDiscountInput(val) {
-  const num = parseFloat(val);
-  posDiscount = isNaN(num) || num < 0 ? 0 : num;
-  syncPosCartSummaryDom();
-}
-
-/**
  * Finalizes sale, persists to D.sales, prints receipt, and resets cart.
  */
 function chargePosSale() {
@@ -11785,23 +13719,34 @@ function chargePosSale() {
   const tendered = posMethod === "Cash" ? (Number(posTendered) || 0) : total;
   const change = posMethod === "Cash" ? Math.max(0, tendered - total) : 0;
 
-  const newSale = {
-    id: uid(),
-    no: generatePosNumber(),
-    at: nowLocalString(),
-    by: u ? u.name : "Cashier",
-    customer: "Walk-in",
-    items: posCart.map((it) => ({
+  const overrides = [];
+  const items = posCart.map((it) => {
+    const isOverridden = it.ref && it.origPrice !== undefined && Number(it.price) !== Number(it.origPrice);
+    if (isOverridden) {
+      overrides.push({ name: it.name, origPrice: it.origPrice, price: it.price });
+    }
+    return {
       id: it.id || uid(),
       kind: it.kind || "part",
       name: it.name || "Item",
       qty: Number(it.qty) || 1,
       price: Number(it.price) || 0,
-      ref: it.ref || ""
-    })),
-    discount: getPosDiscount(),
+      ref: it.ref || "",
+      origPrice: it.origPrice !== undefined ? it.origPrice : Number(it.price) || 0,
+      override: Boolean(isOverridden)
+    };
+  });
+
+  const newSale = {
+    id: uid(),
+    no: generatePosNumber(),
+    at: nowLocalTimestamp(),
+    by: u ? u.name : "Cashier",
+    customer: "Walk-in",
+    items: items,
+    discount: 0,
     method: posMethod,
-    ref: (posMethod === "GCash" && posRef) ? posRef.trim() : "",
+    ref: ((posMethod === "GCash" || posMethod === "Maya") && posRef) ? posRef.trim() : "",
     tendered: tendered,
     change: change,
     total: total,
@@ -11814,10 +13759,14 @@ function chargePosSale() {
   D.sales.push(newSale);
   save();
 
+  // Log price overrides without interrupting checkout
+  overrides.forEach((ov) => {
+    logAudit("Price override", newSale.no, `${ov.name}: ${P(ov.origPrice)} -> ${P(ov.price)}`);
+  });
+
   // Reset cart state
   posCart = [];
   posCustomer = "";
-  posDiscount = 0;
   posTendered = 0;
   posTenderedManual = false;
   posRef = "";
@@ -11851,8 +13800,7 @@ function getPosTodaySalesHtml() {
     return (b.at || "").localeCompare(a.at || "") || (b.no || "").localeCompare(a.no || "");
   });
 
-  const u = getCurrentUser();
-  const canVoid = u && (u.activeRole === "admin" || u.activeRole === "superadmin");
+  const canVoid = isSuper();
 
   return `
     <div class="pos-today-kpi-row">
@@ -11949,79 +13897,44 @@ function togglePosShowOlderSales() {
 }
 
 /**
- * Opens void modal for a specific sale.
+ * Opens void modal for a specific sale (Super Admin only).
+ * Requires audit reason and excludes voided sale from all totals.
  * @param {string} saleId - Sale ID.
  */
 function openPosVoidModal(saleId) {
+  if (!isSuper()) return;
   const s = (Array.isArray(D.sales) ? D.sales : []).find((x) => x.id === saleId);
   if (!s) return;
-  posVoidSaleId = saleId;
-
-  const md = $("pos-void-md");
-  if (!md) return;
-
-  md.innerHTML = `
-    <div style="padding:18px 20px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:10px">
-        <h3 id="pos-void-modal-title" style="margin:0;font-size:16px;color:#0F172A">⚠️ Void Sale ${escHtml(s.no)}</h3>
-        <button type="button" class="search-clear visible" onclick="closePosVoidModal()" style="position:static" title="Close">✕</button>
-      </div>
-      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;line-height:1.4">
-        Are you sure you want to void this sale of <b>${P(s.total)}</b> (${escHtml(s.method || "Cash")})? Voided sales are excluded from sales revenue and performance reports.
-      </p>
-      <div style="margin-bottom:16px">
-        <label for="pos-void-reason" style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text-secondary)">Reason for voiding:</label>
-        <input
-          id="pos-void-reason"
-          type="text"
-          placeholder="e.g., Wrong item selected, Cash refund, Customer cancelled"
-          style="width:100%;height:38px;border-radius:8px;border:1px solid #CBD5E1;padding:0 10px;box-sizing:border-box;font-size:13px"
-        />
-      </div>
-      <div style="display:flex;justify-content:flex-end;gap:8px">
-        <button type="button" class="btn g" onclick="closePosVoidModal()">Cancel</button>
-        <button type="button" class="btn" style="background:var(--danger, #DC2626);border-color:var(--danger, #DC2626)" onclick="confirmPosVoid()">Confirm Void</button>
-      </div>
-    </div>
-  `;
-
-  const ov = $("pos-void-ov");
-  if (ov) {
-    ov.classList.add("on");
-    ov.focus();
-  }
+  askReason(`Void Sale ${s.no}`, "Confirm Void", (reason) => {
+    s.void = true;
+    s.voidReason = reason;
+    s.voidAt = nowLocalTimestamp();
+    const u = getCurrentUser();
+    s.voidBy = u ? u.name : "Super Admin";
+    logAudit("Void sale", s.no, reason);
+    save();
+    renderPosTodaySales();
+    updatePosHeaderStats();
+    if (view === "reports") {
+      const resEl = $("report-results-wrap");
+      if (resEl) resEl.innerHTML = getReportResultsHtml();
+    }
+  }, { description: `Are you sure you want to void this sale of <b>${P(s.total)}</b> (${escHtml(s.method || "Cash")})? Voided sales are excluded from sales revenue and performance reports.` });
 }
 
 /**
  * Closes the void confirmation modal.
  */
 function closePosVoidModal() {
-  const ov = $("pos-void-ov");
-  if (ov) ov.classList.remove("on");
+  closeReasonModal();
   posVoidSaleId = null;
 }
 
 /**
- * Confirms voiding of the active sale, persists change, and updates views.
+ * Confirms voiding of the active sale.
  */
 function confirmPosVoid() {
-  if (!posVoidSaleId) return;
-  const s = (Array.isArray(D.sales) ? D.sales : []).find((x) => x.id === posVoidSaleId);
-  if (s) {
-    const reasonInput = $("pos-void-reason");
-    const reason = reasonInput ? reasonInput.value.trim() : "";
-    s.void = true;
-    s.voidReason = reason || "Voided by admin";
-    s.voidAt = nowLocalString();
-    save();
-  }
-  closePosVoidModal();
-  renderPosTodaySales();
-  updatePosHeaderStats();
-  if (view === "reports") {
-    const resEl = $("report-results-wrap");
-    if (resEl) resEl.innerHTML = getReportResultsHtml();
-  }
+  submitReason();
 }
 
 /**
@@ -12039,8 +13952,8 @@ function openPosReceipt(saleId) {
 
   md.innerHTML = `
     <div style="text-align:center;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:14px">
-      <div style="font-size:28px">⚡</div>
-      <h2 style="margin:4px 0 2px;font-size:22px;color:#0F172A">MotoShop</h2>
+      <div style="display:flex;justify-content:center;margin-bottom:4px;color:var(--text)">${LINE_ICONS.pos}</div>
+      <h2 style="margin:4px 0 2px;font-size:22px;color:var(--text)">MotoShop</h2>
       <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em">Quick Sale Receipt</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${formatPosDateTime(sale.at)}</div>
     </div>
@@ -12048,26 +13961,26 @@ function openPosReceipt(saleId) {
     ${
       sale.void
         ? `
-          <div style="background:#FEE2E2;border:1px solid #F87171;color:#991B1B;padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:14px;font-weight:700;text-align:center">
-            ⚠️ THIS SALE WAS VOIDED${sale.voidAt ? ` ON ${formatPosDateTime(sale.voidAt)}` : ""}<br>
+          <div style="background:var(--danger-soft);border:1px solid var(--danger-border);color:var(--danger);padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:14px;font-weight:700;text-align:center">
+            <span style="display:inline-flex;align-items:center;margin-right:4px">${ICONS.alert}</span> THIS SALE WAS VOIDED${sale.voidAt ? ` ON ${formatPosDateTime(sale.voidAt)}` : ""}<br>
             <span style="font-weight:normal;font-size:11px">Reason: ${escHtml(sale.voidReason || "Voided")}</span>
           </div>
         `
         : ""
     }
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;font-size:12px;background:#F8FAFC;padding:10px 12px;border-radius:8px;border:1px solid var(--border)">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;font-size:12px;background:var(--bg-subtle);padding:10px 12px;border-radius:8px;border:1px solid var(--border)">
       <div>
         <span style="color:var(--text-muted)">Receipt No:</span>
-        <b style="color:#0F172A;margin-left:4px">${escHtml(sale.no)}</b>
+        <b style="color:var(--text);margin-left:4px">${escHtml(sale.no)}</b>
       </div>
       <div>
         <span style="color:var(--text-muted)">Cashier:</span>
-        <b style="color:#0F172A;margin-left:4px">${escHtml(sale.by || "Cashier")}</b>
+        <b style="color:var(--text);margin-left:4px">${escHtml(sale.by || "Cashier")}</b>
       </div>
       <div style="grid-column:1/-1">
         <span style="color:var(--text-muted)">Customer:</span>
-        <b style="color:#0F172A;margin-left:4px">${escHtml(sale.customer || "Customer")}</b>
+        <b style="color:var(--text);margin-left:4px">${escHtml(sale.customer || "Customer")}</b>
       </div>
     </div>
 
@@ -12085,7 +13998,7 @@ function openPosReceipt(saleId) {
           const lineTotal = (Number(it.qty) || 1) * (Number(it.price) || 0);
           const isLabor = it.kind === "labor";
           return `
-            <tr style="border-bottom:1px solid #F1F5F9">
+            <tr style="border-bottom:1px solid var(--border)">
               <td style="padding:6px 0">
                 <span class="cat-badge ${it.kind}" style="margin-right:4px">${isLabor ? 'Labor' : 'Part'}</span>
                 <b>${escHtml(it.name)}</b>
@@ -12100,27 +14013,27 @@ function openPosReceipt(saleId) {
     </table>
 
     <div style="border-top:1px solid var(--border);padding-top:8px;font-size:13px">
-      <div style="display:flex;justify-content:space-between;margin-bottom:3px">
-        <span style="color:var(--text-secondary)">Subtotal</span>
-        <span>${P(subtotal)}</span>
-      </div>
       ${
         (Number(sale.discount) || 0) > 0
           ? `
-            <div style="display:flex;justify-content:space-between;color:var(--success, #16A34A);margin-bottom:3px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+              <span style="color:var(--text-secondary)">Subtotal</span>
+              <span>${P(subtotal)}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;color:var(--success);margin-bottom:3px">
               <span>Discount</span>
               <span>-${P(sale.discount)}</span>
             </div>
           `
           : ""
       }
-      <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:800;border-top:1px solid var(--border);padding-top:6px;margin-top:4px">
+      <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:800;${(Number(sale.discount) || 0) > 0 ? 'border-top:1px solid var(--border);padding-top:6px;margin-top:4px' : ''}">
         <span>Total</span>
         <span style="${sale.void ? 'text-decoration:line-through;color:var(--text-muted)' : ''}">${P(sale.total)}</span>
       </div>
     </div>
 
-    <div style="background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:14px;font-size:12px">
+    <div style="background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:14px;font-size:12px">
       <div style="display:flex;justify-content:space-between">
         <span>Payment Method:</span>
         <b>${escHtml(sale.method || "Cash")}${sale.ref ? ` (Ref: ${escHtml(sale.ref)})` : ""}</b>
@@ -12141,7 +14054,7 @@ function openPosReceipt(saleId) {
 
     <div class="rcpt-no-print" style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px;border-top:1px solid var(--border);padding-top:14px">
       <button type="button" class="btn g" onclick="closeReceipt()">Close</button>
-      <button type="button" class="btn" onclick="window.print()">🖨️ Print Receipt</button>
+      <button type="button" class="btn" onclick="window.print()"><span style="display:inline-flex;align-items:center;margin-right:6px">${ICONS.print}</span>Print Receipt</button>
     </div>
   `;
 
@@ -12200,7 +14113,7 @@ function getPosViewHtml() {
       <!-- Left Column: Search, Item Tiles & Custom Item Form -->
       <div class="pos-left-col">
         <div class="pos-search-wrap">
-          <span class="search-icon" onclick="$('pos-search-input').focus()" title="Search">🔍</span>
+          <span class="search-icon" onclick="$('pos-search-input').focus()" title="Search">${LINE_ICONS.insp}</span>
           <input
             id="pos-search-input"
             type="text"
@@ -12243,32 +14156,1137 @@ function getPosViewHtml() {
 
 
 
+
+/* ==========================================================
+   9.6 QUICK LABOR
+   ========================================================== */
+
+/** In-memory cart items for active Quick Labor ticket. */
+let quickLaborCart = [];
+
+/** Active search query string for Quick Labor catalog items. */
+let quickLaborSearch = "";
+
+/** Active filter pill: "all" | "labor" | "parts". */
+let quickLaborFilter = "all";
+
+/** Mechanic name selected in "Handled by" dropdown. */
+let quickLaborMech = "";
+
+/** Bike plate or model note string. */
+let quickLaborNote = "";
+
+/** Payment method: "Cash" | "GCash". */
+let quickLaborMethod = "Cash";
+
+/** Payment reference number for GCash. */
+let quickLaborRef = "";
+
+/** Cash amount received/tendered. */
+let quickLaborTendered = 0;
+
+/** Inline custom item form toggle flag. */
+let quickLaborCustomOpen = false;
+
+/** Inline custom item kind: "labor" | "part". */
+let quickLaborCustomKind = "labor";
+
+/** Two-step inline confirmation flag for "Clear all" button. */
+let quickLaborClearConfirmActive = false;
+let quickLaborClearConfirmTimer = null;
+
+/** Inline success notification message. */
+let quickLaborSuccessMsg = "";
+
+/**
+ * Calculates sum of labor fees in active Quick Labor cart.
+ * @returns {number} Labor subtotal in PHP.
+ */
+function getQuickLaborLaborSubtotal() {
+  return quickLaborCart.reduce((sum, item) => {
+    if (item.kind === "labor") {
+      return sum + (Number(item.price) || 0);
+    }
+    return sum;
+  }, 0);
+}
+
+/**
+ * Calculates sum of parts and fluids line amounts in active Quick Labor cart.
+ * @returns {number} Parts subtotal in PHP.
+ */
+function getQuickLaborPartsSubtotal() {
+  return quickLaborCart.reduce((sum, item) => {
+    if (item.kind === "part") {
+      return sum + (Number(item.price) || 0) * (Number(item.qty) || 1);
+    }
+    return sum;
+  }, 0);
+}
+
+/**
+ * Calculates grand total for active Quick Labor ticket.
+ * @returns {number} Grand total in PHP.
+ */
+function getQuickLaborTotal() {
+  return getQuickLaborLaborSubtotal() + getQuickLaborPartsSubtotal();
+}
+
+/**
+ * Returns current quantity of a catalog item in active Quick Labor cart.
+ * @param {string} catId - Catalog item ID.
+ * @param {string} kind - "labor" | "part"
+ * @returns {number} Quantity in cart.
+ */
+function getQuickLaborInCartQty(catId, kind) {
+  const line = quickLaborCart.find((x) => !x.custom && x.id === catId && x.kind === kind);
+  if (!line) return 0;
+  return line.kind === "labor" ? 1 : (Number(line.qty) || 0);
+}
+
+/**
+ * Retrieves catalog items matching active Quick Labor filter and search.
+ * @returns {Array<Object>} Filtered catalog items.
+ */
+function getFilteredQuickLaborCatalogItems() {
+  let kindFilter = "all";
+  if (quickLaborFilter === "labor") kindFilter = "labor";
+  else if (quickLaborFilter === "parts") kindFilter = "part";
+
+  const items = getCatalogItems(kindFilter);
+  const q = quickLaborSearch.trim().toLowerCase();
+  if (!q) return items;
+
+  return items.filter((it) => {
+    const matchName = (it.name || "").toLowerCase().includes(q);
+    const matchSku = (it.sku || "").toLowerCase().includes(q);
+    return matchName || matchSku;
+  });
+}
+
+/**
+ * Calculates live counts for Quick Labor filter chips.
+ * @returns {{all: number, labor: number, parts: number}}
+ */
+function getQuickLaborFilterCounts() {
+  const allItems = getCatalogItems("all");
+  return {
+    all: allItems.length,
+    labor: allItems.filter((i) => i.kind === "labor").length,
+    parts: allItems.filter((i) => i.kind === "part").length
+  };
+}
+
+/**
+ * Generates HTML string for the Quick Labor category filter chips with live counts.
+ * @returns {string} HTML string.
+ */
+function getQuickLaborChipsHtml() {
+  const counts = getQuickLaborFilterCounts();
+  return `
+    <button
+      type="button"
+      id="ql-chip-all"
+      class="ql-chip ${quickLaborFilter === 'all' ? 'active' : ''}"
+      onclick="setQuickLaborFilter('all')"
+      aria-pressed="${quickLaborFilter === 'all' ? 'true' : 'false'}"
+    >
+      All Items <span class="ql-chip-cnt">(${counts.all})</span>
+    </button>
+    <button
+      type="button"
+      id="ql-chip-labor"
+      class="ql-chip ${quickLaborFilter === 'labor' ? 'active' : ''}"
+      onclick="setQuickLaborFilter('labor')"
+      aria-pressed="${quickLaborFilter === 'labor' ? 'true' : 'false'}"
+    >
+      Labor Only <span class="ql-chip-cnt">(${counts.labor})</span>
+    </button>
+    <button
+      type="button"
+      id="ql-chip-parts"
+      class="ql-chip ${quickLaborFilter === 'parts' ? 'active' : ''}"
+      onclick="setQuickLaborFilter('parts')"
+      aria-pressed="${quickLaborFilter === 'parts' ? 'true' : 'false'}"
+    >
+      Parts &amp; Fluids <span class="ql-chip-cnt">(${counts.parts})</span>
+    </button>
+  `;
+}
+
+/**
+ * Sets active Quick Labor filter and refreshes chips and grid.
+ * @param {string} f - "all" | "labor" | "parts"
+ */
+function setQuickLaborFilter(f) {
+  quickLaborFilter = f;
+  const chipsEl = $("ql-chips");
+  if (chipsEl) chipsEl.innerHTML = getQuickLaborChipsHtml();
+  renderQuickLaborGrid();
+}
+
+/**
+ * Clears search and resets filter to "All Items".
+ */
+function clearQuickLaborFilters() {
+  quickLaborSearch = "";
+  quickLaborFilter = "all";
+  const inp = $("ql-search-input");
+  if (inp) inp.value = "";
+  const clr = $("ql-search-clear");
+  if (clr) clr.classList.remove("visible");
+  const chipsEl = $("ql-chips");
+  if (chipsEl) chipsEl.innerHTML = getQuickLaborChipsHtml();
+  renderQuickLaborGrid();
+}
+
+/**
+ * Handles live typing in Quick Labor search input.
+ * @param {string} val - Input query string.
+ */
+function onQuickLaborSearchInput(val) {
+  quickLaborSearch = val || "";
+  const clr = $("ql-search-clear");
+  if (clr) {
+    if (quickLaborSearch.trim()) clr.classList.add("visible");
+    else clr.classList.remove("visible");
+  }
+  renderQuickLaborGrid();
+}
+
+/**
+ * Clears Quick Labor search input.
+ */
+function clearQuickLaborSearch() {
+  quickLaborSearch = "";
+  const inp = $("ql-search-input");
+  if (inp) {
+    inp.value = "";
+    inp.focus();
+  }
+  const clr = $("ql-search-clear");
+  if (clr) clr.classList.remove("visible");
+  renderQuickLaborGrid();
+}
+
+/**
+ * Adds first matching item to Quick Labor cart on Enter key press.
+ */
+function addFirstQuickLaborMatchToCart() {
+  const items = getFilteredQuickLaborCatalogItems();
+  if (items.length > 0) {
+    addToQuickLabor({
+      id: items[0].id,
+      kind: items[0].kind,
+      name: items[0].name,
+      price: items[0].price,
+      custom: false
+    });
+    quickLaborSearch = "";
+    const inp = $("ql-search-input");
+    if (inp) {
+      inp.value = "";
+      inp.focus();
+    }
+    const clr = $("ql-search-clear");
+    if (clr) clr.classList.remove("visible");
+    renderQuickLaborGrid();
+  }
+}
+
+/**
+ * Opens inline custom item creation form.
+ * @param {"labor"|"part"} kind - Custom item kind.
+ */
+function openQuickLaborCustomForm(kind) {
+  quickLaborCustomOpen = true;
+  quickLaborCustomKind = kind === "part" ? "part" : "labor";
+  const wrap = $("ql-custom-form-wrap");
+  if (wrap) wrap.innerHTML = getQuickLaborCustomFormHtml();
+  setTimeout(() => {
+    const inp = $("ql-custom-name");
+    if (inp) inp.focus();
+  }, 50);
+}
+
+/**
+ * Closes inline custom item creation form.
+ */
+function closeQuickLaborCustomForm() {
+  quickLaborCustomOpen = false;
+  const wrap = $("ql-custom-form-wrap");
+  if (wrap) wrap.innerHTML = "";
+}
+
+/**
+ * Generates HTML for inline custom item creation form.
+ * @returns {string} HTML string.
+ */
+function getQuickLaborCustomFormHtml() {
+  if (!quickLaborCustomOpen) return "";
+  const isLabor = quickLaborCustomKind === "labor";
+  const title = isLabor ? "Add Custom Labor" : "Add Custom Part / Consumable";
+  const nameLabel = isLabor ? "Work Description" : "Part Name";
+  const namePlaceholder = isLabor ? "e.g. Exhaust bracket re-weld, Minor wiring fix" : "e.g. Bolt, Zip ties, Gasket sealant";
+  const priceLabel = isLabor ? "Labor Fee (PHP)" : "Unit Price (PHP)";
+
+  return `
+    <div class="pos-custom-form-card" id="ql-custom-form-card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="pos-custom-form-title">${title}</div>
+        <button type="button" class="search-clear visible" onclick="closeQuickLaborCustomForm()" style="position:static" title="Cancel">✕</button>
+      </div>
+      <div class="pos-custom-row">
+        <div class="pos-custom-field" style="flex:2;min-width:180px">
+          <label for="ql-custom-name">${nameLabel}</label>
+          <input id="ql-custom-name" type="text" placeholder="${namePlaceholder}" onkeydown="if(event.key==='Enter')addCustomItemToQuickLaborCart()" />
+        </div>
+        <div class="pos-custom-field" style="flex:1;min-width:100px">
+          <label for="ql-custom-price">${priceLabel}</label>
+          <input id="ql-custom-price" type="number" min="0" step="1" placeholder="0" onkeydown="if(event.key==='Enter')addCustomItemToQuickLaborCart()" />
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+        <button type="button" class="btn g sm" onclick="closeQuickLaborCustomForm()">Cancel</button>
+        <button type="button" class="btn sm" onclick="addCustomItemToQuickLaborCart()">Add</button>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Reads custom item input fields and adds new item to Quick Labor cart.
+ */
+function addCustomItemToQuickLaborCart() {
+  const nameInp = $("ql-custom-name");
+  const priceInp = $("ql-custom-price");
+  const name = nameInp ? nameInp.value.trim() : "";
+  const price = priceInp ? Math.max(0, parseFloat(priceInp.value) || 0) : 0;
+
+  const fallbackName = quickLaborCustomKind === "labor" ? "Custom labor" : "Custom part";
+
+  addToQuickLabor({
+    kind: quickLaborCustomKind,
+    name: name || fallbackName,
+    price: price,
+    custom: true
+  });
+
+  closeQuickLaborCustomForm();
+}
+
+/**
+ * Adds an item into quickLaborCart or increments its quantity.
+ * Catalog labor already in cart stays as one row; catalog part increments quantity; custom items always add a new row.
+ * @param {Object} item - Item object { id, kind, name, price, custom }.
+ */
+function addToQuickLabor(item) {
+  quickLaborSuccessMsg = "";
+  if (item.custom) {
+    quickLaborCart.push({
+      key: uid(),
+      kind: item.kind,
+      name: item.name,
+      price: Number(item.price) || 0,
+      qty: 1,
+      id: null,
+      custom: true
+    });
+  } else if (item.kind === "labor") {
+    const existing = quickLaborCart.find((x) => !x.custom && x.id === item.id && x.kind === "labor");
+    if (!existing) {
+      quickLaborCart.push({
+        key: uid(),
+        kind: "labor",
+        name: item.name,
+        price: Number(item.price) || 0,
+        qty: 1,
+        id: item.id,
+        custom: false
+      });
+    }
+  } else {
+    const existing = quickLaborCart.find((x) => !x.custom && x.id === item.id && x.kind === "part");
+    if (existing) {
+      existing.qty = (Number(existing.qty) || 1) + 1;
+    } else {
+      quickLaborCart.push({
+        key: uid(),
+        kind: "part",
+        name: item.name,
+        price: Number(item.price) || 0,
+        qty: 1,
+        id: item.id,
+        custom: false
+      });
+    }
+  }
+
+  renderQuickLaborGrid();
+  renderQuickLaborRightPanel();
+}
+
+/**
+ * Adjusts line item quantity for parts in Quick Labor cart.
+ * @param {string} key - Line key.
+ * @param {number} delta - +1 or -1.
+ */
+function updateQuickLaborCartQty(key, delta) {
+  const idx = quickLaborCart.findIndex((x) => x.key === key);
+  if (idx === -1) return;
+  const newQty = (Number(quickLaborCart[idx].qty) || 1) + delta;
+  if (newQty <= 0) {
+    quickLaborCart.splice(idx, 1);
+  } else {
+    quickLaborCart[idx].qty = newQty;
+  }
+  renderQuickLaborGrid();
+  renderQuickLaborRightPanel();
+}
+
+/**
+ * Updates labor fee directly for a labor item in Quick Labor cart.
+ * Preserves input focus by synchronizing summary DOM without full panel re-render.
+ * @param {string} key - Line key.
+ * @param {string|number} newFee - Fee entered by user.
+ */
+function updateQuickLaborCartFee(key, newFee) {
+  const line = quickLaborCart.find((x) => x.key === key);
+  if (!line) return;
+  const num = parseFloat(newFee);
+  line.price = isNaN(num) || num < 0 ? 0 : num;
+
+  const totEl = $(`ql-line-tot-${key}`);
+  if (totEl) {
+    totEl.textContent = P(line.price);
+  }
+
+  syncQuickLaborSummaryDom();
+}
+
+/**
+ * Removes an item from the Quick Labor cart.
+ * @param {string} key - Line key.
+ */
+function removeQuickLaborCartLine(key) {
+  const idx = quickLaborCart.findIndex((x) => x.key === key);
+  if (idx !== -1) {
+    quickLaborCart.splice(idx, 1);
+    renderQuickLaborGrid();
+    renderQuickLaborRightPanel();
+  }
+}
+
+/**
+ * Sets selected mechanic for Quick Labor fix.
+ * @param {string} mech - Mechanic name.
+ */
+function setQuickLaborMech(mech) {
+  quickLaborMech = mech || "";
+  renderQuickLaborRightPanel();
+}
+
+/**
+ * Sets payment method for Quick Labor ("Cash" or "GCash").
+ * @param {"Cash"|"GCash"} method - Payment method.
+ */
+function setQuickLaborMethod(method) {
+  if (method !== "Cash" && method !== "GCash") return;
+  quickLaborMethod = method;
+  renderQuickLaborRightPanel();
+}
+
+/**
+ * Handles cashier input into cash amount received field.
+ * @param {string} val - Amount entered.
+ */
+function onQuickLaborTenderedInput(val) {
+  const num = parseFloat(val);
+  quickLaborTendered = isNaN(num) || num < 0 ? 0 : num;
+  syncQuickLaborSummaryDom();
+}
+
+/**
+ * Sets quick tender preset amount (Exact, 100, 500, 1000).
+ * @param {"exact"|number} amount - Tender amount or "exact".
+ */
+function setQuickLaborQuickTender(amount) {
+  if (amount === "exact") {
+    quickLaborTendered = getQuickLaborTotal();
+  } else {
+    quickLaborTendered = Number(amount) || 0;
+  }
+  const inp = $("ql-tendered-input");
+  if (inp) inp.value = quickLaborTendered > 0 ? quickLaborTendered : "";
+  syncQuickLaborSummaryDom();
+}
+
+/**
+ * Generates Change (green) or Short by (red) HTML string.
+ * Change is never negative and never NaN.
+ * @param {number} total - Grand total.
+ * @param {number} tendered - Tendered amount.
+ * @returns {string} HTML string.
+ */
+function getQuickLaborCashCalcHtml(total, tendered) {
+  const diff = (Number(tendered) || 0) - total;
+  if (diff >= 0) {
+    return `<span>Change:</span><b style="color:var(--success);font-size:14px">${P(diff)}</b>`;
+  }
+  return `<span style="color:var(--danger);font-weight:600">Short by:</span><b style="color:var(--danger);font-size:14px">${P(Math.abs(diff))}</b>`;
+}
+
+/**
+ * Synchronizes DOM summary elements for Quick Labor without destroying input focus.
+ */
+function syncQuickLaborSummaryDom() {
+  const total = getQuickLaborTotal();
+  const laborSubtotal = getQuickLaborLaborSubtotal();
+  const partsSubtotal = getQuickLaborPartsSubtotal();
+
+  const laborEl = $("ql-labor-subtotal");
+  if (laborEl) laborEl.textContent = P(laborSubtotal);
+
+  const partsEl = $("ql-parts-subtotal");
+  if (partsEl) partsEl.textContent = P(partsSubtotal);
+
+  const totalEl = $("ql-total-val");
+  if (totalEl) totalEl.textContent = P(total);
+
+  const cashCalcRow = $("ql-cash-calc-row");
+  if (cashCalcRow) {
+    const tendered = quickLaborMethod === "Cash" ? quickLaborTendered : (quickLaborTendered || total);
+    cashCalcRow.innerHTML = getQuickLaborCashCalcHtml(total, tendered);
+
+  }
+
+  const chargeBtn = $("ql-charge-btn");
+  if (chargeBtn) {
+    chargeBtn.textContent = `Log Fix & Charge ${P(total)}`;
+  }
+}
+
+/**
+ * Handles two-step inline confirmation for "Clear all" button.
+ */
+function handleQuickLaborClearAll() {
+  const btn = $("ql-btn-clear-all");
+  if (!quickLaborClearConfirmActive) {
+    quickLaborClearConfirmActive = true;
+    if (btn) {
+      btn.textContent = "Tap again to clear";
+      btn.style.color = "var(--danger, #DC2626)";
+      btn.style.fontWeight = "700";
+    }
+    if (quickLaborClearConfirmTimer) clearTimeout(quickLaborClearConfirmTimer);
+    quickLaborClearConfirmTimer = setTimeout(() => {
+      quickLaborClearConfirmActive = false;
+      const b = $("ql-btn-clear-all");
+      if (b) {
+        b.textContent = "Clear all";
+        b.style.color = "";
+        b.style.fontWeight = "";
+      }
+    }, 3000);
+    return;
+  }
+
+  quickLaborClearConfirmActive = false;
+  if (quickLaborClearConfirmTimer) clearTimeout(quickLaborClearConfirmTimer);
+  quickLaborCart = [];
+  quickLaborMech = "";
+  quickLaborNote = "";
+  quickLaborMethod = "Cash";
+  quickLaborRef = "";
+  quickLaborTendered = 0;
+  quickLaborSuccessMsg = "";
+  renderQuickLaborGrid();
+  renderQuickLaborRightPanel();
+}
+
+/**
+ * Generates HTML string for the Quick Labor items grid.
+ * @returns {string} HTML string.
+ */
+function getQuickLaborGridHtml() {
+  const items = getFilteredQuickLaborCatalogItems();
+
+  if (items.length === 0) {
+    return `
+      <div class="empty" style="padding:40px 16px;text-align:center;background:#FFFFFF;border:1px dashed var(--border);border-radius:12px;margin-top:4px">
+        <div style="font-weight:700;font-size:14px;color:var(--text-primary);margin-bottom:4px">No items found</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">No catalog items matched your current filter or search query.</div>
+        <button type="button" class="btn g sm" onclick="clearQuickLaborFilters()">Clear filters</button>
+      </div>
+    `;
+  }
+
+  const tilesHtml = items.map((it) => {
+    const inCartQty = getQuickLaborInCartQty(it.id, it.kind);
+    const isLabor = it.kind === "labor";
+    const badgeStyle = isLabor
+      ? 'style="background:#F5F3FF;color:#7C3AED;border-color:#DDD6FE"'
+      : '';
+    const badgeText = isLabor ? 'Labor' : 'Part';
+
+    return `
+      <button
+        type="button"
+        class="pos-tile ${inCartQty > 0 ? "in-cart" : ""}"
+        onclick="addToQuickLabor({ id: '${it.id}', kind: '${it.kind}', name: '${escHtml(it.name).replace(/'/g, "\\'")}', price: ${Number(it.price) || 0}, custom: false })"
+        title="Tap to add: ${escHtml(it.name)}"
+      >
+        ${inCartQty > 0 ? `<span class="pos-tile-badge">${inCartQty}</span>` : ""}
+        <div>
+          <span class="cat-badge ${it.kind}" ${badgeStyle}>
+            ${badgeText}
+          </span>
+          <div class="pos-tile-name">${escHtml(it.name)}</div>
+        </div>
+        <div class="pos-tile-price">${P(it.price)}</div>
+      </button>
+    `;
+  }).join("");
+
+  return `
+    <div class="pos-tiles-grid">
+      ${tilesHtml}
+    </div>
+  `;
+}
+
+/**
+ * Re-renders the Quick Labor catalog items grid in the DOM.
+ */
+function renderQuickLaborGrid() {
+  const wrap = $("ql-grid-wrap");
+  if (wrap) wrap.innerHTML = getQuickLaborGridHtml();
+}
+
+/**
+ * Generates full HTML for the right column "Current Quick Fix" panel.
+ * @returns {string} HTML string.
+ */
+function getQuickLaborRightPanelHtml() {
+  const total = getQuickLaborTotal();
+  const laborSubtotal = getQuickLaborLaborSubtotal();
+  const partsSubtotal = getQuickLaborPartsSubtotal();
+  const mechanics = getUniqueMechanics();
+
+  return `
+    <div class="pos-cart-panel" style="padding:16px">
+      ${
+        quickLaborSuccessMsg
+          ? `
+            <div style="background:#ECFDF5;border:1px solid #A7F3D0;color:#047857;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+              <span>✓ ${escHtml(quickLaborSuccessMsg)}</span>
+              <button type="button" onclick="quickLaborSuccessMsg='';renderQuickLaborRightPanel()" style="background:none;border:none;color:#047857;cursor:pointer;font-size:14px">✕</button>
+            </div>
+          `
+          : ""
+      }
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="font-size:14px;font-weight:700;color:var(--text-primary)">Current Quick Fix</span>
+        <button
+          type="button"
+          class="btn g sm"
+          id="ql-btn-clear-all"
+          onclick="handleQuickLaborClearAll()"
+          style="${quickLaborClearConfirmActive ? 'color:var(--danger, #DC2626);font-weight:700' : ''}"
+          title="Clear fix and inputs"
+        >
+          ${quickLaborClearConfirmActive ? "Tap again to clear" : "Clear all"}
+        </button>
+      </div>
+
+      <!-- Top two compact inputs -->
+      <div style="margin-bottom:10px">
+        <label for="ql-mech-select" style="font-size:12px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:4px">
+          Handled by <span style="color:var(--danger)">*</span>
+        </label>
+        <select
+          id="ql-mech-select"
+          class="his-select"
+          style="width:100%;height:34px;font-size:13px;border:1px solid var(--border);border-radius:6px;background:var(--bg-surface);color:var(--text)"
+          onchange="setQuickLaborMech(this.value)"
+        >
+          <option value="">Select mechanic...</option>
+          ${mechanics.map((m) => `<option value="${escHtml(m)}" ${quickLaborMech === m ? "selected" : ""}>${escHtml(m)}</option>`).join("")}
+        </select>
+        ${
+          !quickLaborMech
+            ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;font-style:italic">Not selected. Will be logged as Unassigned.</div>`
+            : ""
+        }
+      </div>
+
+      <div style="margin-bottom:14px">
+        <label for="ql-note-input" style="font-size:12px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:4px">
+          Bike / note (optional)
+        </label>
+        <input
+          id="ql-note-input"
+          type="text"
+          placeholder="Plate # or bike model, e.g. Click 125i"
+          value="${escHtml(quickLaborNote)}"
+          oninput="quickLaborNote = this.value"
+          style="width:100%;height:34px;box-sizing:border-box;border-radius:6px;border:1px solid var(--border);padding:0 8px;font-size:13px;background:var(--bg-surface);color:var(--text)"
+        />
+      </div>
+
+      <!-- Itemized Cart List -->
+      <div class="pos-cart-list" id="ql-cart-list">
+        ${
+          quickLaborCart.length === 0
+            ? `<div class="empty" style="padding:32px 16px;text-align:center;font-size:13px;color:var(--text-muted)">No items yet.<br>Tap a labor or part card to add it.</div>`
+            : quickLaborCart.map((item) => {
+                const isLabor = item.kind === "labor";
+                const lineTotal = isLabor ? (Number(item.price) || 0) : ((Number(item.qty) || 1) * (Number(item.price) || 0));
+                const badgeStyle = isLabor
+                  ? 'style="background:#F5F3FF;color:#7C3AED;border:1px solid #DDD6FE;margin-right:4px"'
+                  : 'style="margin-right:4px"';
+                const badgeText = isLabor ? 'Labor' : 'Part';
+
+                return `
+                  <div class="pos-cart-line" id="ql-cart-line-${item.key}">
+                    <div class="pos-cart-line-top">
+                      <div style="flex:1;min-width:0">
+                        <span class="cat-badge ${item.kind}" ${badgeStyle}>${badgeText}</span>
+                        <b style="font-size:13px;color:var(--text-primary)">${escHtml(item.name)}</b>
+                      </div>
+                      <button type="button" class="pos-line-del-btn" onclick="removeQuickLaborCartLine('${item.key}')" title="Remove item">✕</button>
+                    </div>
+
+                    ${
+                      isLabor
+                        ? `
+                          <div class="pos-cart-line-bottom" style="justify-content:space-between">
+                            <div style="display:flex;align-items:center;gap:4px">
+                              <span style="font-size:12px;font-weight:600;color:var(--text-secondary)">Fee: ₱</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                class="pos-price-input"
+                                value="${item.price}"
+                                oninput="updateQuickLaborCartFee('${item.key}', this.value)"
+                                style="width:90px;height:28px;border-radius:4px;border:1px solid var(--border);padding:0 6px;font-size:13px;font-weight:700;text-align:right"
+                              />
+                            </div>
+                            <b style="font-size:13px;color:var(--text);min-width:60px;text-align:right" id="ql-line-tot-${item.key}">
+                              ${P(lineTotal)}
+                            </b>
+                          </div>
+                        `
+                        : `
+                          <div class="pos-cart-line-bottom">
+                            <div class="pos-qty-stepper">
+                              <button type="button" class="pos-qty-btn" onclick="updateQuickLaborCartQty('${item.key}', -1)" title="Decrease quantity">−</button>
+                              <span class="pos-qty-val">${item.qty}</span>
+                              <button type="button" class="pos-qty-btn" onclick="updateQuickLaborCartQty('${item.key}', 1)" title="Increase quantity">+</button>
+                            </div>
+                            <div style="font-size:12px;color:var(--text-muted)">@ ${P(item.price)}</div>
+                            <b style="font-size:13px;color:var(--text);min-width:60px;text-align:right" id="ql-line-tot-${item.key}">
+                              ${P(lineTotal)}
+                            </b>
+                          </div>
+                        `
+                    }
+                  </div>
+                `;
+              }).join("")
+        }
+      </div>
+
+      <!-- Totals Block -->
+      <div class="pos-totals-block" style="margin-top:12px">
+        <div class="pos-totals-row" style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);margin-bottom:4px">
+          <span>Labor Subtotal</span>
+          <span id="ql-labor-subtotal">${P(laborSubtotal)}</span>
+        </div>
+        <div class="pos-totals-row" style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);margin-bottom:6px">
+          <span>Parts Subtotal</span>
+          <span id="ql-parts-subtotal">${P(partsSubtotal)}</span>
+        </div>
+        <div class="pos-totals-row grand-total" style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:8px">
+          <span style="font-size:14px;font-weight:700">Total</span>
+          <span id="ql-total-val" style="font-size:16px;font-weight:800;color:var(--text)">${P(total)}</span>
+        </div>
+      </div>
+
+      <!-- Payment Method Toggle: Cash and GCash ONLY (2 equal columns) -->
+      <div style="margin-top:14px">
+        <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:6px">Payment Method</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <button
+            type="button"
+            class="btn g sm ${quickLaborMethod === 'Cash' ? 'on' : ''}"
+            style="${quickLaborMethod === 'Cash' ? 'background:var(--accent);color:#FFF;border-color:var(--accent);font-weight:700' : ''}"
+            onclick="setQuickLaborMethod('Cash')"
+          >
+            <span style="display:inline-flex;align-items:center;margin-right:4px">${ICONS.money}</span>Cash
+          </button>
+          <button
+            type="button"
+            class="btn g sm ${quickLaborMethod === 'GCash' ? 'on' : ''}"
+            style="${quickLaborMethod === 'GCash' ? 'background:var(--accent);color:#FFF;border-color:var(--accent);font-weight:700' : ''}"
+            onclick="setQuickLaborMethod('GCash')"
+          >
+            <span style="display:inline-flex;align-items:center;margin-right:4px">${ICONS.phone}</span>GCash
+          </button>
+        </div>
+      </div>
+
+      <!-- Amount received, quick buttons, and Change -->
+      ${
+        quickLaborMethod === "Cash"
+          ? `
+            <div style="margin-top:12px;background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <label for="ql-tendered-input" style="font-size:12px;font-weight:700;color:var(--text-secondary)">Amount received (PHP):</label>
+                <input
+                  id="ql-tendered-input"
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="0"
+                  value="${quickLaborTendered > 0 ? quickLaborTendered : ''}"
+                  oninput="onQuickLaborTenderedInput(this.value)"
+                  style="width:100px;height:32px;border-radius:6px;border:1px solid var(--border);padding:0 8px;text-align:right;font-size:13px;font-weight:700;background:var(--bg-surface);color:var(--text)"
+                />
+              </div>
+
+              <!-- Quick cash buttons -->
+              <div style="display:flex;gap:4px;margin-top:6px">
+                <button type="button" class="btn g sm" style="flex:1;padding:4px 0;font-size:11px" onclick="setQuickLaborQuickTender('exact')">Exact</button>
+                <button type="button" class="btn g sm" style="flex:1;padding:4px 0;font-size:11px" onclick="setQuickLaborQuickTender(100)">₱100</button>
+                <button type="button" class="btn g sm" style="flex:1;padding:4px 0;font-size:11px" onclick="setQuickLaborQuickTender(500)">₱500</button>
+                <button type="button" class="btn g sm" style="flex:1;padding:4px 0;font-size:11px" onclick="setQuickLaborQuickTender(1000)">₱1,000</button>
+              </div>
+
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:12px" id="ql-cash-calc-row">
+                ${getQuickLaborCashCalcHtml(total, quickLaborTendered)}
+              </div>
+            </div>
+          `
+          : `
+            <div style="margin-top:12px;background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+              <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px">
+                Digital payment via <b>GCash</b>. Exact amount (${P(total)}) billed.
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <label for="ql-tendered-input" style="font-size:12px;font-weight:700;color:var(--text-secondary)">Amount received (PHP):</label>
+                <input
+                  id="ql-tendered-input"
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="0"
+                  value="${quickLaborTendered > 0 ? quickLaborTendered : total}"
+                  oninput="onQuickLaborTenderedInput(this.value)"
+                  style="width:100px;height:32px;border-radius:6px;border:1px solid var(--border);padding:0 8px;text-align:right;font-size:13px;font-weight:700;background:var(--bg-surface);color:var(--text)"
+                />
+              </div>
+              <div style="display:flex;gap:4px;margin-top:6px;margin-bottom:8px">
+                <button type="button" class="btn g sm" style="flex:1;padding:4px 0;font-size:11px" onclick="setQuickLaborQuickTender('exact')">Exact</button>
+                <button type="button" class="btn g sm" style="flex:1;padding:4px 0;font-size:11px" onclick="setQuickLaborQuickTender(100)">₱100</button>
+                <button type="button" class="btn g sm" style="flex:1;padding:4px 0;font-size:11px" onclick="setQuickLaborQuickTender(500)">₱500</button>
+                <button type="button" class="btn g sm" style="flex:1;padding:4px 0;font-size:11px" onclick="setQuickLaborQuickTender(1000)">₱1,000</button>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:12px" id="ql-cash-calc-row">
+                ${getQuickLaborCashCalcHtml(total, quickLaborTendered || total)}
+              </div>
+              <label for="ql-ref-input" style="font-size:11px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Reference No. (optional):</label>
+              <input
+                id="ql-ref-input"
+                type="text"
+                placeholder="e.g. 1002938472"
+                value="${escHtml(quickLaborRef)}"
+                oninput="quickLaborRef = this.value"
+                style="width:100%;height:32px;border-radius:6px;border:1px solid var(--border);padding:0 8px;font-size:13px;box-sizing:border-box;background:var(--bg-surface);color:var(--text)"
+              />
+            </div>
+          `
+      }
+
+      <!-- Primary Action Button: Log Fix & Charge, always enabled -->
+      <button
+        type="button"
+        class="pos-charge-btn"
+        id="ql-charge-btn"
+        onclick="logQuickFix()"
+        style="margin-top:14px"
+      >
+        Log Fix &amp; Charge ${P(total)}
+      </button>
+    </div>
+  `;
+}
+
+/**
+ * Re-renders the Quick Labor right panel in the DOM.
+ */
+function renderQuickLaborRightPanel() {
+  const panel = $("ql-right-panel");
+  if (panel) panel.innerHTML = getQuickLaborRightPanelHtml();
+}
+
+/**
+ * Generates the full HTML markup for the Quick Labor view.
+ * @returns {string} HTML markup string.
+ */
+function getQuickLaborViewHtml() {
+  return `
+    <div class="card top">
+      <div>
+        <h1>Quick Labor</h1>
+        <p>Fast-track logging and checkout for completed walk-in minor repairs and part replacements.</p>
+      </div>
+    </div>
+
+    <div class="pos-container">
+      <!-- Left Column: Search, Filters, Custom Items, Catalog Items -->
+      <div class="pos-left-col">
+        <!-- Search bar with live search and Enter quick-add -->
+        <div class="rep-search-wrap" style="margin-bottom:12px">
+          <span class="search-icon" onclick="$('ql-search-input').focus()" title="Search">${LINE_ICONS.insp}</span>
+          <input
+            id="ql-search-input"
+            type="text"
+            placeholder="Search quick services or replacement parts (press Enter to quick-add)..."
+            value="${quickLaborSearch.replace(/"/g, '&quot;')}"
+            autocomplete="off"
+            oninput="onQuickLaborSearchInput(this.value)"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();addFirstQuickLaborMatchToCart();}"
+          />
+          <button
+            id="ql-search-clear"
+            class="search-clear ${quickLaborSearch ? "visible" : ""}"
+            onclick="clearQuickLaborSearch()"
+            type="button"
+            aria-label="Clear search"
+            title="Clear search"
+          >✕</button>
+        </div>
+
+        <!-- Filter pills with live counts -->
+        <div class="pos-chips" id="ql-chips" style="margin-bottom:12px">
+          ${getQuickLaborChipsHtml()}
+        </div>
+
+        <!-- Top dashed cards for Custom Labor & Custom Part -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <button type="button" class="pos-tile pos-tile-custom" onclick="openQuickLaborCustomForm('labor')" title="Add custom labor">
+            <div class="pos-custom-plus">+</div>
+            <div class="pos-custom-text">+ Custom Labor</div>
+          </button>
+          <button type="button" class="pos-tile pos-tile-custom" onclick="openQuickLaborCustomForm('part')" title="Add custom part / consumable">
+            <div class="pos-custom-plus">+</div>
+            <div class="pos-custom-text">+ Custom Part / Consumable</div>
+          </button>
+        </div>
+
+        <!-- Custom Item Inline Form (shown when open) -->
+        <div id="ql-custom-form-wrap">
+          ${getQuickLaborCustomFormHtml()}
+        </div>
+
+        <!-- Catalog items grid container -->
+        <div id="ql-grid-wrap">
+          ${getQuickLaborGridHtml()}
+        </div>
+      </div>
+
+      <!-- Right Column: Current Quick Fix Panel -->
+      <div class="pos-right-col" id="ql-right-panel">
+        ${getQuickLaborRightPanelHtml()}
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Logs a completed quick walk-in fix into D.wo, deducts catalog part stock,
+ * clears the cart and inputs, and displays an inline success confirmation.
+ */
+function logQuickFix() {
+  const total = getQuickLaborTotal();
+  // Copying Quick Sales behavior for empty cart: early return
+  if (quickLaborCart.length === 0) return;
+
+  const laborSubtotal = getQuickLaborLaborSubtotal();
+  const partsSubtotal = getQuickLaborPartsSubtotal();
+
+  const tendered = quickLaborMethod === "Cash"
+    ? (Number(quickLaborTendered) || 0)
+    : (Number(quickLaborTendered) || total);
+  const change = Math.max(0, tendered - total);
+
+  // Deduct stock for catalog Part items using the same method Quick Sales uses
+  quickLaborCart.forEach((item) => {
+    if (!item.custom && item.kind === "part" && item.id) {
+      const pt = (D.pt || []).find((p) => p.id === item.id);
+      if (pt && typeof pt.stock === "number") {
+        pt.stock = Math.max(0, pt.stock - (Number(item.qty) || 1));
+      }
+    }
+  });
+
+  const nextIdx = D.wo.length + 1;
+  const txnId = "TXN-" + String(nextIdx).padStart(4, "0");
+
+  const newFix = {
+    id: "w" + uid(),
+    type: "QUICK LABOR",
+    st: "Completed",
+    done: nowLocalString(),
+    at: today(),
+    customer: "Walk-in Customer",
+    vehicleLine: (quickLaborNote.trim()) || "Walk-in Motorcycle",
+    mech: (quickLaborMech.trim()) || "Unassigned",
+    items: quickLaborCart.map((it) => ({
+      id: it.id || uid(),
+      kind: it.kind,
+      name: it.name,
+      qty: it.kind === "labor" ? 1 : (Number(it.qty) || 1),
+      price: Number(it.price) || 0,
+      custom: !!it.custom
+    })),
+    laborSubtotal: laborSubtotal,
+    partsSubtotal: partsSubtotal,
+    total: total,
+    pay: {
+      method: quickLaborMethod,
+      paidAt: nowLocalString(),
+      tendered: tendered,
+      change: change,
+      ref: quickLaborRef.trim()
+    }
+  };
+
+  D.wo.push(newFix);
+  save();
+
+  // Reset cart, inputs, and state
+  quickLaborCart = [];
+  quickLaborMech = "";
+  quickLaborNote = "";
+  quickLaborMethod = "Cash";
+  quickLaborRef = "";
+  quickLaborTendered = 0;
+  quickLaborClearConfirmActive = false;
+  if (quickLaborClearConfirmTimer) clearTimeout(quickLaborClearConfirmTimer);
+  quickLaborSuccessMsg = `Fix logged. ${txnId}`;
+
+  // Refresh UI
+  renderQuickLaborGrid();
+  renderQuickLaborRightPanel();
+}
+
+
+
+
 /* ==========================================================
    10. INIT
    ========================================================== */
 
 /**
- * Bootstraps authentication state on page load.
- * Sets copyright year, and if a valid session exists, opens the app directly; otherwise shows only the login screen.
+ * Bootstraps authentication and application state on page load.
+ * Restores session, active role, and active view with zero flash.
  */
 function initAuth() {
   const yearEl = $("login-year");
   if (yearEl) yearEl.textContent = new Date().getFullYear();
 
-  const u = getCurrentUser();
-  if (u) {
+  // 1. Read sidebar state & UI state
+  updateSidebarToggleUI();
+  if (desktopSidebarState === "collapsed" && typeof window !== "undefined" && window.innerWidth >= 900) {
+    if (document.body) document.body.classList.add("sidebar--collapsed");
+  }
+
+  // Read users & session
+  const users = loadUsers();
+  const session = getSession();
+
+  let validUser = null;
+  if (session && session.userId) {
+    const found = users.find((u) => u.id === session.userId);
+    if (found && found.active !== false) {
+      validUser = found;
+    }
+  }
+
+  // 2. If session is valid
+  if (validUser) {
+    const activeRole = session.role && ROLES[session.role] ? session.role : validUser.role;
+
+    // Render sidebar user profile and navigation
+    renderSidebarUser();
+    renderNav();
+
+    // 3. Choose the page in order:
+    // a. URL hash if valid page key and canOpen() allows it
+    // b. session.view if allowed
+    // c. First allowed page (dash if allowed, else allowed[0])
+    // d. renderNoAccess()
+    const allowed = getRoleNav(activeRole);
+    const hashKey = (typeof window !== "undefined" && window.location && window.location.hash
+      ? window.location.hash.replace(/^#/, "").trim()
+      : "");
+
+    let targetPage = null;
+    if (hashKey && canOpen(hashKey)) {
+      targetPage = hashKey;
+    } else if (session.view && canOpen(session.view)) {
+      targetPage = session.view;
+    } else if (allowed.length > 0) {
+      targetPage = allowed.includes("dash") ? "dash" : allowed[0];
+    }
+
+    if (targetPage) {
+      go(targetPage);
+    } else {
+      view = "";
+      $("main").innerHTML = renderNoAccess();
+    }
+
+    // Show the app shell
     document.body.classList.remove("logged-out");
     document.body.classList.add("logged-in");
-    syncViewForRole();
   } else {
+    // 4. If no valid session, corrupted, or user deactivated/deleted:
+    clearSession();
+    if (typeof window !== "undefined" && window.location && window.location.hash) {
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState(null, "", (window.location.pathname || "") + (window.location.search || ""));
+      } else {
+        window.location.hash = "";
+      }
+    }
+    if (document.documentElement) document.documentElement.classList.remove("has-session");
     document.body.classList.remove("logged-in");
     document.body.classList.add("logged-out");
+
     const emailEl = $("login-email");
     if (emailEl) {
+      emailEl.value = "";
       emailEl.focus();
       openLoginDropdown();
     }
   }
+}
+
+// Listen to browser Back and Forward hash changes
+if (typeof window !== "undefined") {
+  window.addEventListener("hashchange", () => {
+    const u = getCurrentUser();
+    if (!u) return;
+    const hashKey = (window.location && window.location.hash ? window.location.hash : "").replace(/^#/, "").trim();
+    if (hashKey && hashKey !== view && canOpen(hashKey)) {
+      go(hashKey);
+    }
+  });
 }
 
 initAuth();

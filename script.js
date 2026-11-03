@@ -1704,6 +1704,118 @@ function addS() {
 
 
 /* ==========================================================
+   9b. POS SWITCHER (Navigation & Tabs)
+   ========================================================== */
+
+/**
+ * Tab definitions for the consolidated POS switcher bar.
+ * Ordered: Quick Sales, Quick Labor, Transactions & Billing.
+ */
+const POS_TABS = [
+  { id: "pos", label: "Quick Sales", shortLabel: "Sales", icon: "pos" },
+  { id: "ql", label: "Quick Labor", shortLabel: "Labor", icon: "ql" },
+  { id: "bill", label: "Transactions & Billing", shortLabel: "Billing", icon: "bill" }
+];
+
+/**
+ * Returns the POS_TABS the current role may open, read from the shared role-permissions map.
+ * @returns {Array<Object>} Permitted POS tab definitions.
+ */
+function getPosTabsForRole() {
+  if (typeof canOpen === "function") {
+    return POS_TABS.filter((tab) => canOpen(tab.id));
+  }
+  return POS_TABS;
+}
+
+/** Last POS screen ID opened during this session. */
+let posLastTab = "";
+
+/**
+ * Resolves which POS screen should open when the POS sidebar item is tapped.
+ * Returns posLastTab if permitted, else "pos" (Quick Sales) if permitted,
+ * else the first permitted POS tab, else null.
+ * @returns {string|null} Resolved screen ID.
+ */
+function resolvePosTab() {
+  const tabs = getPosTabsForRole();
+  if (!tabs.length) return null;
+  if (posLastTab && tabs.some((t) => t.id === posLastTab)) {
+    return posLastTab;
+  }
+  const quickSales = tabs.find((t) => t.id === "pos");
+  if (quickSales) {
+    return "pos";
+  }
+  return tabs[0].id;
+}
+
+/**
+ * Renders the consolidated 3-button switcher bar at the top of the main content area.
+ * Removes any existing switcher first to avoid duplicates.
+ * If fewer than 2 tabs are permitted for the active role, adds nothing.
+ * @param {string} activeId - The active POS screen ID ("pos", "ql", or "bill").
+ */
+function renderPosSwitcher(activeId) {
+  const existing = $("pos-switcher");
+  if (existing) {
+    existing.remove();
+  }
+
+  const tabs = getPosTabsForRole();
+  if (tabs.length < 2) {
+    return;
+  }
+
+  const mainEl = $("main-content-area") || $("main");
+  if (!mainEl) return;
+
+  const switcher = document.createElement("div");
+  switcher.id = "pos-switcher";
+  switcher.setAttribute("role", "tablist");
+  switcher.setAttribute("aria-label", "POS Section Switcher");
+
+  const iconsMap = typeof ICONS !== "undefined" ? ICONS : {};
+
+  switcher.innerHTML = tabs
+    .map(
+      (t) => `
+        <button
+          type="button"
+          role="tab"
+          class="pos-tab ${t.id === activeId ? "pos-tab-active" : ""}"
+          data-screen="${t.id}"
+          aria-selected="${t.id === activeId ? "true" : "false"}"
+          onclick="loadView('${t.id}')"
+        >
+          <span>${iconsMap[t.icon] || ""}</span>
+          <span class="pos-tab-label-full">${t.label}</span>
+          <span class="pos-tab-label-short">${t.shortLabel}</span>
+        </button>
+      `
+    )
+    .join("");
+
+  mainEl.insertBefore(switcher, mainEl.firstChild);
+
+  if (window.lucide && typeof lucide.createIcons === "function") {
+    lucide.createIcons();
+  }
+}
+
+/**
+ * Loads a view and triggers per-screen setup.
+ * Wraps go(v) for standard screen loading.
+ * @param {string} v - Screen ID to load.
+ */
+function loadView(v) {
+  if (typeof go === "function") {
+    go(v);
+  }
+}
+
+
+/* ==========================================================
    10. INIT
    ========================================================== */
 

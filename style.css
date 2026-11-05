@@ -6555,67 +6555,136 @@ body.logged-in .login-screen {
   border-left: 3px solid var(--ql-amber-border) !important;
 }
 
-/* Filter Pills: Slate when active, White with border when inactive */
-.ql-chips {
+/* Segmented Control for Job Types (Fix + Parts vs Parts Only) */
+.ql-type-bar {
   display: flex;
   gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 6px;
+  margin-bottom: 20px;
 }
 
-.ql-chip {
-  all: unset;
-  cursor: pointer;
-  box-sizing: border-box;
-  min-height: 40px;
-  border-radius: 999px;
-  border: 1px solid var(--ql-border);
-  background: #FFFFFF;
+.ql-type-btn {
+  flex: 1;
+  min-height: 44px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--text-muted);
-  padding: 0 16px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.15s ease;
   user-select: none;
 }
 
-.ql-chip:hover {
+.ql-type-btn:hover:not(.active) {
   background: var(--bg-subtle);
-  border-color: var(--border);
   color: var(--text);
 }
 
-.ql-chip:focus-visible {
+.ql-type-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-.ql-chip.active {
-  background: var(--ql-slate);
-  color: #FFFFFF;
-  border-color: var(--ql-slate);
-}
-
-.ql-chip.active:hover {
-  background: var(--ql-slate);
-  border-color: var(--ql-slate);
+.ql-type-btn.active {
+  background: #1E293B;
   color: #FFFFFF;
 }
 
-.ql-chip-cnt {
+.ql-type-btn.confirm-remove {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: var(--danger-border);
+}
+
+/* Numbered Step Cards (28px circle badge, stacked in cards on left) */
+.ql-step-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.ql-step-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.ql-step-badge {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: 50%;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  margin-top: 1px;
+}
+
+.ql-step-badge.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #FFFFFF;
+}
+
+.ql-step-badge.done {
+  background: var(--success);
+  border-color: var(--success);
+  color: #FFFFFF;
+}
+
+.ql-step-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.ql-step-subtitle {
   font-size: 12px;
-  font-weight: 600;
-  color: inherit;
-  opacity: 0.85;
+  color: var(--text-muted);
+  margin-top: 2px;
 }
 
-.ql-chip.active .ql-chip-cnt {
-  color: rgba(255, 255, 255, 0.85);
-  opacity: 1;
+.ql-chosen-box {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+
+.ql-empty-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 8px 0;
+}
+
+.ql-steps-footer-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 8px;
+  margin-bottom: 16px;
+  font-style: italic;
 }
 
 /* Checkout Button: Blue with hover state */
@@ -6807,6 +6876,277 @@ body.is-mobile #pos-switcher .pos-tab .pos-tab-label-short,
   text-decoration: line-through;
   color: var(--text-muted, #94a3b8);
 }
+
+/* ==========================================================
+   ECU / OBD COLLAPSIBLE FAULT CARDS (dtc-)
+   ========================================================== */
+
+/* Results Grid */
+.obd-results-grid.dtc-grid,
+.dtc-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: start;
+  gap: 12px;
+  margin-top: 10px;
+  margin-bottom: 12px;
+}
+
+@media (min-width: 1100px) {
+  .obd-results-grid.dtc-grid,
+  .dtc-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Mobile UI frame: strictly 1 column at all times */
+.mobile-ui .obd-results-grid,
+.mobile-ui .dtc-grid,
+[data-mobile] .obd-results-grid,
+[data-mobile] .dtc-grid,
+body.is-mobile .obd-results-grid,
+body.is-mobile .dtc-grid,
+.phone-frame .obd-results-grid,
+.phone-frame .dtc-grid {
+  grid-template-columns: 1fr !important;
+}
+
+/* DTC Card */
+.dtc-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 16px;
+  min-width: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.dtc-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.dtc-top .obd-card-action {
+  margin-left: auto;
+}
+
+.dtc-top .obd-btn-add,
+.dtc-top .obd-btn-added {
+  min-height: 44px;
+}
+
+.dtc-name {
+  margin: 10px 0 0;
+  padding: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.dtc-toggle {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 44px;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #0F172A);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.dtc-toggle:focus-visible {
+  outline: 2px solid var(--accent, #2563EB);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (hover: hover) {
+  .dtc-toggle:hover {
+    opacity: 0.85;
+  }
+}
+
+.dtc-title-text {
+  flex: 1;
+  text-align: left;
+  padding-right: 8px;
+  overflow-wrap: anywhere;
+}
+
+.dtc-toggle-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.dtc-toggle-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted, #64748B);
+}
+
+.dtc-chevron {
+  display: inline-block;
+  color: var(--text-muted, #64748B);
+  transition: transform 200ms ease;
+  flex-shrink: 0;
+}
+
+.dtc-card.is-open .dtc-chevron {
+  transform: rotate(180deg);
+}
+
+/* Collapsible Details Panel */
+.dtc-details {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 200ms ease;
+  visibility: hidden;
+}
+
+.dtc-card.is-open .dtc-details {
+  grid-template-rows: 1fr;
+  visibility: visible;
+}
+
+.dtc-details-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dtc-details,
+  .dtc-chevron {
+    transition: none !important;
+  }
+}
+
+/* Content inside details */
+.dtc-desc {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-secondary, #475569);
+  margin: 10px 0 8px;
+  overflow-wrap: anywhere;
+}
+
+.dtc-section {
+  margin-top: 8px;
+}
+
+.dtc-section-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted, #64748B);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.dtc-checks-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-secondary, #334155);
+}
+
+.dtc-checks-list li {
+  font-size: 14px;
+  line-height: 1.4;
+  margin-bottom: 6px;
+  overflow-wrap: anywhere;
+}
+
+.dtc-parts-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dtc-parts-chips .obd-part-chip {
+  overflow-wrap: anywhere;
+}
+
+/* Controls above results wrap: ensure min 44px tap targets */
+.btn-elm-scan-compact,
+.btn-elm-pair {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.obd-drawer-header {
+  min-height: 44px;
+  flex-wrap: wrap;
+}
+
+/* Phone & Mobile UI frame styles */
+@media (max-width: 640px) {
+  .dtc-card {
+    padding: 14px;
+  }
+  .dtc-top {
+    flex-wrap: wrap;
+  }
+  .dtc-top .obd-card-action {
+    flex: 1 1 100%;
+    margin-left: 0;
+    margin-top: 6px;
+  }
+  .dtc-top .obd-btn-add,
+  .dtc-top .obd-btn-added {
+    width: 100%;
+    text-align: center;
+    min-height: 44px;
+  }
+}
+
+.mobile-ui .dtc-card,
+[data-mobile] .dtc-card,
+body.is-mobile .dtc-card,
+.phone-frame .dtc-card {
+  padding: 14px;
+}
+
+.mobile-ui .dtc-top,
+[data-mobile] .dtc-top,
+body.is-mobile .dtc-top,
+.phone-frame .dtc-top {
+  flex-wrap: wrap;
+}
+
+.mobile-ui .dtc-top .obd-card-action,
+[data-mobile] .dtc-top .obd-card-action,
+body.is-mobile .dtc-top .obd-card-action,
+.phone-frame .dtc-top .obd-card-action {
+  flex: 1 1 100%;
+  margin-left: 0;
+  margin-top: 6px;
+}
+
+.mobile-ui .dtc-top .obd-btn-add,
+[data-mobile] .dtc-top .obd-btn-add,
+body.is-mobile .dtc-top .obd-btn-add,
+.phone-frame .dtc-top .obd-btn-add,
+.mobile-ui .dtc-top .obd-btn-added,
+[data-mobile] .dtc-top .obd-btn-added,
+body.is-mobile .dtc-top .obd-btn-added,
+.phone-frame .dtc-top .obd-btn-added {
+  width: 100%;
+  text-align: center;
+  min-height: 44px;
+}
+
 
 
 

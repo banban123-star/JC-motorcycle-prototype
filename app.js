@@ -1649,6 +1649,9 @@ function logout() {
   if (typeof resetPosState === "function") {
     resetPosState();
   }
+  if (typeof resetQuickLaborState === "function") {
+    resetQuickLaborState();
+  }
 
   if (document.documentElement) document.documentElement.classList.remove("has-session");
   document.body.classList.remove("logged-in");
@@ -1931,7 +1934,7 @@ function lines(o) {
  */
 function getOrderTotals(o) {
   if (!o) return { labor: 0, parts: 0, discount: 0, total: 0 };
-  if (o.type === "QUICK LABOR" && typeof o.total === "number") {
+  if ((o.type === "QUICK LABOR" || o.type === "quicklabor") && typeof o.total === "number") {
     return {
       labor: Number(o.laborSubtotal) || 0,
       parts: Number(o.partsSubtotal) || 0,
@@ -3444,22 +3447,11 @@ ${isMech ? `
 
   /**
    * Quick Labor view: fast-track logging and checkout for walk-in minor repairs and part replacements.
+   * Preserves cart state across tab navigation.
    * @returns {string} HTML string.
    */
   ql() {
-    quickLaborCart = [];
-    quickLaborSearch = "";
-    quickLaborFilter = "all";
-    quickLaborMech = "";
-    quickLaborNote = "";
-    quickLaborMethod = "Cash";
-    quickLaborRef = "";
-    quickLaborTendered = 0;
-    quickLaborCustomOpen = false;
-    quickLaborCustomKind = "labor";
-    quickLaborClearConfirmActive = false;
-    if (quickLaborClearConfirmTimer) clearTimeout(quickLaborClearConfirmTimer);
-    quickLaborSuccessMsg = "";
+    initDefaultQuickLaborMech();
     return getQuickLaborViewHtml();
   },
 
@@ -7324,25 +7316,17 @@ function getInspStep2Html() {
           </div>
 
           <div id="obd-proto-notice" class="obd-proto-notice" style="display:none;margin-top:10px">
-            ECU/OBD hardware connection is not available in this prototype yet. You can look up and add fault codes manually.
+            ECU/OBD hardware connection is not available in this prototype yet. Run the scan to load sample fault codes.
           </div>
 
           <div id="obd-drawer-body" style="display:${obdDrawerOpen ? 'block' : 'none'};margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
-            <!-- Quick fault codes row -->
-            <div style="margin-bottom:14px">
-              <div class="obd-field-label" style="margin-bottom:8px">QUICK FAULT CODES <span class="muted-hint">(tap to add/remove)</span></div>
-              <div class="quick-obd-chips" id="quick-obd-chips">
-                ${getQuickObdChipsHtml()}
-              </div>
-            </div>
-
             <!-- Compact Run Scan button -->
             <button type="button" class="btn-elm-scan-compact" id="btn-run-ecu-scan" onclick="runEcuScan()">
               <span style="display:inline-flex;align-items:center;margin-right:6px">${ICONS.cpu}</span>Run ECU/OBD Scan
             </button>
 
             <!-- Scan Results Area -->
-            <div id="obd-scan-results-wrap" aria-live="polite">
+            <div id="obd-scan-results-wrap" aria-live="polite" aria-label="Scan results">
               ${getObdScanResultsAreaHtml()}
             </div>
 
@@ -7813,8 +7797,25 @@ function runEcuScan() {
 }
 
 /**
+ * Binds delegated click listener on OBD scan results wrap once.
+ */
+function initDtcCardListeners() {
+  const container = $("obd-scan-results-wrap");
+  if (!container || container.dataset.dtcBound === "true") return;
+  container.dataset.dtcBound = "true";
+  container.addEventListener("click", (e) => {
+    const toggle = e.target.closest(".dtc-toggle");
+    if (!toggle) return;
+    const card = toggle.closest(".dtc-card");
+    if (!card) return;
+    const isOpen = card.classList.toggle("is-open");
+    toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+  });
+}
+
+/**
  * Generates HTML for the OBD scan results area.
- * Displays placeholder when no scan has been run, or 4 result cards.
+ * Displays placeholder when no scan has been run, or collapsible result cards.
  * @returns {string} HTML string.
  */
 function getObdScanResultsAreaHtml() {
@@ -7826,62 +7827,71 @@ function getObdScanResultsAreaHtml() {
     ? inspDraft.inspection.obd.codes
     : [];
 
-  const cardsHtml = obdScanResults.map((item) => {
+  const cardsHtml = obdScanResults.map((item, idx) => {
     const isAdded = addedCodes.some((c) => c.code === item.code);
     const otherCodes = Array.isArray(item.dtc) ? item.dtc.filter((c) => c !== item.code) : [];
 
     return `
-      <div class="obd-result-card">
-        <div>
-          <div class="obd-card-top-row">
-            <div class="obd-card-pills-row">
-              <span class="obd-primary-code-pill">${escHtml(item.code)}</span>
-              ${item.err ? `<span class="obd-err-code-pill">${escHtml(item.err)}</span>` : ""}
-              ${otherCodes.length > 0 ? `<span class="obd-also-dtc">Also: ${escHtml(otherCodes.join(", "))}</span>` : ""}
-            </div>
-            <div class="obd-card-action">
-              ${isAdded ? `
-                <span class="obd-btn-added" role="status" aria-label="Fault code added to findings">✓ Added</span>
-                <div class="obd-added-hint">Added to Final Findings below</div>
+      <article class="dtc-card obd-result-card" data-dtc="${escHtml(item.code || "")}">
+        <div class="dtc-top">
+          <div class="obd-card-pills-row">
+            <span class="obd-primary-code-pill">${escHtml(item.code || "")}</span>
+            ${item.err ? `<span class="obd-err-code-pill">${escHtml(item.err)}</span>` : ""}
+            ${otherCodes.length > 0 ? `<span class="obd-also-dtc">Also: ${escHtml(otherCodes.join(", "))}</span>` : ""}
+          </div>
+          <div class="obd-card-action">
+            ${isAdded ? `
+              <span class="obd-btn-added" role="status" aria-label="Fault code added to findings">✓ Added</span>
+              <div class="obd-added-hint">Added to Final Findings below</div>
+            ` : `
+              <button type="button" class="obd-btn-add" onclick="addSampleCodeToFindings('${escHtml(item.code || "")}')">
+                Add to findings
+              </button>
+            `}
+          </div>
+        </div>
+
+        <h3 class="dtc-name">
+          <button type="button" class="dtc-toggle" aria-expanded="false" aria-controls="dtc-panel-${idx}">
+            <span class="dtc-title-text">${escHtml(item.part || item.name || "")}</span>
+            <span class="dtc-toggle-right">
+              <span class="dtc-toggle-label">Details</span>
+              <svg class="dtc-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </span>
+          </button>
+        </h3>
+
+        <div class="dtc-details" id="dtc-panel-${idx}">
+          <div class="dtc-details-inner">
+            ${item.desc ? `<p class="dtc-desc">${escHtml(item.desc)}</p>` : ""}
+
+            ${Array.isArray(item.checks) && item.checks.length > 0 ? `
+              <div class="dtc-section">
+                <div class="dtc-section-label">Verification:</div>
+                <ul class="dtc-checks-list">
+                  ${item.checks.map((chk) => `<li>${escHtml(chk)}</li>`).join("")}
+                </ul>
+              </div>
+            ` : ""}
+
+            <div class="dtc-section" style="margin-top:8px">
+              <div class="dtc-section-label">Suggested parts:</div>
+              ${Array.isArray(item.parts) && item.parts.length > 0 ? `
+                <div class="dtc-parts-chips">
+                  ${item.parts.map((pt) => `<span class="obd-part-chip">${escHtml(pt)}</span>`).join("")}
+                </div>
               ` : `
-                <button type="button" class="obd-btn-add" onclick="addSampleCodeToFindings('${escHtml(item.code)}')">
-                  Add to findings
-                </button>
+                <div class="dtc-empty-parts" style="font-size:13px;color:var(--text-muted)">No suggested parts listed.</div>
               `}
             </div>
           </div>
-
-          <div class="obd-card-part">${escHtml(item.part || "")}</div>
-          <div class="obd-card-desc">${escHtml(item.desc || "")}</div>
-
-          ${Array.isArray(item.checks) && item.checks.length > 0 ? `
-            <div class="obd-card-section">
-              <div class="obd-card-section-label">Verification:</div>
-              <ul class="obd-card-checks-list">
-                ${item.checks.map((chk) => `<li>${escHtml(chk)}</li>`).join("")}
-              </ul>
-            </div>
-          ` : ""}
-
-          ${Array.isArray(item.parts) && item.parts.length > 0 ? `
-            <div class="obd-card-section" style="margin-top:8px">
-              <div class="obd-card-section-label">Suggested parts:</div>
-              <div class="obd-card-parts-chips">
-                ${item.parts.map((pt) => `<span class="obd-part-chip">${escHtml(pt)}</span>`).join("")}
-              </div>
-            </div>
-          ` : ""}
         </div>
-      </div>
+      </article>
     `;
   }).join("");
 
   return `
-    <div class="obd-results-header">
-      <div class="obd-results-title">SCAN RESULTS (${obdScanResults.length} faults found)</div>
-      <div class="obd-results-sub">Sample data · Yamaha Sniper 150 V2 · simulated scan</div>
-    </div>
-    <div class="obd-results-grid">
+    <div class="obd-results-grid dtc-grid">
       ${cardsHtml}
     </div>
   `;
@@ -7894,6 +7904,10 @@ function renderObdScanResultsArea() {
   const container = $("obd-scan-results-wrap");
   if (container) {
     container.innerHTML = getObdScanResultsAreaHtml();
+    initDtcCardListeners();
+    if (typeof window !== "undefined" && window.lucide && typeof window.lucide.createIcons === "function") {
+      window.lucide.createIcons();
+    }
   }
 }
 
@@ -10407,7 +10421,7 @@ function matchesBillSearch(o, q) {
   const name = c && c.name ? c.name.toLowerCase() : (o.customer ? o.customer.toLowerCase() : "");
   const phone = c && c.phone ? c.phone.toLowerCase() : "";
   const txnId = getTxnId(o).toLowerCase();
-  const jo = (o.type === "QUICK LABOR") ? "" : getJobNumber(o).toLowerCase();
+  const jo = (o.type === "QUICK LABOR" || o.type === "quicklabor") ? "" : getJobNumber(o).toLowerCase();
   const wid = o.id ? o.id.toLowerCase() : "";
   const model = b ? `${b.make || ""} ${b.model || ""}`.toLowerCase() : (o.vehicleLine ? o.vehicleLine.toLowerCase() : "");
   const mech = o.mech ? o.mech.toLowerCase() : "";
@@ -10640,7 +10654,7 @@ function getBillResultsHtml() {
                 actionsHtml = `<button type="button" class="btn sm btn-adv-pay" onclick="openAdvanceModal('${o.id}')">+ Advance Payment</button>`;
               }
 
-              const isQuickLabor = o.type === "QUICK LABOR";
+              const isQuickLabor = o.type === "QUICK LABOR" || o.type === "quicklabor";
               const typeBadge = isQuickLabor ? "QUICK LABOR" : "REPAIR SERVICE";
               const typeClass = isQuickLabor ? "badge-txn-type ql" : "badge-txn-type";
               const dateLine = isQuickLabor
@@ -11290,8 +11304,8 @@ function openReceipt(woId) {
     <div style="text-align:center;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:16px">
       <div style="display:flex;justify-content:center;margin-bottom:4px;color:var(--text)">${ICONS.bike}</div>
       <h2 style="margin:4px 0 2px;font-size:22px;color:var(--text)">MotoShop</h2>
-      <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em">Official Repair &amp; Service Receipt</div>
-      <div style="font-size:13px;font-weight:700;color:var(--accent);margin-top:6px">${o.type === "QUICK LABOR" ? getTxnId(o) : jo}</div>
+      <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em">${(o.type === "QUICK LABOR" || o.type === "quicklabor") ? "Quick Fix Receipt" : "Official Repair &amp; Service Receipt"}</div>
+      <div style="font-size:13px;font-weight:700;color:var(--accent);margin-top:6px">${(o.type === "QUICK LABOR" || o.type === "quicklabor") ? (o.no || o.txnId || getTxnId(o)) : jo}</div>
       <div style="font-size:11px;color:var(--text-muted)">${formatJobDate(pay.paidAt || today())} · ${formatJobTime(pay.paidAt || "")}</div>
     </div>
 
@@ -14164,39 +14178,89 @@ function getPosViewHtml() {
 /** In-memory cart items for active Quick Labor ticket. */
 let quickLaborCart = [];
 
-/** Active search query string for Quick Labor catalog items. */
-let quickLaborSearch = "";
+/** Active job type: "fix" (Fix + Parts) | "parts" (Parts Only). Default is "fix". */
+let qlJobType = "fix";
 
-/** Active filter pill: "all" | "labor" | "parts". */
-let quickLaborFilter = "all";
+/** Two-step inline confirmation flag when switching to "Parts Only" with labor in cart. */
+let qlPartsOnlyConfirmActive = false;
+let qlPartsOnlyConfirmTimer = null;
 
-/** Mechanic name selected in "Handled by" dropdown. */
+/** Mechanic name selected in Step 1 "Who did the work". */
 let quickLaborMech = "";
 
-/** Bike plate or model note string. */
-let quickLaborNote = "";
+/** Error display flag for Step 1 when user attempts to record without mechanic. */
+let quickLaborStep1Err = false;
 
-/** Payment method: "Cash" | "GCash". */
+/** Search queries for Step 2 (labor) and Step 3 (parts). */
+let quickLaborSearchLabor = "";
+let quickLaborSearchPart = "";
+
+/** Optional Customer or bike plate string. */
+let quickLaborCustomer = "";
+
+/** Checkbox state for "Work is finished" in Step 4 and Summary panel. */
+let qlWorkFinished = false;
+
+/** Payment method: "Cash" | "GCash" | "Maya". */
 let quickLaborMethod = "Cash";
 
-/** Payment reference number for GCash. */
+/** Payment reference number for GCash or Maya. */
 let quickLaborRef = "";
 
-/** Cash amount received/tendered. */
+/** Cash amount received/tendered from cashier. */
 let quickLaborTendered = 0;
-
-/** Inline custom item form toggle flag. */
-let quickLaborCustomOpen = false;
-
-/** Inline custom item kind: "labor" | "part". */
-let quickLaborCustomKind = "labor";
 
 /** Two-step inline confirmation flag for "Clear all" button. */
 let quickLaborClearConfirmActive = false;
 let quickLaborClearConfirmTimer = null;
 
-/** Inline success notification message. */
-let quickLaborSuccessMsg = "";
+/** Toggle state for custom labor and custom part inline forms. */
+let quickLaborCustomLaborOpen = false;
+let quickLaborCustomPartOpen = false;
+
+/**
+ * Initializes default mechanic from logged-in user if their role is mechanic.
+ */
+function initDefaultQuickLaborMech() {
+  const u = typeof getCurrentUser === "function" ? getCurrentUser() : null;
+  if (u && u.role === "mechanic") {
+    quickLaborMech = u.name;
+  } else if (!quickLaborMech) {
+    quickLaborMech = "";
+  }
+}
+
+/**
+ * Resets all Quick Labor working state to Step 1 defaults.
+ */
+function resetQuickLaborState() {
+  quickLaborCart = [];
+  qlJobType = "fix";
+  qlPartsOnlyConfirmActive = false;
+  if (qlPartsOnlyConfirmTimer) clearTimeout(qlPartsOnlyConfirmTimer);
+  quickLaborSearchLabor = "";
+  quickLaborSearchPart = "";
+  quickLaborCustomer = "";
+  qlWorkFinished = false;
+  quickLaborMethod = "Cash";
+  quickLaborRef = "";
+  quickLaborTendered = 0;
+  quickLaborClearConfirmActive = false;
+  if (quickLaborClearConfirmTimer) clearTimeout(quickLaborClearConfirmTimer);
+  quickLaborCustomLaborOpen = false;
+  quickLaborCustomPartOpen = false;
+  quickLaborStep1Err = false;
+  initDefaultQuickLaborMech();
+}
+
+/**
+ * Returns active mechanics list loaded from moto1_users.
+ * @returns {Array<Object>} Active mechanic user records.
+ */
+function getActiveMechanics() {
+  const users = typeof loadUsers === "function" ? loadUsers() : [];
+  return users.filter((u) => u.role === "mechanic" && u.active !== false);
+}
 
 /**
  * Calculates sum of labor fees in active Quick Labor cart.
@@ -14229,7 +14293,16 @@ function getQuickLaborPartsSubtotal() {
  * @returns {number} Grand total in PHP.
  */
 function getQuickLaborTotal() {
-  return getQuickLaborLaborSubtotal() + getQuickLaborPartsSubtotal();
+  const labor = qlJobType === "fix" ? getQuickLaborLaborSubtotal() : 0;
+  return labor + getQuickLaborPartsSubtotal();
+}
+
+/**
+ * Returns total count of items in the active Quick Labor cart.
+ * @returns {number} Total item count.
+ */
+function getQuickLaborTotalItemsCount() {
+  return quickLaborCart.reduce((acc, item) => acc + (item.kind === "labor" ? 1 : (Number(item.qty) || 1)), 0);
 }
 
 /**
@@ -14245,18 +14318,351 @@ function getQuickLaborInCartQty(catId, kind) {
 }
 
 /**
- * Retrieves catalog items matching active Quick Labor filter and search.
- * @returns {Array<Object>} Filtered catalog items.
+ * Switches active Quick Labor job type with two-step inline confirmation if labor lines exist.
+ * @param {"fix"|"parts"} type - Target job type.
  */
-function getFilteredQuickLaborCatalogItems() {
-  let kindFilter = "all";
-  if (quickLaborFilter === "labor") kindFilter = "labor";
-  else if (quickLaborFilter === "parts") kindFilter = "part";
+function setQuickLaborJobType(type) {
+  if (type === "parts") {
+    const hasLabor = quickLaborCart.some((it) => it.kind === "labor");
+    if (hasLabor) {
+      if (!qlPartsOnlyConfirmActive) {
+        qlPartsOnlyConfirmActive = true;
+        renderQuickLaborTypeBar();
+        if (qlPartsOnlyConfirmTimer) clearTimeout(qlPartsOnlyConfirmTimer);
+        qlPartsOnlyConfirmTimer = setTimeout(() => {
+          qlPartsOnlyConfirmActive = false;
+          renderQuickLaborTypeBar();
+        }, 3000);
+        return;
+      }
+      // Confirmed: strip labor lines from cart
+      quickLaborCart = quickLaborCart.filter((it) => it.kind !== "labor");
+      qlPartsOnlyConfirmActive = false;
+      if (qlPartsOnlyConfirmTimer) clearTimeout(qlPartsOnlyConfirmTimer);
+    }
+    qlJobType = "parts";
+  } else {
+    qlJobType = "fix";
+    qlPartsOnlyConfirmActive = false;
+    if (qlPartsOnlyConfirmTimer) clearTimeout(qlPartsOnlyConfirmTimer);
+  }
+  renderQuickLaborLeftCol();
+  renderQuickLaborRightPanel();
+  updateQuickLaborMobileBar();
+}
 
-  const items = getCatalogItems(kindFilter);
-  const q = quickLaborSearch.trim().toLowerCase();
+/**
+ * Generates HTML for the Job Type segmented control bar.
+ * @returns {string} HTML string.
+ */
+function getQuickLaborTypeBarHtml() {
+  return `
+    <div class="ql-type-bar" role="group" aria-label="Job Type">
+      <button
+        type="button"
+        class="ql-type-btn ${qlJobType === 'fix' ? 'active' : ''}"
+        onclick="setQuickLaborJobType('fix')"
+        aria-pressed="${qlJobType === 'fix' ? 'true' : 'false'}"
+      >
+        Fix + Parts
+      </button>
+      <button
+        type="button"
+        id="ql-type-btn-parts"
+        class="ql-type-btn ${qlJobType === 'parts' ? 'active' : ''} ${qlPartsOnlyConfirmActive ? 'confirm-remove' : ''}"
+        onclick="setQuickLaborJobType('parts')"
+        aria-pressed="${qlJobType === 'parts' ? 'true' : 'false'}"
+      >
+        ${qlPartsOnlyConfirmActive ? "Tap again to remove labor" : "Parts Only"}
+      </button>
+    </div>
+  `;
+}
+
+/**
+ * Re-renders only the job type segmented control bar.
+ */
+function renderQuickLaborTypeBar() {
+  const barWrap = $("ql-type-bar-wrap");
+  if (barWrap) barWrap.innerHTML = getQuickLaborTypeBarHtml();
+}
+
+/**
+ * Sets selected mechanic in Step 1.
+ * @param {string} mech - Mechanic name.
+ */
+function setQuickLaborMech(mech) {
+  quickLaborMech = mech || "";
+  quickLaborStep1Err = false;
+  renderQuickLaborStep1();
+  renderQuickLaborRightPanel();
+}
+
+/**
+ * Generates HTML for Step 1 card.
+ * @returns {string} HTML string.
+ */
+function getQuickLaborStep1Html() {
+  const isDone = Boolean(quickLaborMech && quickLaborMech.trim());
+  const activeMechs = getActiveMechanics();
+  const u = typeof getCurrentUser === "function" ? getCurrentUser() : null;
+  const isMechanic = u && u.role === "mechanic";
+  const canChangeMech = (typeof isSuper === "function" && isSuper()) || (typeof isAdmin === "function" && isAdmin());
+
+  return `
+    <div class="ql-step-card" id="ql-step-1">
+      <div class="ql-step-header">
+        <div class="ql-step-badge ${isDone ? 'done' : 'active'}">${isDone ? '✓' : '1'}</div>
+        <div>
+          <div class="ql-step-title">Who did the work</div>
+          <div class="ql-step-subtitle">Handled by active mechanic (required)</div>
+        </div>
+      </div>
+      <div>
+        <select
+          id="ql-mech-select"
+          class="his-select"
+          ${(!canChangeMech && isMechanic) ? "disabled" : ""}
+          style="width:100%;height:44px;font-size:14px;border:1px solid ${quickLaborStep1Err && !isDone ? 'var(--danger, #DC2626)' : 'var(--border)'};border-radius:8px;background:var(--bg-surface);color:var(--text);padding:0 12px"
+          onchange="setQuickLaborMech(this.value)"
+        >
+          <option value="">Select mechanic...</option>
+          ${activeMechs.map((m) => `<option value="${escHtml(m.name)}" ${quickLaborMech === m.name ? "selected" : ""}>${escHtml(m.name)}</option>`).join("")}
+        </select>
+        ${
+          quickLaborStep1Err && !isDone
+            ? `<div id="ql-mech-err" style="color:var(--danger, #DC2626);font-size:12px;font-weight:600;margin-top:6px">Choose who did the work.</div>`
+            : ""
+        }
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Re-renders only the Step 1 card.
+ */
+function renderQuickLaborStep1() {
+  const card = $("ql-step-1-wrap");
+  if (card) card.innerHTML = getQuickLaborStep1Html();
+}
+
+/**
+ * Retrieves catalog labor items matching active Step 2 search query.
+ * @returns {Array<Object>} Filtered labor items.
+ */
+function getFilteredQuickLaborServices() {
+  const items = typeof getCatalogItems === "function" ? getCatalogItems("labor") : [];
+  const q = quickLaborSearchLabor.trim().toLowerCase();
   if (!q) return items;
+  return items.filter((it) => (it.name || "").toLowerCase().includes(q));
+}
 
+/**
+ * Live typing handler for Step 2 labor search input.
+ * Preserves focus by updating only the labor tiles grid.
+ * @param {string} val - Input query.
+ */
+function onQuickLaborSearchLaborInput(val) {
+  quickLaborSearchLabor = val || "";
+  const clr = $("ql-search-labor-clear");
+  if (clr) {
+    if (quickLaborSearchLabor.trim()) clr.classList.add("visible");
+    else clr.classList.remove("visible");
+  }
+  renderQuickLaborLaborTiles();
+}
+
+/**
+ * Clears Step 2 labor search.
+ */
+function clearQuickLaborSearchLabor() {
+  quickLaborSearchLabor = "";
+  const inp = $("ql-search-labor");
+  if (inp) {
+    inp.value = "";
+    inp.focus();
+  }
+  const clr = $("ql-search-labor-clear");
+  if (clr) clr.classList.remove("visible");
+  renderQuickLaborLaborTiles();
+}
+
+/**
+ * Generates HTML for catalog labor tiles in Step 2.
+ * @returns {string} HTML string.
+ */
+function getQuickLaborLaborTilesHtml() {
+  const items = getFilteredQuickLaborServices();
+
+  const customTileHtml = `
+    <button type="button" class="pos-tile pos-tile-custom" onclick="openQuickLaborCustomLaborForm()" title="Add custom labor">
+      <div class="pos-custom-plus">+</div>
+      <div class="pos-custom-text">+ Custom Labor</div>
+    </button>
+  `;
+
+  if (items.length === 0) {
+    return `
+      <div class="pos-tiles-grid">
+        ${customTileHtml}
+      </div>
+      <div class="empty" style="padding:24px 16px;text-align:center;background:#FFFFFF;border:1px dashed var(--border);border-radius:12px;margin-top:8px">
+        No labor services matched "<b>${escHtml(quickLaborSearchLabor)}</b>". Add custom labor above.
+      </div>
+    `;
+  }
+
+  const tiles = items.map((it) => {
+    const inCart = getQuickLaborInCartQty(it.id, "labor");
+    return `
+      <button
+        type="button"
+        class="pos-tile ${inCart > 0 ? "in-cart" : ""}"
+        onclick="addCatalogLaborToQuickLabor('${it.id}')"
+        title="Tap to add: ${escHtml(it.name)}"
+      >
+        ${inCart > 0 ? `<span class="pos-tile-badge">${inCart}</span>` : ""}
+        <div>
+          <span class="cat-badge labor" style="background:#F5F3FF;color:#7C3AED;border-color:#DDD6FE">Labor</span>
+          <div class="pos-tile-name">${escHtml(it.name)}</div>
+        </div>
+        <div class="pos-tile-price">${P(it.price)}</div>
+      </button>
+    `;
+  }).join("");
+
+  return `
+    <div class="pos-tiles-grid">
+      ${customTileHtml}
+      ${tiles}
+    </div>
+  `;
+}
+
+/**
+ * Re-renders only the labor tiles grid in Step 2.
+ */
+function renderQuickLaborLaborTiles() {
+  const wrap = $("ql-labor-tiles-grid-wrap");
+  if (wrap) wrap.innerHTML = getQuickLaborLaborTilesHtml();
+}
+
+/**
+ * Adds catalog labor to quickLaborCart. Labor items exist at most once.
+ * @param {string} catId - Catalog service ID.
+ */
+function addCatalogLaborToQuickLabor(catId) {
+  const items = typeof getCatalogItems === "function" ? getCatalogItems("labor") : [];
+  const it = items.find((x) => x.id === catId);
+  if (!it) return;
+
+  const existing = quickLaborCart.find((x) => !x.custom && x.id === it.id && x.kind === "labor");
+  if (!existing) {
+    quickLaborCart.push({
+      key: uid(),
+      id: it.id,
+      kind: "labor",
+      name: it.name,
+      price: Number(it.price) || 0,
+      origPrice: Number(it.price) || 0,
+      qty: 1,
+      custom: false,
+      override: false
+    });
+  }
+
+  renderQuickLaborLaborTiles();
+  renderQuickLaborChosenLabor();
+  renderQuickLaborStep2Badge();
+  renderQuickLaborRightPanel();
+  updateQuickLaborMobileBar();
+}
+
+/**
+ * Generates HTML for chosen labor lines list in Step 2.
+ * @returns {string} HTML string.
+ */
+function getQuickLaborChosenLaborHtml() {
+  const laborLines = quickLaborCart.filter((it) => it.kind === "labor");
+  if (laborLines.length === 0) {
+    return `<div class="ql-empty-hint">No labor added yet. Choose a labor service or add custom labor above.</div>`;
+  }
+
+  const isSuperUser = typeof isSuper === "function" && isSuper();
+
+  return `
+    <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:8px">
+      Chosen Labor (${laborLines.length})
+    </div>
+    <div class="pos-cart-list">
+      ${laborLines.map((item) => {
+        const isOverridden = !item.custom && item.origPrice !== undefined && Number(item.price) !== Number(item.origPrice);
+        const isPriceReadOnly = !isSuperUser && !item.custom;
+
+        return `
+          <div class="pos-cart-line" id="ql-chosen-labor-line-${item.key}">
+            <div class="pos-cart-line-top">
+              <div style="flex:1;min-width:0;display:flex;align-items:center;flex-wrap:wrap;gap:4px">
+                <span class="cat-badge labor" style="background:#F5F3FF;color:#7C3AED;border-color:#DDD6FE">Labor</span>
+                <b style="font-size:13px;color:var(--text-primary)">${escHtml(item.name)}</b>
+                <span id="ql-override-tag-${item.key}" class="badge-override" style="font-size:10px;padding:1px 4px;${isOverridden ? '' : 'display:none'}">OVERRIDE</span>
+              </div>
+              <button type="button" class="pos-line-del-btn" onclick="removeQuickLaborLine('${item.key}')" title="Remove labor">✕</button>
+            </div>
+            <div class="pos-cart-line-bottom" style="justify-content:space-between">
+              <div style="display:flex;align-items:center;gap:4px">
+                <span style="font-size:12px;font-weight:600;color:var(--text-secondary)">Fee: ₱</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  class="pos-price-input"
+                  value="${item.price}"
+                  ${isPriceReadOnly ? "readonly disabled style='background:var(--bg-subtle);color:var(--text-muted)'" : ""}
+                  oninput="updateQuickLaborLinePrice('${item.key}', this.value)"
+                  style="width:90px;height:28px;border-radius:4px;border:1px solid var(--border);padding:0 6px;font-size:13px;font-weight:700;text-align:right"
+                />
+              </div>
+              <b style="font-size:13px;color:var(--text);min-width:60px;text-align:right" id="ql-chosen-tot-${item.key}">
+                ${P(item.price)}
+              </b>
+            </div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+/**
+ * Re-renders only the chosen labor lines list in Step 2.
+ */
+function renderQuickLaborChosenLabor() {
+  const wrap = $("ql-chosen-labor-wrap");
+  if (wrap) wrap.innerHTML = getQuickLaborChosenLaborHtml();
+}
+
+/**
+ * Updates Step 2 badge done/active status.
+ */
+function renderQuickLaborStep2Badge() {
+  const badge = $("ql-step-2-badge");
+  const isDone = quickLaborCart.some((it) => it.kind === "labor");
+  if (badge) {
+    badge.className = `ql-step-badge ${isDone ? "done" : "active"}`;
+    badge.textContent = isDone ? "✓" : "2";
+  }
+}
+
+/**
+ * Retrieves catalog part items matching active Step 3 search query.
+ * @returns {Array<Object>} Filtered part items.
+ */
+function getFilteredQuickLaborParts() {
+  const items = typeof getCatalogItems === "function" ? getCatalogItems("part") : [];
+  const q = quickLaborSearchPart.trim().toLowerCase();
+  if (!q) return items;
   return items.filter((it) => {
     const matchName = (it.name || "").toLowerCase().includes(q);
     const matchSku = (it.sku || "").toLowerCase().includes(q);
@@ -14265,269 +14671,404 @@ function getFilteredQuickLaborCatalogItems() {
 }
 
 /**
- * Calculates live counts for Quick Labor filter chips.
- * @returns {{all: number, labor: number, parts: number}}
+ * Live typing handler for Step 3 parts search input.
+ * Preserves focus by updating only the part tiles grid.
+ * @param {string} val - Input query.
  */
-function getQuickLaborFilterCounts() {
-  const allItems = getCatalogItems("all");
-  return {
-    all: allItems.length,
-    labor: allItems.filter((i) => i.kind === "labor").length,
-    parts: allItems.filter((i) => i.kind === "part").length
-  };
-}
-
-/**
- * Generates HTML string for the Quick Labor category filter chips with live counts.
- * @returns {string} HTML string.
- */
-function getQuickLaborChipsHtml() {
-  const counts = getQuickLaborFilterCounts();
-  return `
-    <button
-      type="button"
-      id="ql-chip-all"
-      class="ql-chip ${quickLaborFilter === 'all' ? 'active' : ''}"
-      onclick="setQuickLaborFilter('all')"
-      aria-pressed="${quickLaborFilter === 'all' ? 'true' : 'false'}"
-    >
-      All Items <span class="ql-chip-cnt">(${counts.all})</span>
-    </button>
-    <button
-      type="button"
-      id="ql-chip-labor"
-      class="ql-chip ${quickLaborFilter === 'labor' ? 'active' : ''}"
-      onclick="setQuickLaborFilter('labor')"
-      aria-pressed="${quickLaborFilter === 'labor' ? 'true' : 'false'}"
-    >
-      Labor Only <span class="ql-chip-cnt">(${counts.labor})</span>
-    </button>
-    <button
-      type="button"
-      id="ql-chip-parts"
-      class="ql-chip ${quickLaborFilter === 'parts' ? 'active' : ''}"
-      onclick="setQuickLaborFilter('parts')"
-      aria-pressed="${quickLaborFilter === 'parts' ? 'true' : 'false'}"
-    >
-      Parts &amp; Fluids <span class="ql-chip-cnt">(${counts.parts})</span>
-    </button>
-  `;
-}
-
-/**
- * Sets active Quick Labor filter and refreshes chips and grid.
- * @param {string} f - "all" | "labor" | "parts"
- */
-function setQuickLaborFilter(f) {
-  quickLaborFilter = f;
-  const chipsEl = $("ql-chips");
-  if (chipsEl) chipsEl.innerHTML = getQuickLaborChipsHtml();
-  renderQuickLaborGrid();
-}
-
-/**
- * Clears search and resets filter to "All Items".
- */
-function clearQuickLaborFilters() {
-  quickLaborSearch = "";
-  quickLaborFilter = "all";
-  const inp = $("ql-search-input");
-  if (inp) inp.value = "";
-  const clr = $("ql-search-clear");
-  if (clr) clr.classList.remove("visible");
-  const chipsEl = $("ql-chips");
-  if (chipsEl) chipsEl.innerHTML = getQuickLaborChipsHtml();
-  renderQuickLaborGrid();
-}
-
-/**
- * Handles live typing in Quick Labor search input.
- * @param {string} val - Input query string.
- */
-function onQuickLaborSearchInput(val) {
-  quickLaborSearch = val || "";
-  const clr = $("ql-search-clear");
+function onQuickLaborSearchPartInput(val) {
+  quickLaborSearchPart = val || "";
+  const clr = $("ql-search-part-clear");
   if (clr) {
-    if (quickLaborSearch.trim()) clr.classList.add("visible");
+    if (quickLaborSearchPart.trim()) clr.classList.add("visible");
     else clr.classList.remove("visible");
   }
-  renderQuickLaborGrid();
+  renderQuickLaborPartTiles();
 }
 
 /**
- * Clears Quick Labor search input.
+ * Clears Step 3 parts search.
  */
-function clearQuickLaborSearch() {
-  quickLaborSearch = "";
-  const inp = $("ql-search-input");
+function clearQuickLaborSearchPart() {
+  quickLaborSearchPart = "";
+  const inp = $("ql-search-part");
   if (inp) {
     inp.value = "";
     inp.focus();
   }
-  const clr = $("ql-search-clear");
+  const clr = $("ql-search-part-clear");
   if (clr) clr.classList.remove("visible");
-  renderQuickLaborGrid();
+  renderQuickLaborPartTiles();
 }
 
 /**
- * Adds first matching item to Quick Labor cart on Enter key press.
- */
-function addFirstQuickLaborMatchToCart() {
-  const items = getFilteredQuickLaborCatalogItems();
-  if (items.length > 0) {
-    addToQuickLabor({
-      id: items[0].id,
-      kind: items[0].kind,
-      name: items[0].name,
-      price: items[0].price,
-      custom: false
-    });
-    quickLaborSearch = "";
-    const inp = $("ql-search-input");
-    if (inp) {
-      inp.value = "";
-      inp.focus();
-    }
-    const clr = $("ql-search-clear");
-    if (clr) clr.classList.remove("visible");
-    renderQuickLaborGrid();
-  }
-}
-
-/**
- * Opens inline custom item creation form.
- * @param {"labor"|"part"} kind - Custom item kind.
- */
-function openQuickLaborCustomForm(kind) {
-  quickLaborCustomOpen = true;
-  quickLaborCustomKind = kind === "part" ? "part" : "labor";
-  const wrap = $("ql-custom-form-wrap");
-  if (wrap) wrap.innerHTML = getQuickLaborCustomFormHtml();
-  setTimeout(() => {
-    const inp = $("ql-custom-name");
-    if (inp) inp.focus();
-  }, 50);
-}
-
-/**
- * Closes inline custom item creation form.
- */
-function closeQuickLaborCustomForm() {
-  quickLaborCustomOpen = false;
-  const wrap = $("ql-custom-form-wrap");
-  if (wrap) wrap.innerHTML = "";
-}
-
-/**
- * Generates HTML for inline custom item creation form.
+ * Generates HTML for catalog part tiles in Step 3.
  * @returns {string} HTML string.
  */
-function getQuickLaborCustomFormHtml() {
-  if (!quickLaborCustomOpen) return "";
-  const isLabor = quickLaborCustomKind === "labor";
-  const title = isLabor ? "Add Custom Labor" : "Add Custom Part / Consumable";
-  const nameLabel = isLabor ? "Work Description" : "Part Name";
-  const namePlaceholder = isLabor ? "e.g. Exhaust bracket re-weld, Minor wiring fix" : "e.g. Bolt, Zip ties, Gasket sealant";
-  const priceLabel = isLabor ? "Labor Fee (PHP)" : "Unit Price (PHP)";
+function getQuickLaborPartTilesHtml() {
+  const items = getFilteredQuickLaborParts();
+
+  const customTileHtml = `
+    <button type="button" class="pos-tile pos-tile-custom" onclick="openQuickLaborCustomPartForm()" title="Add custom part / consumable">
+      <div class="pos-custom-plus">+</div>
+      <div class="pos-custom-text">+ Custom Part / Consumable</div>
+    </button>
+  `;
+
+  if (items.length === 0) {
+    return `
+      <div class="pos-tiles-grid">
+        ${customTileHtml}
+      </div>
+      <div class="empty" style="padding:24px 16px;text-align:center;background:#FFFFFF;border:1px dashed var(--border);border-radius:12px;margin-top:8px">
+        No parts matched "<b>${escHtml(quickLaborSearchPart)}</b>". Add custom part or consumable above.
+      </div>
+    `;
+  }
+
+  const tiles = items.map((it) => {
+    const inCart = getQuickLaborInCartQty(it.id, "part");
+    return `
+      <button
+        type="button"
+        class="pos-tile ${inCart > 0 ? "in-cart" : ""}"
+        onclick="addCatalogPartToQuickLabor('${it.id}')"
+        title="Tap to add: ${escHtml(it.name)}"
+      >
+        ${inCart > 0 ? `<span class="pos-tile-badge">${inCart}</span>` : ""}
+        <div>
+          <span class="cat-badge part">Part</span>
+          <div class="pos-tile-name">${escHtml(it.name)}</div>
+        </div>
+        <div class="pos-tile-price">${P(it.price)}</div>
+      </button>
+    `;
+  }).join("");
 
   return `
-    <div class="pos-custom-form-card" id="ql-custom-form-card" style="margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div class="pos-custom-form-title">${title}</div>
-        <button type="button" class="search-clear visible" onclick="closeQuickLaborCustomForm()" style="position:static" title="Cancel">✕</button>
-      </div>
-      <div class="pos-custom-row">
-        <div class="pos-custom-field" style="flex:2;min-width:180px">
-          <label for="ql-custom-name">${nameLabel}</label>
-          <input id="ql-custom-name" type="text" placeholder="${namePlaceholder}" onkeydown="if(event.key==='Enter')addCustomItemToQuickLaborCart()" />
-        </div>
-        <div class="pos-custom-field" style="flex:1;min-width:100px">
-          <label for="ql-custom-price">${priceLabel}</label>
-          <input id="ql-custom-price" type="number" min="0" step="1" placeholder="0" onkeydown="if(event.key==='Enter')addCustomItemToQuickLaborCart()" />
-        </div>
-      </div>
-      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
-        <button type="button" class="btn g sm" onclick="closeQuickLaborCustomForm()">Cancel</button>
-        <button type="button" class="btn sm" onclick="addCustomItemToQuickLaborCart()">Add</button>
-      </div>
+    <div class="pos-tiles-grid">
+      ${customTileHtml}
+      ${tiles}
     </div>
   `;
 }
 
 /**
- * Reads custom item input fields and adds new item to Quick Labor cart.
+ * Re-renders only the part tiles grid in Step 3.
  */
-function addCustomItemToQuickLaborCart() {
-  const nameInp = $("ql-custom-name");
-  const priceInp = $("ql-custom-price");
+function renderQuickLaborPartTiles() {
+  const wrap = $("ql-part-tiles-grid-wrap");
+  if (wrap) wrap.innerHTML = getQuickLaborPartTilesHtml();
+}
+
+/**
+ * Adds catalog part to quickLaborCart or increments its quantity.
+ * @param {string} catId - Catalog part ID.
+ */
+function addCatalogPartToQuickLabor(catId) {
+  const items = typeof getCatalogItems === "function" ? getCatalogItems("part") : [];
+  const it = items.find((x) => x.id === catId);
+  if (!it) return;
+
+  const existing = quickLaborCart.find((x) => !x.custom && x.id === it.id && x.kind === "part");
+  if (existing) {
+    existing.qty = (Number(existing.qty) || 1) + 1;
+  } else {
+    quickLaborCart.push({
+      key: uid(),
+      id: it.id,
+      kind: "part",
+      name: it.name,
+      price: Number(it.price) || 0,
+      origPrice: Number(it.price) || 0,
+      qty: 1,
+      custom: false,
+      override: false
+    });
+  }
+
+  renderQuickLaborPartTiles();
+  renderQuickLaborChosenParts();
+  renderQuickLaborStep3Badge();
+  renderQuickLaborRightPanel();
+  updateQuickLaborMobileBar();
+}
+
+/**
+ * Generates HTML for chosen parts list in Step 3.
+ * @returns {string} HTML string.
+ */
+function getQuickLaborChosenPartsHtml() {
+  const partLines = quickLaborCart.filter((it) => it.kind === "part");
+  if (partLines.length === 0) {
+    if (qlJobType === "fix") {
+      return `<div class="ql-empty-hint">No parts added. Add the parts replaced, if any.</div>`;
+    }
+    return `<div class="ql-empty-hint">No parts added yet. Add at least one replacement part.</div>`;
+  }
+
+  const isSuperUser = typeof isSuper === "function" && isSuper();
+
+  return `
+    <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:8px">
+      Chosen Parts (${partLines.length})
+    </div>
+    <div class="pos-cart-list">
+      ${partLines.map((item) => {
+        const lineTotal = (Number(item.qty) || 1) * (Number(item.price) || 0);
+        const isOverridden = !item.custom && item.origPrice !== undefined && Number(item.price) !== Number(item.origPrice);
+        const isPriceReadOnly = !isSuperUser && !item.custom;
+
+        return `
+          <div class="pos-cart-line" id="ql-chosen-part-line-${item.key}">
+            <div class="pos-cart-line-top">
+              <div style="flex:1;min-width:0;display:flex;align-items:center;flex-wrap:wrap;gap:4px">
+                <span class="cat-badge part">Part</span>
+                <b style="font-size:13px;color:var(--text-primary)">${escHtml(item.name)}</b>
+                <span id="ql-override-tag-${item.key}" class="badge-override" style="font-size:10px;padding:1px 4px;${isOverridden ? '' : 'display:none'}">OVERRIDE</span>
+              </div>
+              <button type="button" class="pos-line-del-btn" onclick="removeQuickLaborLine('${item.key}')" title="Remove part">✕</button>
+            </div>
+            <div class="pos-cart-line-bottom">
+              <div class="pos-qty-stepper">
+                <button type="button" class="pos-qty-btn" onclick="updateQuickLaborCartQty('${item.key}', -1)" title="Decrease quantity">−</button>
+                <span class="pos-qty-val" id="ql-chosen-qty-${item.key}">${item.qty}</span>
+                <button type="button" class="pos-qty-btn" onclick="updateQuickLaborCartQty('${item.key}', 1)" title="Increase quantity">+</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:4px">
+                <span style="font-size:11px;color:var(--text-muted)">@ ₱</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  class="pos-price-input"
+                  value="${item.price}"
+                  ${isPriceReadOnly ? "readonly disabled style='background:var(--bg-subtle);color:var(--text-muted)'" : ""}
+                  oninput="updateQuickLaborLinePrice('${item.key}', this.value)"
+                  style="width:80px;height:28px;border-radius:4px;border:1px solid var(--border);padding:0 6px;font-size:13px;font-weight:700;text-align:right"
+                />
+              </div>
+              <b style="font-size:13px;color:var(--text);min-width:60px;text-align:right" id="ql-chosen-tot-${item.key}">
+                ${P(lineTotal)}
+              </b>
+            </div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+/**
+ * Re-renders only the chosen parts lines list in Step 3.
+ */
+function renderQuickLaborChosenParts() {
+  const wrap = $("ql-chosen-part-wrap");
+  if (wrap) wrap.innerHTML = getQuickLaborChosenPartsHtml();
+}
+
+/**
+ * Updates Step 3 badge done/active status.
+ */
+function renderQuickLaborStep3Badge() {
+  const badge = $("ql-step-3-badge");
+  const isDone = quickLaborCart.some((it) => it.kind === "part");
+  const stepNum = qlJobType === "fix" ? "3" : "2";
+  if (badge) {
+    badge.className = `ql-step-badge ${isDone ? "done" : "active"}`;
+    badge.textContent = isDone ? "✓" : stepNum;
+  }
+}
+
+/**
+ * Adds the first matching catalog item to cart when Enter key is pressed in search inputs.
+ * @param {"labor"|"part"} kind - Step kind.
+ */
+function addFirstQuickLaborMatch(kind) {
+  if (kind === "labor") {
+    const items = getFilteredQuickLaborServices();
+    if (items.length > 0) {
+      addCatalogLaborToQuickLabor(items[0].id);
+      quickLaborSearchLabor = "";
+      const inp = $("ql-search-labor");
+      if (inp) {
+        inp.value = "";
+        inp.focus();
+      }
+      const clr = $("ql-search-labor-clear");
+      if (clr) clr.classList.remove("visible");
+      renderQuickLaborLaborTiles();
+    }
+  } else {
+    const items = getFilteredQuickLaborParts();
+    if (items.length > 0) {
+      addCatalogPartToQuickLabor(items[0].id);
+      quickLaborSearchPart = "";
+      const inp = $("ql-search-part");
+      if (inp) {
+        inp.value = "";
+        inp.focus();
+      }
+      const clr = $("ql-search-part-clear");
+      if (clr) clr.classList.remove("visible");
+      renderQuickLaborPartTiles();
+    }
+  }
+}
+
+/**
+ * Opens custom labor form in Step 2.
+ */
+function openQuickLaborCustomLaborForm() {
+  quickLaborCustomLaborOpen = true;
+  const wrap = $("ql-custom-labor-wrap");
+  if (wrap) {
+    wrap.innerHTML = `
+      <div class="pos-custom-form-card" style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div class="pos-custom-form-title">Add Custom Labor</div>
+          <button type="button" class="search-clear visible" onclick="closeQuickLaborCustomLaborForm()" style="position:static" title="Cancel">✕</button>
+        </div>
+        <div class="pos-custom-row">
+          <div class="pos-custom-field" style="flex:2;min-width:180px">
+            <label for="ql-custom-labor-name">Work Description</label>
+            <input id="ql-custom-labor-name" type="text" placeholder="e.g. Exhaust bracket re-weld, Minor wiring fix" onkeydown="if(event.key==='Enter')submitQuickLaborCustomLabor()" />
+          </div>
+          <div class="pos-custom-field" style="flex:1;min-width:100px">
+            <label for="ql-custom-labor-price">Labor Fee (PHP)</label>
+            <input id="ql-custom-labor-price" type="number" min="0" step="1" placeholder="0" onkeydown="if(event.key==='Enter')submitQuickLaborCustomLabor()" />
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+          <button type="button" class="btn g sm" onclick="closeQuickLaborCustomLaborForm()">Cancel</button>
+          <button type="button" class="btn sm" onclick="submitQuickLaborCustomLabor()">Add</button>
+        </div>
+      </div>
+    `;
+    setTimeout(() => {
+      const inp = $("ql-custom-labor-name");
+      if (inp) inp.focus();
+    }, 50);
+  }
+}
+
+/**
+ * Closes custom labor form in Step 2.
+ */
+function closeQuickLaborCustomLaborForm() {
+  quickLaborCustomLaborOpen = false;
+  const wrap = $("ql-custom-labor-wrap");
+  if (wrap) wrap.innerHTML = "";
+}
+
+/**
+ * Submits custom labor form and adds line to cart.
+ */
+function submitQuickLaborCustomLabor() {
+  const nameInp = $("ql-custom-labor-name");
+  const priceInp = $("ql-custom-labor-price");
   const name = nameInp ? nameInp.value.trim() : "";
   const price = priceInp ? Math.max(0, parseFloat(priceInp.value) || 0) : 0;
 
-  const fallbackName = quickLaborCustomKind === "labor" ? "Custom labor" : "Custom part";
-
-  addToQuickLabor({
-    kind: quickLaborCustomKind,
-    name: name || fallbackName,
+  quickLaborCart.push({
+    key: uid(),
+    id: null,
+    kind: "labor",
+    name: name || "Custom Labor",
     price: price,
-    custom: true
+    origPrice: price,
+    qty: 1,
+    custom: true,
+    override: false
   });
 
-  closeQuickLaborCustomForm();
-}
-
-/**
- * Adds an item into quickLaborCart or increments its quantity.
- * Catalog labor already in cart stays as one row; catalog part increments quantity; custom items always add a new row.
- * @param {Object} item - Item object { id, kind, name, price, custom }.
- */
-function addToQuickLabor(item) {
-  quickLaborSuccessMsg = "";
-  if (item.custom) {
-    quickLaborCart.push({
-      key: uid(),
-      kind: item.kind,
-      name: item.name,
-      price: Number(item.price) || 0,
-      qty: 1,
-      id: null,
-      custom: true
-    });
-  } else if (item.kind === "labor") {
-    const existing = quickLaborCart.find((x) => !x.custom && x.id === item.id && x.kind === "labor");
-    if (!existing) {
-      quickLaborCart.push({
-        key: uid(),
-        kind: "labor",
-        name: item.name,
-        price: Number(item.price) || 0,
-        qty: 1,
-        id: item.id,
-        custom: false
-      });
-    }
-  } else {
-    const existing = quickLaborCart.find((x) => !x.custom && x.id === item.id && x.kind === "part");
-    if (existing) {
-      existing.qty = (Number(existing.qty) || 1) + 1;
-    } else {
-      quickLaborCart.push({
-        key: uid(),
-        kind: "part",
-        name: item.name,
-        price: Number(item.price) || 0,
-        qty: 1,
-        id: item.id,
-        custom: false
-      });
-    }
-  }
-
-  renderQuickLaborGrid();
+  closeQuickLaborCustomLaborForm();
+  renderQuickLaborChosenLabor();
+  renderQuickLaborStep2Badge();
   renderQuickLaborRightPanel();
+  updateQuickLaborMobileBar();
 }
 
 /**
- * Adjusts line item quantity for parts in Quick Labor cart.
+ * Opens custom part form in Step 3.
+ */
+function openQuickLaborCustomPartForm() {
+  quickLaborCustomPartOpen = true;
+  const wrap = $("ql-custom-part-wrap");
+  if (wrap) {
+    wrap.innerHTML = `
+      <div class="pos-custom-form-card" style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div class="pos-custom-form-title">Add Custom Part / Consumable</div>
+          <button type="button" class="search-clear visible" onclick="closeQuickLaborCustomPartForm()" style="position:static" title="Cancel">✕</button>
+        </div>
+        <div class="pos-custom-row">
+          <div class="pos-custom-field" style="flex:2;min-width:180px">
+            <label for="ql-custom-part-name">Part Name</label>
+            <input id="ql-custom-part-name" type="text" placeholder="e.g. Bolt, Zip ties, Gasket sealant" onkeydown="if(event.key==='Enter')submitQuickLaborCustomPart()" />
+          </div>
+          <div class="pos-custom-field" style="flex:1;min-width:80px">
+            <label for="ql-custom-part-qty">Qty</label>
+            <input id="ql-custom-part-qty" type="number" min="1" step="1" value="1" onkeydown="if(event.key==='Enter')submitQuickLaborCustomPart()" />
+          </div>
+          <div class="pos-custom-field" style="flex:1;min-width:100px">
+            <label for="ql-custom-part-price">Unit Price (PHP)</label>
+            <input id="ql-custom-part-price" type="number" min="0" step="1" placeholder="0" onkeydown="if(event.key==='Enter')submitQuickLaborCustomPart()" />
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+          <button type="button" class="btn g sm" onclick="closeQuickLaborCustomPartForm()">Cancel</button>
+          <button type="button" class="btn sm" onclick="submitQuickLaborCustomPart()">Add</button>
+        </div>
+      </div>
+    `;
+    setTimeout(() => {
+      const inp = $("ql-custom-part-name");
+      if (inp) inp.focus();
+    }, 50);
+  }
+}
+
+/**
+ * Closes custom part form in Step 3.
+ */
+function closeQuickLaborCustomPartForm() {
+  quickLaborCustomPartOpen = false;
+  const wrap = $("ql-custom-part-wrap");
+  if (wrap) wrap.innerHTML = "";
+}
+
+/**
+ * Submits custom part form and adds line to cart.
+ */
+function submitQuickLaborCustomPart() {
+  const nameInp = $("ql-custom-part-name");
+  const qtyInp = $("ql-custom-part-qty");
+  const priceInp = $("ql-custom-part-price");
+  const name = nameInp ? nameInp.value.trim() : "";
+  const qty = qtyInp ? Math.max(1, parseInt(qtyInp.value, 10) || 1) : 1;
+  const price = priceInp ? Math.max(0, parseFloat(priceInp.value) || 0) : 0;
+
+  quickLaborCart.push({
+    key: uid(),
+    id: null,
+    kind: "part",
+    name: name || "Custom Part",
+    price: price,
+    origPrice: price,
+    qty: qty,
+    custom: true,
+    override: false
+  });
+
+  closeQuickLaborCustomPartForm();
+  renderQuickLaborChosenParts();
+  renderQuickLaborStep3Badge();
+  renderQuickLaborRightPanel();
+  updateQuickLaborMobileBar();
+}
+
+/**
+ * Updates quantity of a part item in the cart.
  * @param {string} key - Line key.
  * @param {number} delta - +1 or -1.
  */
@@ -14540,90 +15081,134 @@ function updateQuickLaborCartQty(key, delta) {
   } else {
     quickLaborCart[idx].qty = newQty;
   }
-  renderQuickLaborGrid();
+
+  renderQuickLaborPartTiles();
+  renderQuickLaborChosenParts();
+  renderQuickLaborStep3Badge();
   renderQuickLaborRightPanel();
+  updateQuickLaborMobileBar();
 }
 
 /**
- * Updates labor fee directly for a labor item in Quick Labor cart.
- * Preserves input focus by synchronizing summary DOM without full panel re-render.
+ * Updates unit price / labor fee for a line item.
+ * Preserves input focus.
  * @param {string} key - Line key.
- * @param {string|number} newFee - Fee entered by user.
+ * @param {string|number} newPrice - New price.
  */
-function updateQuickLaborCartFee(key, newFee) {
+function updateQuickLaborLinePrice(key, newPrice) {
   const line = quickLaborCart.find((x) => x.key === key);
   if (!line) return;
-  const num = parseFloat(newFee);
+  const num = parseFloat(newPrice);
   line.price = isNaN(num) || num < 0 ? 0 : num;
 
-  const totEl = $(`ql-line-tot-${key}`);
-  if (totEl) {
-    totEl.textContent = P(line.price);
-  }
+  const lineTot = (line.kind === "labor" ? 1 : (Number(line.qty) || 1)) * line.price;
+  const chosenTot = $(`ql-chosen-tot-${key}`);
+  if (chosenTot) chosenTot.textContent = P(lineTot);
+
+  const summaryTot = $(`ql-summary-tot-${key}`);
+  if (summaryTot) summaryTot.textContent = P(lineTot);
+
+  const isOverridden = !line.custom && line.origPrice !== undefined && Number(line.price) !== Number(line.origPrice);
+  line.override = isOverridden;
+
+  const tag1 = $(`ql-override-tag-${key}`);
+  if (tag1) tag1.style.display = isOverridden ? "inline-flex" : "none";
+
+  const tag2 = $(`ql-summary-override-${key}`);
+  if (tag2) tag2.style.display = isOverridden ? "inline-flex" : "none";
 
   syncQuickLaborSummaryDom();
 }
 
 /**
- * Removes an item from the Quick Labor cart.
+ * Removes a line item from the active cart.
  * @param {string} key - Line key.
  */
-function removeQuickLaborCartLine(key) {
+function removeQuickLaborLine(key) {
   const idx = quickLaborCart.findIndex((x) => x.key === key);
   if (idx !== -1) {
+    const kind = quickLaborCart[idx].kind;
     quickLaborCart.splice(idx, 1);
-    renderQuickLaborGrid();
+    if (kind === "labor") {
+      renderQuickLaborLaborTiles();
+      renderQuickLaborChosenLabor();
+      renderQuickLaborStep2Badge();
+    } else {
+      renderQuickLaborPartTiles();
+      renderQuickLaborChosenParts();
+      renderQuickLaborStep3Badge();
+    }
     renderQuickLaborRightPanel();
+    updateQuickLaborMobileBar();
   }
 }
 
-/**
- * Sets selected mechanic for Quick Labor fix.
- * @param {string} mech - Mechanic name.
- */
-function setQuickLaborMech(mech) {
-  quickLaborMech = mech || "";
-  renderQuickLaborRightPanel();
+/** Backward compatibility alias */
+function removeQuickLaborCartLine(key) {
+  removeQuickLaborLine(key);
 }
 
-/**
- * Sets payment method for Quick Labor ("Cash" or "GCash").
- * @param {"Cash"|"GCash"} method - Payment method.
- */
-function setQuickLaborMethod(method) {
-  if (method !== "Cash" && method !== "GCash") return;
-  quickLaborMethod = method;
-  renderQuickLaborRightPanel();
+/** Backward compatibility alias */
+function updateQuickLaborCartFee(key, newFee) {
+  updateQuickLaborLinePrice(key, newFee);
 }
 
-/**
- * Handles cashier input into cash amount received field.
- * @param {string} val - Amount entered.
- */
-function onQuickLaborTenderedInput(val) {
-  const num = parseFloat(val);
-  quickLaborTendered = isNaN(num) || num < 0 ? 0 : num;
-  syncQuickLaborSummaryDom();
-}
-
-/**
- * Sets quick tender preset amount (Exact, 100, 500, 1000).
- * @param {"exact"|number} amount - Tender amount or "exact".
- */
-function setQuickLaborQuickTender(amount) {
-  if (amount === "exact") {
-    quickLaborTendered = getQuickLaborTotal();
+/** Backward compatibility alias */
+function addToQuickLabor(item) {
+  if (!item) return;
+  if (item.custom) {
+    quickLaborCart.push({
+      key: uid(),
+      id: null,
+      kind: item.kind,
+      name: item.name,
+      price: Number(item.price) || 0,
+      origPrice: Number(item.price) || 0,
+      qty: 1,
+      custom: true,
+      override: false
+    });
+  } else if (item.kind === "labor") {
+    addCatalogLaborToQuickLabor(item.id);
+    return;
   } else {
-    quickLaborTendered = Number(amount) || 0;
+    addCatalogPartToQuickLabor(item.id);
+    return;
   }
-  const inp = $("ql-tendered-input");
-  if (inp) inp.value = quickLaborTendered > 0 ? quickLaborTendered : "";
+  renderQuickLaborLeftCol();
+  renderQuickLaborRightPanel();
+  updateQuickLaborMobileBar();
+}
+
+/**
+ * Toggles work finished state and synchronizes both checkboxes.
+ * @param {boolean} checked - Checked state.
+ */
+function setQuickLaborWorkFinished(checked) {
+  qlWorkFinished = Boolean(checked);
+  const c1 = $("ql-work-finished-step");
+  if (c1) c1.checked = qlWorkFinished;
+  const c2 = $("ql-work-finished-panel");
+  if (c2) c2.checked = qlWorkFinished;
+
+  renderQuickLaborStep4Badge();
   syncQuickLaborSummaryDom();
+}
+
+/**
+ * Updates Step 4 badge done/active status.
+ */
+function renderQuickLaborStep4Badge() {
+  const badge = $("ql-step-4-badge");
+  const stepNum = qlJobType === "fix" ? "4" : "3";
+  if (badge) {
+    badge.className = `ql-step-badge ${qlWorkFinished ? "done" : "active"}`;
+    badge.textContent = qlWorkFinished ? "✓" : stepNum;
+  }
 }
 
 /**
  * Generates Change (green) or Short by (red) HTML string.
- * Change is never negative and never NaN.
  * @param {number} total - Grand total.
  * @param {number} tendered - Tendered amount.
  * @returns {string} HTML string.
@@ -14637,11 +15222,57 @@ function getQuickLaborCashCalcHtml(total, tendered) {
 }
 
 /**
- * Synchronizes DOM summary elements for Quick Labor without destroying input focus.
+ * Computes disabled reason text for the Record Quick Fix button.
+ * @param {number} total - Grand total.
+ * @returns {string} Reason string or empty if enabled.
+ */
+function getQuickLaborRecordReason(total = getQuickLaborTotal()) {
+  if (!quickLaborMech || !quickLaborMech.trim()) {
+    return "Select who did the work";
+  }
+  if (qlJobType === "fix" && !quickLaborCart.some((it) => it.kind === "labor")) {
+    return "Add at least one labor service";
+  }
+  if (qlJobType === "parts" && !quickLaborCart.some((it) => it.kind === "part")) {
+    return "Add at least one replacement part";
+  }
+  if (!qlWorkFinished) {
+    return "Confirm the work is finished";
+  }
+  if (quickLaborMethod === "Cash" && (Number(quickLaborTendered) || 0) < total) {
+    const diff = total - (Number(quickLaborTendered) || 0);
+    return `Short by ${P(diff)}`;
+  }
+  return "";
+}
+
+/**
+ * Handles cashier input into cash amount received field.
+ * Preserves input focus.
+ * @param {string} val - Amount entered.
+ */
+function onQuickLaborTenderedInput(val) {
+  const num = parseFloat(val);
+  quickLaborTendered = isNaN(num) || num < 0 ? 0 : num;
+  syncQuickLaborSummaryDom();
+}
+
+/**
+ * Sets payment method for Quick Labor ("Cash", "GCash", or "Maya").
+ * @param {"Cash"|"GCash"|"Maya"} m - Method name.
+ */
+function setQuickLaborMethod(m) {
+  if (m !== "Cash" && m !== "GCash" && m !== "Maya") return;
+  quickLaborMethod = m;
+  renderQuickLaborRightPanel();
+}
+
+/**
+ * Synchronizes DOM summary elements without destroying input focus.
  */
 function syncQuickLaborSummaryDom() {
   const total = getQuickLaborTotal();
-  const laborSubtotal = getQuickLaborLaborSubtotal();
+  const laborSubtotal = qlJobType === "fix" ? getQuickLaborLaborSubtotal() : 0;
   const partsSubtotal = getQuickLaborPartsSubtotal();
 
   const laborEl = $("ql-labor-subtotal");
@@ -14654,20 +15285,29 @@ function syncQuickLaborSummaryDom() {
   if (totalEl) totalEl.textContent = P(total);
 
   const cashCalcRow = $("ql-cash-calc-row");
-  if (cashCalcRow) {
-    const tendered = quickLaborMethod === "Cash" ? quickLaborTendered : (quickLaborTendered || total);
-    cashCalcRow.innerHTML = getQuickLaborCashCalcHtml(total, tendered);
-
+  if (cashCalcRow && quickLaborMethod === "Cash") {
+    cashCalcRow.innerHTML = getQuickLaborCashCalcHtml(total, quickLaborTendered);
   }
+
+  const reason = getQuickLaborRecordReason(total);
+  const isDisabled = Boolean(reason);
 
   const chargeBtn = $("ql-charge-btn");
   if (chargeBtn) {
-    chargeBtn.textContent = `Log Fix & Charge ${P(total)}`;
+    chargeBtn.disabled = isDisabled;
+    chargeBtn.textContent = `Record Quick Fix · ${P(total)}`;
   }
+
+  const reasonEl = $("ql-record-reason");
+  if (reasonEl) {
+    reasonEl.textContent = reason;
+  }
+
+  updateQuickLaborMobileBar();
 }
 
 /**
- * Handles two-step inline confirmation for "Clear all" button.
+ * Two-step inline confirmation handler for "Clear all" button.
  */
 function handleQuickLaborClearAll() {
   const btn = $("ql-btn-clear-all");
@@ -14693,169 +15333,396 @@ function handleQuickLaborClearAll() {
 
   quickLaborClearConfirmActive = false;
   if (quickLaborClearConfirmTimer) clearTimeout(quickLaborClearConfirmTimer);
-  quickLaborCart = [];
-  quickLaborMech = "";
-  quickLaborNote = "";
-  quickLaborMethod = "Cash";
-  quickLaborRef = "";
-  quickLaborTendered = 0;
-  quickLaborSuccessMsg = "";
-  renderQuickLaborGrid();
+  resetQuickLaborState();
+  renderQuickLaborLeftCol();
   renderQuickLaborRightPanel();
+  updateQuickLaborMobileBar();
 }
 
 /**
- * Generates HTML string for the Quick Labor items grid.
- * @returns {string} HTML string.
+ * Opens mobile bottom sheet summary drawer.
  */
-function getQuickLaborGridHtml() {
-  const items = getFilteredQuickLaborCatalogItems();
+function openQuickLaborBottomSheet() {
+  const col = $("ql-right-panel");
+  if (col) col.classList.add("bottom-sheet-open");
+}
 
-  if (items.length === 0) {
-    return `
-      <div class="empty" style="padding:40px 16px;text-align:center;background:#FFFFFF;border:1px dashed var(--border);border-radius:12px;margin-top:4px">
-        <div style="font-weight:700;font-size:14px;color:var(--text-primary);margin-bottom:4px">No items found</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">No catalog items matched your current filter or search query.</div>
-        <button type="button" class="btn g sm" onclick="clearQuickLaborFilters()">Clear filters</button>
-      </div>
-    `;
+/**
+ * Closes mobile bottom sheet summary drawer.
+ */
+function closeQuickLaborBottomSheet() {
+  const col = $("ql-right-panel");
+  if (col) col.classList.remove("bottom-sheet-open");
+}
+
+/**
+ * Updates floating mobile bar checkout summary.
+ */
+function updateQuickLaborMobileBar() {
+  const barEl = $("ql-mobile-bar");
+  const total = getQuickLaborTotal();
+  const count = getQuickLaborTotalItemsCount();
+  if (barEl) {
+    barEl.textContent = `View summary · ${count} item${count === 1 ? "" : "s"} · ${P(total)}`;
+  }
+}
+
+/**
+ * Finalizes quick fix ticket, persists to D.wo with type "quicklabor",
+ * logs any price overrides to audit trail, opens receipt, and resets to Step 1.
+ */
+function recordQuickFix() {
+  const total = getQuickLaborTotal();
+
+  // Validate Step 1: mechanic required
+  if (!quickLaborMech || !quickLaborMech.trim()) {
+    quickLaborStep1Err = true;
+    renderQuickLaborStep1();
+    const sel = $("ql-mech-select");
+    if (sel) {
+      sel.focus();
+      if (typeof sel.scrollIntoView === "function") {
+        sel.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+    return;
   }
 
-  const tilesHtml = items.map((it) => {
-    const inCartQty = getQuickLaborInCartQty(it.id, it.kind);
-    const isLabor = it.kind === "labor";
-    const badgeStyle = isLabor
-      ? 'style="background:#F5F3FF;color:#7C3AED;border-color:#DDD6FE"'
-      : '';
-    const badgeText = isLabor ? 'Labor' : 'Part';
+  // Validate all other conditions
+  const reason = getQuickLaborRecordReason(total);
+  if (reason) return;
 
-    return `
-      <button
-        type="button"
-        class="pos-tile ${inCartQty > 0 ? "in-cart" : ""}"
-        onclick="addToQuickLabor({ id: '${it.id}', kind: '${it.kind}', name: '${escHtml(it.name).replace(/'/g, "\\'")}', price: ${Number(it.price) || 0}, custom: false })"
-        title="Tap to add: ${escHtml(it.name)}"
-      >
-        ${inCartQty > 0 ? `<span class="pos-tile-badge">${inCartQty}</span>` : ""}
-        <div>
-          <span class="cat-badge ${it.kind}" ${badgeStyle}>
-            ${badgeText}
-          </span>
-          <div class="pos-tile-name">${escHtml(it.name)}</div>
-        </div>
-        <div class="pos-tile-price">${P(it.price)}</div>
-      </button>
-    `;
-  }).join("");
+  const tendered = quickLaborMethod === "Cash" ? (Number(quickLaborTendered) || 0) : total;
+  const change = quickLaborMethod === "Cash" ? Math.max(0, tendered - total) : 0;
+
+  const overrides = [];
+  const items = quickLaborCart.map((it) => {
+    const isOverridden = !it.custom && it.origPrice !== undefined && Number(it.price) !== Number(it.origPrice);
+    if (isOverridden) {
+      overrides.push({ name: it.name, origPrice: it.origPrice, price: it.price });
+    }
+    return {
+      id: it.id || uid(),
+      kind: it.kind,
+      name: it.name,
+      qty: it.kind === "labor" ? 1 : (Number(it.qty) || 1),
+      price: Number(it.price) || 0,
+      origPrice: it.origPrice !== undefined ? it.origPrice : Number(it.price) || 0,
+      override: Boolean(isOverridden),
+      custom: !!it.custom
+    };
+  });
+
+  // Number format: continue highest existing number
+  let maxNum = 0;
+  (D.wo || []).forEach((w) => {
+    const numStr = (w.no || w.txnId || "").replace(/^TXN-?/i, "");
+    const n = parseInt(numStr, 10);
+    if (!isNaN(n) && n > maxNum) maxNum = n;
+  });
+  if (maxNum === 0) maxNum = (D.wo || []).length;
+  const nextNum = maxNum + 1;
+  const txnId = "TXN-" + String(nextNum).padStart(4, "0");
+
+  const laborSubtotal = qlJobType === "fix" ? getQuickLaborLaborSubtotal() : 0;
+  const partsSubtotal = getQuickLaborPartsSubtotal();
+
+  const newFix = {
+    id: "w" + uid(),
+    no: txnId,
+    txnId: txnId,
+    type: "quicklabor",
+    subtype: qlJobType,
+    st: "Completed",
+    done: nowLocalString(),
+    doneAt: nowLocalString(),
+    at: today(),
+    customer: (quickLaborCustomer && quickLaborCustomer.trim()) ? quickLaborCustomer.trim() : "Walk-in Customer",
+    vehicleLine: (quickLaborCustomer && quickLaborCustomer.trim()) ? quickLaborCustomer.trim() : "Walk-in Motorcycle",
+    mech: quickLaborMech.trim(),
+    items: items,
+    laborSubtotal: laborSubtotal,
+    partsSubtotal: partsSubtotal,
+    total: total,
+    pay: {
+      method: quickLaborMethod,
+      paidAt: nowLocalString(),
+      tendered: tendered,
+      change: change,
+      ref: (quickLaborMethod === "GCash" || quickLaborMethod === "Maya") && quickLaborRef ? quickLaborRef.trim() : ""
+    }
+  };
+
+  if (!Array.isArray(D.wo)) D.wo = [];
+  D.wo.push(newFix);
+  save();
+
+  // Log price overrides to audit trail
+  overrides.forEach((ov) => {
+    if (typeof logAudit === "function") {
+      logAudit("Price override", txnId, `${ov.name}: ${P(ov.origPrice)} -> ${P(ov.price)}`);
+    }
+  });
+
+  // Reset page state to Step 1
+  quickLaborCart = [];
+  quickLaborCustomer = "";
+  qlWorkFinished = false;
+  quickLaborTendered = 0;
+  quickLaborRef = "";
+  quickLaborClearConfirmActive = false;
+  if (quickLaborClearConfirmTimer) clearTimeout(quickLaborClearConfirmTimer);
+  quickLaborStep1Err = false;
+
+  // If logged in as mechanic, keep their name preselected; otherwise reset
+  initDefaultQuickLaborMech();
+
+  closeQuickLaborBottomSheet();
+  renderQuickLaborView();
+  if (typeof openReceipt === "function") {
+    openReceipt(newFix.id);
+  }
+}
+
+/** Backward compatibility alias */
+function logQuickFix() {
+  recordQuickFix();
+}
+
+/**
+ * Generates HTML for the left column: segmented control + 4 stacked step cards.
+ * @returns {string} HTML string.
+ */
+function getQuickLaborLeftColHtml() {
+  const isFix = qlJobType === "fix";
 
   return `
-    <div class="pos-tiles-grid">
-      ${tilesHtml}
+    <div id="ql-type-bar-wrap">
+      ${getQuickLaborTypeBarHtml()}
+    </div>
+
+    <!-- STEP 1: Who did the work -->
+    <div id="ql-step-1-wrap">
+      ${getQuickLaborStep1Html()}
+    </div>
+
+    <!-- STEP 2: Labor done (Fix + Parts only) -->
+    ${
+      isFix
+        ? `
+          <div class="ql-step-card" id="ql-step-2">
+            <div class="ql-step-header">
+              <div class="ql-step-badge ${quickLaborCart.some((it) => it.kind === 'labor') ? 'done' : 'active'}" id="ql-step-2-badge">
+                ${quickLaborCart.some((it) => it.kind === 'labor') ? '✓' : '2'}
+              </div>
+              <div>
+                <div class="ql-step-title">Labor done</div>
+                <div class="ql-step-subtitle">Select catalog service or add custom labor (required)</div>
+              </div>
+            </div>
+
+            <!-- Search bar with live filter and Enter quick-add -->
+            <div class="rep-search-wrap" style="margin-bottom:12px">
+              <span class="search-icon" onclick="$('ql-search-labor').focus()" title="Search">${LINE_ICONS.insp}</span>
+              <input
+                id="ql-search-labor"
+                type="text"
+                placeholder="Search labor (press Enter to quick-add)..."
+                value="${escHtml(quickLaborSearchLabor)}"
+                autocomplete="off"
+                oninput="onQuickLaborSearchLaborInput(this.value)"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();addFirstQuickLaborMatch('labor');}"
+              />
+              <button
+                id="ql-search-labor-clear"
+                class="search-clear ${quickLaborSearchLabor ? 'visible' : ''}"
+                onclick="clearQuickLaborSearchLabor()"
+                type="button"
+                aria-label="Clear search"
+                title="Clear search"
+              >✕</button>
+            </div>
+
+            <!-- Custom labor inline form container -->
+            <div id="ql-custom-labor-wrap"></div>
+
+            <!-- Labor catalog tiles grid container -->
+            <div id="ql-labor-tiles-grid-wrap">
+              ${getQuickLaborLaborTilesHtml()}
+            </div>
+
+            <!-- Chosen labor lines box -->
+            <div class="ql-chosen-box" id="ql-chosen-labor-wrap">
+              ${getQuickLaborChosenLaborHtml()}
+            </div>
+          </div>
+        `
+        : ""
+    }
+
+    <!-- STEP 3: Parts replaced -->
+    <div class="ql-step-card" id="ql-step-3">
+      <div class="ql-step-header">
+        <div class="ql-step-badge ${quickLaborCart.some((it) => it.kind === 'part') ? 'done' : 'active'}" id="ql-step-3-badge">
+          ${quickLaborCart.some((it) => it.kind === 'part') ? '✓' : (isFix ? '3' : '2')}
+        </div>
+        <div>
+          <div class="ql-step-title">Parts replaced</div>
+          <div class="ql-step-subtitle">${isFix ? 'Parts replaced or consumables used (optional)' : 'Replacement parts or consumables sold (required)'}</div>
+        </div>
+      </div>
+
+      <!-- Search bar with live filter and Enter quick-add -->
+      <div class="rep-search-wrap" style="margin-bottom:12px">
+        <span class="search-icon" onclick="$('ql-search-part').focus()" title="Search">${LINE_ICONS.insp}</span>
+        <input
+          id="ql-search-part"
+          type="text"
+          placeholder="Search parts (press Enter to quick-add)..."
+          value="${escHtml(quickLaborSearchPart)}"
+          autocomplete="off"
+          oninput="onQuickLaborSearchPartInput(this.value)"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();addFirstQuickLaborMatch('part');}"
+        />
+        <button
+          id="ql-search-part-clear"
+          class="search-clear ${quickLaborSearchPart ? 'visible' : ''}"
+          onclick="clearQuickLaborSearchPart()"
+          type="button"
+          aria-label="Clear search"
+          title="Clear search"
+        >✕</button>
+      </div>
+
+      <!-- Custom part inline form container -->
+      <div id="ql-custom-part-wrap"></div>
+
+      <!-- Part catalog tiles grid container -->
+      <div id="ql-part-tiles-grid-wrap">
+        ${getQuickLaborPartTilesHtml()}
+      </div>
+
+      <!-- Chosen parts lines box -->
+      <div class="ql-chosen-box" id="ql-chosen-part-wrap">
+        ${getQuickLaborChosenPartsHtml()}
+      </div>
+    </div>
+
+    <!-- STEP 4: Confirm work is finished -->
+    <div class="ql-step-card" id="ql-step-4">
+      <div class="ql-step-header">
+        <div class="ql-step-badge ${qlWorkFinished ? 'done' : 'active'}" id="ql-step-4-badge">
+          ${qlWorkFinished ? '✓' : (isFix ? '4' : '3')}
+        </div>
+        <div>
+          <div class="ql-step-title">Confirm work is finished</div>
+          <div class="ql-step-subtitle">Must be checked before logging fix</div>
+        </div>
+      </div>
+      <div>
+        <label style="display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;font-weight:700;color:var(--text-primary);padding:6px 0;user-select:none">
+          <input
+            type="checkbox"
+            id="ql-work-finished-step"
+            style="width:20px;height:20px;accent-color:var(--accent);cursor:pointer"
+            ${qlWorkFinished ? "checked" : ""}
+            onchange="setQuickLaborWorkFinished(this.checked)"
+          />
+          <span>Work is finished</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="ql-steps-footer-note">
+      Step 2 and 3 can be done in any order, but the job is recorded only after the work is done.
     </div>
   `;
 }
 
 /**
- * Re-renders the Quick Labor catalog items grid in the DOM.
+ * Re-renders only the left column steps container.
  */
-function renderQuickLaborGrid() {
-  const wrap = $("ql-grid-wrap");
-  if (wrap) wrap.innerHTML = getQuickLaborGridHtml();
+function renderQuickLaborLeftCol() {
+  const col = $("ql-left-col");
+  if (col) col.innerHTML = getQuickLaborLeftColHtml();
 }
 
 /**
- * Generates full HTML for the right column "Current Quick Fix" panel.
+ * Generates full HTML for the right column "Quick Fix Summary" panel.
  * @returns {string} HTML string.
  */
 function getQuickLaborRightPanelHtml() {
   const total = getQuickLaborTotal();
-  const laborSubtotal = getQuickLaborLaborSubtotal();
+  const laborSubtotal = qlJobType === "fix" ? getQuickLaborLaborSubtotal() : 0;
   const partsSubtotal = getQuickLaborPartsSubtotal();
-  const mechanics = getUniqueMechanics();
+  const reason = getQuickLaborRecordReason(total);
+  const isDisabled = Boolean(reason);
+  const isSuperUser = typeof isSuper === "function" && isSuper();
 
   return `
     <div class="pos-cart-panel" style="padding:16px">
-      ${
-        quickLaborSuccessMsg
-          ? `
-            <div style="background:#ECFDF5;border:1px solid #A7F3D0;color:#047857;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
-              <span>✓ ${escHtml(quickLaborSuccessMsg)}</span>
-              <button type="button" onclick="quickLaborSuccessMsg='';renderQuickLaborRightPanel()" style="background:none;border:none;color:#047857;cursor:pointer;font-size:14px">✕</button>
-            </div>
-          `
-          : ""
-      }
-
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <span style="font-size:14px;font-weight:700;color:var(--text-primary)">Current Quick Fix</span>
-        <button
-          type="button"
-          class="btn g sm"
-          id="ql-btn-clear-all"
-          onclick="handleQuickLaborClearAll()"
-          style="${quickLaborClearConfirmActive ? 'color:var(--danger, #DC2626);font-weight:700' : ''}"
-          title="Clear fix and inputs"
-        >
-          ${quickLaborClearConfirmActive ? "Tap again to clear" : "Clear all"}
-        </button>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:15px;font-weight:800;color:var(--text-primary)">Quick Fix Summary</span>
+          <span class="badge" style="font-size:11px;font-weight:700;background:var(--bg-subtle);color:var(--text-primary);padding:2px 8px;border-radius:999px;border:1px solid var(--border)">
+            ${qlJobType === 'fix' ? 'Fix + Parts' : 'Parts Only'}
+          </span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button
+            type="button"
+            class="btn g sm"
+            id="ql-btn-clear-all"
+            onclick="handleQuickLaborClearAll()"
+            style="${quickLaborClearConfirmActive ? 'color:var(--danger, #DC2626);font-weight:700' : ''}"
+            title="Clear all"
+          >
+            ${quickLaborClearConfirmActive ? 'Tap again to clear' : 'Clear all'}
+          </button>
+          <button type="button" class="pos-sheet-close" onclick="closeQuickLaborBottomSheet()" aria-label="Close summary">✕</button>
+        </div>
       </div>
 
-      <!-- Top two compact inputs -->
-      <div style="margin-bottom:10px">
-        <label for="ql-mech-select" style="font-size:12px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:4px">
-          Handled by <span style="color:var(--danger)">*</span>
-        </label>
-        <select
-          id="ql-mech-select"
-          class="his-select"
-          style="width:100%;height:34px;font-size:13px;border:1px solid var(--border);border-radius:6px;background:var(--bg-surface);color:var(--text)"
-          onchange="setQuickLaborMech(this.value)"
-        >
-          <option value="">Select mechanic...</option>
-          ${mechanics.map((m) => `<option value="${escHtml(m)}" ${quickLaborMech === m ? "selected" : ""}>${escHtml(m)}</option>`).join("")}
-        </select>
-        ${
-          !quickLaborMech
-            ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;font-style:italic">Not selected. Will be logged as Unassigned.</div>`
-            : ""
-        }
+      <!-- Handled by & Customer / Plate -->
+      <div style="background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="color:var(--text-muted);font-weight:600">Handled by:</span>
+          <b style="color:${quickLaborMech ? 'var(--text-primary)' : 'var(--danger, #DC2626)'}">
+            ${escHtml(quickLaborMech || 'Not selected')}
+          </b>
+        </div>
+        <div>
+          <input
+            id="ql-customer-input"
+            type="text"
+            placeholder="Customer or plate (optional)"
+            value="${escHtml(quickLaborCustomer)}"
+            oninput="quickLaborCustomer = this.value"
+            style="width:100%;height:34px;box-sizing:border-box;border-radius:6px;border:1px solid var(--border);padding:0 8px;font-size:12px;background:var(--bg-surface);color:var(--text)"
+          />
+        </div>
       </div>
 
-      <div style="margin-bottom:14px">
-        <label for="ql-note-input" style="font-size:12px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:4px">
-          Bike / note (optional)
-        </label>
-        <input
-          id="ql-note-input"
-          type="text"
-          placeholder="Plate # or bike model, e.g. Click 125i"
-          value="${escHtml(quickLaborNote)}"
-          oninput="quickLaborNote = this.value"
-          style="width:100%;height:34px;box-sizing:border-box;border-radius:6px;border:1px solid var(--border);padding:0 8px;font-size:13px;background:var(--bg-surface);color:var(--text)"
-        />
-      </div>
-
-      <!-- Itemized Cart List -->
-      <div class="pos-cart-list" id="ql-cart-list">
+      <!-- Itemized Cart List in Summary -->
+      <div class="pos-cart-list" id="ql-summary-cart-list">
         ${
           quickLaborCart.length === 0
-            ? `<div class="empty" style="padding:32px 16px;text-align:center;font-size:13px;color:var(--text-muted)">No items yet.<br>Tap a labor or part card to add it.</div>`
+            ? `<div class="empty" style="padding:24px 16px;text-align:center;font-size:13px;color:var(--text-muted)">No items yet.<br>Add labor or parts from the steps on the left.</div>`
             : quickLaborCart.map((item) => {
                 const isLabor = item.kind === "labor";
                 const lineTotal = isLabor ? (Number(item.price) || 0) : ((Number(item.qty) || 1) * (Number(item.price) || 0));
-                const badgeStyle = isLabor
-                  ? 'style="background:#F5F3FF;color:#7C3AED;border:1px solid #DDD6FE;margin-right:4px"'
-                  : 'style="margin-right:4px"';
-                const badgeText = isLabor ? 'Labor' : 'Part';
+                const isOverridden = !item.custom && item.origPrice !== undefined && Number(item.price) !== Number(item.origPrice);
+                const isPriceReadOnly = !isSuperUser && !item.custom;
 
                 return `
-                  <div class="pos-cart-line" id="ql-cart-line-${item.key}">
+                  <div class="pos-cart-line" id="ql-summary-line-${item.key}">
                     <div class="pos-cart-line-top">
-                      <div style="flex:1;min-width:0">
-                        <span class="cat-badge ${item.kind}" ${badgeStyle}>${badgeText}</span>
+                      <div style="flex:1;min-width:0;display:flex;align-items:center;flex-wrap:wrap;gap:4px">
+                        <span class="cat-badge ${item.kind}" ${isLabor ? 'style="background:#F5F3FF;color:#7C3AED;border-color:#DDD6FE"' : ''}>${isLabor ? 'Labor' : 'Part'}</span>
                         <b style="font-size:13px;color:var(--text-primary)">${escHtml(item.name)}</b>
+                        <span id="ql-summary-override-${item.key}" class="badge-override" style="font-size:10px;padding:1px 4px;${isOverridden ? '' : 'display:none'}">OVERRIDE</span>
                       </div>
-                      <button type="button" class="pos-line-del-btn" onclick="removeQuickLaborCartLine('${item.key}')" title="Remove item">✕</button>
+                      <button type="button" class="pos-line-del-btn" onclick="removeQuickLaborLine('${item.key}')" title="Remove item">✕</button>
                     </div>
 
                     ${
@@ -14870,11 +15737,12 @@ function getQuickLaborRightPanelHtml() {
                                 step="1"
                                 class="pos-price-input"
                                 value="${item.price}"
-                                oninput="updateQuickLaborCartFee('${item.key}', this.value)"
+                                ${isPriceReadOnly ? "readonly disabled style='background:var(--bg-subtle);color:var(--text-muted)'" : ""}
+                                oninput="updateQuickLaborLinePrice('${item.key}', this.value)"
                                 style="width:90px;height:28px;border-radius:4px;border:1px solid var(--border);padding:0 6px;font-size:13px;font-weight:700;text-align:right"
                               />
                             </div>
-                            <b style="font-size:13px;color:var(--text);min-width:60px;text-align:right" id="ql-line-tot-${item.key}">
+                            <b style="font-size:13px;color:var(--text);min-width:60px;text-align:right" id="ql-summary-tot-${item.key}">
                               ${P(lineTotal)}
                             </b>
                           </div>
@@ -14886,8 +15754,20 @@ function getQuickLaborRightPanelHtml() {
                               <span class="pos-qty-val">${item.qty}</span>
                               <button type="button" class="pos-qty-btn" onclick="updateQuickLaborCartQty('${item.key}', 1)" title="Increase quantity">+</button>
                             </div>
-                            <div style="font-size:12px;color:var(--text-muted)">@ ${P(item.price)}</div>
-                            <b style="font-size:13px;color:var(--text);min-width:60px;text-align:right" id="ql-line-tot-${item.key}">
+                            <div style="display:flex;align-items:center;gap:4px">
+                              <span style="font-size:11px;color:var(--text-muted)">@ ₱</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                class="pos-price-input"
+                                value="${item.price}"
+                                ${isPriceReadOnly ? "readonly disabled style='background:var(--bg-subtle);color:var(--text-muted)'" : ""}
+                                oninput="updateQuickLaborLinePrice('${item.key}', this.value)"
+                                style="width:80px;height:28px;border-radius:4px;border:1px solid var(--border);padding:0 6px;font-size:13px;font-weight:700;text-align:right"
+                              />
+                            </div>
+                            <b style="font-size:13px;color:var(--text);min-width:60px;text-align:right" id="ql-summary-tot-${item.key}">
                               ${P(lineTotal)}
                             </b>
                           </div>
@@ -14901,10 +15781,16 @@ function getQuickLaborRightPanelHtml() {
 
       <!-- Totals Block -->
       <div class="pos-totals-block" style="margin-top:12px">
-        <div class="pos-totals-row" style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);margin-bottom:4px">
-          <span>Labor Subtotal</span>
-          <span id="ql-labor-subtotal">${P(laborSubtotal)}</span>
-        </div>
+        ${
+          qlJobType === "fix"
+            ? `
+              <div class="pos-totals-row" style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);margin-bottom:4px">
+                <span>Labor Subtotal</span>
+                <span id="ql-labor-subtotal">${P(laborSubtotal)}</span>
+              </div>
+            `
+            : ""
+        }
         <div class="pos-totals-row" style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);margin-bottom:6px">
           <span>Parts Subtotal</span>
           <span id="ql-parts-subtotal">${P(partsSubtotal)}</span>
@@ -14915,10 +15801,24 @@ function getQuickLaborRightPanelHtml() {
         </div>
       </div>
 
-      <!-- Payment Method Toggle: Cash and GCash ONLY (2 equal columns) -->
+      <!-- Required Checkbox: Work is finished -->
+      <div style="margin-top:14px;padding:8px 10px;background:var(--bg-subtle);border-radius:8px;border:1px solid var(--border)">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:700;color:var(--text-primary);user-select:none">
+          <input
+            type="checkbox"
+            id="ql-work-finished-panel"
+            style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer"
+            ${qlWorkFinished ? "checked" : ""}
+            onchange="setQuickLaborWorkFinished(this.checked)"
+          />
+          <span>Work is finished <span style="color:var(--danger)">*</span></span>
+        </label>
+      </div>
+
+      <!-- Payment Method Toggle: Cash, GCash, Maya -->
       <div style="margin-top:14px">
         <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:6px">Payment Method</label>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:6px">
           <button
             type="button"
             class="btn g sm ${quickLaborMethod === 'Cash' ? 'on' : ''}"
@@ -14935,16 +15835,24 @@ function getQuickLaborRightPanelHtml() {
           >
             <span style="display:inline-flex;align-items:center;margin-right:4px">${ICONS.phone}</span>GCash
           </button>
+          <button
+            type="button"
+            class="btn g sm ${quickLaborMethod === 'Maya' ? 'on' : ''}"
+            style="${quickLaborMethod === 'Maya' ? 'background:var(--accent);color:#FFF;border-color:var(--accent);font-weight:700' : ''}"
+            onclick="setQuickLaborMethod('Maya')"
+          >
+            <span style="display:inline-flex;align-items:center;margin-right:4px">${LINE_ICONS.bill}</span>Maya
+          </button>
         </div>
       </div>
 
-      <!-- Amount received, quick buttons, and Change -->
+      <!-- Amount received and Change breakdown -->
       ${
         quickLaborMethod === "Cash"
           ? `
             <div style="margin-top:12px;background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-                <label for="ql-tendered-input" style="font-size:12px;font-weight:700;color:var(--text-secondary)">Amount received (PHP):</label>
+                <label for="ql-tendered-input" style="font-size:12px;font-weight:700;color:var(--text-secondary)">Amount Received (PHP):</label>
                 <input
                   id="ql-tendered-input"
                   type="number"
@@ -14956,15 +15864,6 @@ function getQuickLaborRightPanelHtml() {
                   style="width:100px;height:32px;border-radius:6px;border:1px solid var(--border);padding:0 8px;text-align:right;font-size:13px;font-weight:700;background:var(--bg-surface);color:var(--text)"
                 />
               </div>
-
-              <!-- Quick cash buttons -->
-              <div style="display:flex;gap:4px;margin-top:6px">
-                <button type="button" class="btn g sm" style="flex:1;padding:4px 0;font-size:11px" onclick="setQuickLaborQuickTender('exact')">Exact</button>
-                <button type="button" class="btn g sm" style="flex:1;padding:4px 0;font-size:11px" onclick="setQuickLaborQuickTender(100)">₱100</button>
-                <button type="button" class="btn g sm" style="flex:1;padding:4px 0;font-size:11px" onclick="setQuickLaborQuickTender(500)">₱500</button>
-                <button type="button" class="btn g sm" style="flex:1;padding:4px 0;font-size:11px" onclick="setQuickLaborQuickTender(1000)">₱1,000</button>
-              </div>
-
               <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:12px" id="ql-cash-calc-row">
                 ${getQuickLaborCashCalcHtml(total, quickLaborTendered)}
               </div>
@@ -14973,29 +15872,7 @@ function getQuickLaborRightPanelHtml() {
           : `
             <div style="margin-top:12px;background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
               <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px">
-                Digital payment via <b>GCash</b>. Exact amount (${P(total)}) billed.
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-                <label for="ql-tendered-input" style="font-size:12px;font-weight:700;color:var(--text-secondary)">Amount received (PHP):</label>
-                <input
-                  id="ql-tendered-input"
-                  type="number"
-                  min="0"
-                  step="1"
-                  placeholder="0"
-                  value="${quickLaborTendered > 0 ? quickLaborTendered : total}"
-                  oninput="onQuickLaborTenderedInput(this.value)"
-                  style="width:100px;height:32px;border-radius:6px;border:1px solid var(--border);padding:0 8px;text-align:right;font-size:13px;font-weight:700;background:var(--bg-surface);color:var(--text)"
-                />
-              </div>
-              <div style="display:flex;gap:4px;margin-top:6px;margin-bottom:8px">
-                <button type="button" class="btn g sm" style="flex:1;padding:4px 0;font-size:11px" onclick="setQuickLaborQuickTender('exact')">Exact</button>
-                <button type="button" class="btn g sm" style="flex:1;padding:4px 0;font-size:11px" onclick="setQuickLaborQuickTender(100)">₱100</button>
-                <button type="button" class="btn g sm" style="flex:1;padding:4px 0;font-size:11px" onclick="setQuickLaborQuickTender(500)">₱500</button>
-                <button type="button" class="btn g sm" style="flex:1;padding:4px 0;font-size:11px" onclick="setQuickLaborQuickTender(1000)">₱1,000</button>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:12px" id="ql-cash-calc-row">
-                ${getQuickLaborCashCalcHtml(total, quickLaborTendered || total)}
+                Digital payment via <b>${escHtml(quickLaborMethod)}</b>. Exact amount (${P(total)}) billed.
               </div>
               <label for="ql-ref-input" style="font-size:11px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Reference No. (optional):</label>
               <input
@@ -15010,22 +15887,26 @@ function getQuickLaborRightPanelHtml() {
           `
       }
 
-      <!-- Primary Action Button: Log Fix & Charge, always enabled -->
+      <!-- Primary Action Button: Record Quick Fix -->
       <button
         type="button"
         class="pos-charge-btn"
         id="ql-charge-btn"
-        onclick="logQuickFix()"
+        onclick="recordQuickFix()"
+        ${isDisabled ? 'disabled' : ''}
         style="margin-top:14px"
       >
-        Log Fix &amp; Charge ${P(total)}
+        Record Quick Fix · ${P(total)}
       </button>
+      <div id="ql-record-reason" style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:6px;min-height:16px">
+        ${reason}
+      </div>
     </div>
   `;
 }
 
 /**
- * Re-renders the Quick Labor right panel in the DOM.
+ * Re-renders only the right panel summary in the DOM.
  */
 function renderQuickLaborRightPanel() {
   const panel = $("ql-right-panel");
@@ -15033,156 +15914,47 @@ function renderQuickLaborRightPanel() {
 }
 
 /**
- * Generates the full HTML markup for the Quick Labor view.
+ * Re-renders both columns of the Quick Labor view.
+ */
+function renderQuickLaborView() {
+  renderQuickLaborLeftCol();
+  renderQuickLaborRightPanel();
+}
+
+/**
+ * Generates the full HTML markup for the Quick Labor page view.
  * @returns {string} HTML markup string.
  */
 function getQuickLaborViewHtml() {
+  initDefaultQuickLaborMech();
+
   return `
     <div class="card top">
       <div>
         <h1>Quick Labor</h1>
-        <p>Fast-track logging and checkout for completed walk-in minor repairs and part replacements.</p>
+        <p>Record quick fixes: labor with the parts replaced, or parts only.</p>
       </div>
     </div>
 
-    <div class="pos-container">
-      <!-- Left Column: Search, Filters, Custom Items, Catalog Items -->
-      <div class="pos-left-col">
-        <!-- Search bar with live search and Enter quick-add -->
-        <div class="rep-search-wrap" style="margin-bottom:12px">
-          <span class="search-icon" onclick="$('ql-search-input').focus()" title="Search">${LINE_ICONS.insp}</span>
-          <input
-            id="ql-search-input"
-            type="text"
-            placeholder="Search quick services or replacement parts (press Enter to quick-add)..."
-            value="${quickLaborSearch.replace(/"/g, '&quot;')}"
-            autocomplete="off"
-            oninput="onQuickLaborSearchInput(this.value)"
-            onkeydown="if(event.key==='Enter'){event.preventDefault();addFirstQuickLaborMatchToCart();}"
-          />
-          <button
-            id="ql-search-clear"
-            class="search-clear ${quickLaborSearch ? "visible" : ""}"
-            onclick="clearQuickLaborSearch()"
-            type="button"
-            aria-label="Clear search"
-            title="Clear search"
-          >✕</button>
-        </div>
-
-        <!-- Filter pills with live counts -->
-        <div class="pos-chips" id="ql-chips" style="margin-bottom:12px">
-          ${getQuickLaborChipsHtml()}
-        </div>
-
-        <!-- Top dashed cards for Custom Labor & Custom Part -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-          <button type="button" class="pos-tile pos-tile-custom" onclick="openQuickLaborCustomForm('labor')" title="Add custom labor">
-            <div class="pos-custom-plus">+</div>
-            <div class="pos-custom-text">+ Custom Labor</div>
-          </button>
-          <button type="button" class="pos-tile pos-tile-custom" onclick="openQuickLaborCustomForm('part')" title="Add custom part / consumable">
-            <div class="pos-custom-plus">+</div>
-            <div class="pos-custom-text">+ Custom Part / Consumable</div>
-          </button>
-        </div>
-
-        <!-- Custom Item Inline Form (shown when open) -->
-        <div id="ql-custom-form-wrap">
-          ${getQuickLaborCustomFormHtml()}
-        </div>
-
-        <!-- Catalog items grid container -->
-        <div id="ql-grid-wrap">
-          ${getQuickLaborGridHtml()}
-        </div>
+    <div class="pos-layout">
+      <!-- Left Column: 4 Step Cards stacked -->
+      <div class="pos-left-col" id="ql-left-col">
+        ${getQuickLaborLeftColHtml()}
       </div>
 
-      <!-- Right Column: Current Quick Fix Panel -->
+      <!-- Right Column: Quick Fix Summary Panel -->
       <div class="pos-right-col" id="ql-right-panel">
         ${getQuickLaborRightPanelHtml()}
       </div>
     </div>
+
+    <!-- Mobile Floating Checkout Bar (<900px) -->
+    <div class="pos-mobile-bar" id="ql-mobile-bar" onclick="openQuickLaborBottomSheet()">
+      View summary · ${getQuickLaborTotalItemsCount()} items · ${P(getQuickLaborTotal())}
+    </div>
   `;
 }
 
-/**
- * Logs a completed quick walk-in fix into D.wo, deducts catalog part stock,
- * clears the cart and inputs, and displays an inline success confirmation.
- */
-function logQuickFix() {
-  const total = getQuickLaborTotal();
-  // Copying Quick Sales behavior for empty cart: early return
-  if (quickLaborCart.length === 0) return;
-
-  const laborSubtotal = getQuickLaborLaborSubtotal();
-  const partsSubtotal = getQuickLaborPartsSubtotal();
-
-  const tendered = quickLaborMethod === "Cash"
-    ? (Number(quickLaborTendered) || 0)
-    : (Number(quickLaborTendered) || total);
-  const change = Math.max(0, tendered - total);
-
-  // Deduct stock for catalog Part items using the same method Quick Sales uses
-  quickLaborCart.forEach((item) => {
-    if (!item.custom && item.kind === "part" && item.id) {
-      const pt = (D.pt || []).find((p) => p.id === item.id);
-      if (pt && typeof pt.stock === "number") {
-        pt.stock = Math.max(0, pt.stock - (Number(item.qty) || 1));
-      }
-    }
-  });
-
-  const nextIdx = D.wo.length + 1;
-  const txnId = "TXN-" + String(nextIdx).padStart(4, "0");
-
-  const newFix = {
-    id: "w" + uid(),
-    type: "QUICK LABOR",
-    st: "Completed",
-    done: nowLocalString(),
-    at: today(),
-    customer: "Walk-in Customer",
-    vehicleLine: (quickLaborNote.trim()) || "Walk-in Motorcycle",
-    mech: (quickLaborMech.trim()) || "Unassigned",
-    items: quickLaborCart.map((it) => ({
-      id: it.id || uid(),
-      kind: it.kind,
-      name: it.name,
-      qty: it.kind === "labor" ? 1 : (Number(it.qty) || 1),
-      price: Number(it.price) || 0,
-      custom: !!it.custom
-    })),
-    laborSubtotal: laborSubtotal,
-    partsSubtotal: partsSubtotal,
-    total: total,
-    pay: {
-      method: quickLaborMethod,
-      paidAt: nowLocalString(),
-      tendered: tendered,
-      change: change,
-      ref: quickLaborRef.trim()
-    }
-  };
-
-  D.wo.push(newFix);
-  save();
-
-  // Reset cart, inputs, and state
-  quickLaborCart = [];
-  quickLaborMech = "";
-  quickLaborNote = "";
-  quickLaborMethod = "Cash";
-  quickLaborRef = "";
-  quickLaborTendered = 0;
-  quickLaborClearConfirmActive = false;
-  if (quickLaborClearConfirmTimer) clearTimeout(quickLaborClearConfirmTimer);
-  quickLaborSuccessMsg = `Fix logged. ${txnId}`;
-
-  // Refresh UI
-  renderQuickLaborGrid();
-  renderQuickLaborRightPanel();
-}
 
 
 

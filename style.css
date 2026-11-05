@@ -446,7 +446,10 @@ aside {
   }
 
   body.logged-in main {
-    padding-top: 68px;
+    padding: 68px 16px 24px;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   body.logged-out .btn-mobile-menu {
@@ -476,17 +479,21 @@ aside {
     top: 0;
     bottom: 0;
     left: 0;
-    width: 260px;
+    width: min(85vw, 300px);
     height: 100vh;
+    height: 100dvh;
     z-index: 250;
     transform: translateX(-100%);
     transition: transform 200ms ease;
+    visibility: hidden;
     box-shadow: none;
     overflow-y: auto;
+    margin: 0;
   }
 
   body.drawer-open aside {
     transform: translateX(0);
+    visibility: visible;
     box-shadow: 4px 0 24px rgba(15, 23, 42, 0.18);
   }
 }
@@ -2368,39 +2375,11 @@ body.logged-in .login-screen {
 
 /* Responsive */
 @media (max-width: 860px) {
-  body {
-    flex-direction: column;
-  }
-  aside {
-    width: 100%;
-    height: auto;
-    position: static;
-    border-right: none;
-    border-bottom: 1px solid var(--sidebar-border);
-  }
-  nav {
-    flex-direction: row;
-    overflow-x: auto;
-    padding-bottom: 12px;
-  }
-  .nl {
-    display: none;
-  }
-  .me {
-    display: flex;
-    padding: 10px 16px;
-  }
-  .sidebar-account-switcher {
-    padding: 8px 16px 12px;
-  }
   .grid2 {
     grid-template-columns: 1fr;
   }
   .stats {
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  }
-  main {
-    padding: 16px;
   }
 }
 
@@ -7146,6 +7125,118 @@ body.is-mobile .dtc-top .obd-btn-added,
   text-align: center;
   min-height: 44px;
 }
+
+/* ==========================================================
+   RESPONSIVE NARROW LAYOUT FIXES & POLISH (resp-)
+   ========================================================== */
+
+/* Top Card Margins & Padding inside main at <= 899.98px */
+@media (max-width: 899.98px) {
+  body.logged-in main {
+    padding-top: 68px !important;
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-bottom: 24px;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  main > .card:first-child,
+  main > .top:first-child,
+  main > div:first-child > .card:first-child,
+  main > div:first-child > .top:first-child {
+    margin-top: 0 !important;
+  }
+
+  .card,
+  .grid2,
+  .tw {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  aside nav button {
+    min-height: 44px;
+  }
+
+  .btn-mobile-menu {
+    outline: none;
+  }
+  .btn-mobile-menu:focus-visible {
+    outline: 2px solid var(--accent, #2563EB);
+    outline-offset: 2px;
+  }
+}
+
+/* Mobile UI frame support */
+.mobile-ui aside,
+[data-mobile] aside,
+body.is-mobile aside,
+.phone-frame aside {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: min(85vw, 300px) !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  z-index: 250 !important;
+  transform: translateX(-100%) !important;
+  visibility: hidden !important;
+  margin: 0 !important;
+}
+
+.mobile-ui.drawer-open aside,
+[data-mobile].drawer-open aside,
+body.is-mobile.drawer-open aside,
+.phone-frame.drawer-open aside {
+  transform: translateX(0) !important;
+  visibility: visible !important;
+}
+
+.mobile-ui main,
+[data-mobile] main,
+body.is-mobile main,
+.phone-frame main {
+  padding-top: 68px !important;
+  padding-left: 14px;
+  padding-right: 14px;
+  padding-bottom: 24px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Scroll lock when mobile drawer is open */
+body.resp-scroll-locked {
+  overflow: hidden !important;
+}
+
+/* Padding polish at <= 640px */
+@media (max-width: 640px) {
+  body.logged-in main {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+}
+
+/* Stepper responsive polish at <= 400px (hide inactive step labels, keep active label) */
+@media (max-width: 400px) {
+  .insp-step.upcoming span:not(.insp-step-num),
+  .insp-step.done span:not(.insp-step-num) {
+    display: none;
+  }
+  .insp-step {
+    font-size: 13px;
+  }
+}
+
+/* Header cards wrap cleanly without overflow */
+.card.top {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 
 
 

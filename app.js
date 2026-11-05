@@ -887,7 +887,7 @@ function openSidebarDrawer() {
   mobileDrawerOpen = true;
 
   if (document.body) {
-    document.body.classList.add("drawer-open");
+    document.body.classList.add("drawer-open", "resp-scroll-locked");
     document.body.style.overflow = "hidden";
   }
 
@@ -911,7 +911,7 @@ function closeSidebarDrawer() {
   mobileDrawerOpen = false;
 
   if (document.body) {
-    document.body.classList.remove("drawer-open");
+    document.body.classList.remove("drawer-open", "resp-scroll-locked");
     document.body.style.overflow = "";
   }
 
@@ -978,13 +978,7 @@ function handleWindowResize() {
   if (currentWidth >= 900) {
     // Desktop breakpoint
     if (mobileDrawerOpen) {
-      mobileDrawerOpen = false;
-      if (document.body) {
-        document.body.classList.remove("drawer-open");
-        document.body.style.overflow = "";
-      }
-      const menuBtn = $("btn-mobile-menu");
-      if (menuBtn) menuBtn.setAttribute("aria-expanded", "false");
+      closeSidebarDrawer();
     }
     if (desktopSidebarState === "collapsed" && document.body) {
       document.body.classList.add("sidebar--collapsed");
@@ -1004,6 +998,26 @@ function handleWindowResize() {
 }
 if (typeof window !== "undefined") {
   window.addEventListener("resize", handleWindowResize);
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && mobileDrawerOpen) {
+      closeSidebarDrawer();
+    }
+  });
+
+  // matchMedia change listener: safely handles crossing breakpoint
+  if (window.matchMedia) {
+    const mql = window.matchMedia("(max-width: 899.98px)");
+    const handleBreakpointCross = (e) => {
+      if (!e.matches && mobileDrawerOpen) {
+        closeSidebarDrawer();
+      }
+    };
+    if (typeof mql.addEventListener === "function") {
+      mql.addEventListener("change", handleBreakpointCross);
+    } else if (typeof mql.addListener === "function") {
+      mql.addListener(handleBreakpointCross);
+    }
+  }
 }
 
 /**
@@ -2404,6 +2418,9 @@ function go(v) {
   view = v;
   renderNav();
   $("main").innerHTML = R[v]();
+  const mainArea = $("main");
+  if (mainArea) mainArea.scrollTop = 0;
+  if (typeof window !== "undefined") window.scrollTo(0, 0);
   if (v === "insp" && inspDraftStep === 2) {
     autoGrowTextarea($("insp-diag-findings"));
   }

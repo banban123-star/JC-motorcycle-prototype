@@ -136,33 +136,7 @@
   --badge-shop-bg:     var(--bg-subtle);
   --badge-shop-tx:     var(--text);
 
-  --bill-all-bg:         var(--bg-surface);
-  --bill-all-border:     var(--border);
-  --bill-all-tx:         var(--text);
-  --bill-all-hover-bg:   var(--bg-subtle);
-  --bill-all-sel-bg:     var(--accent);
-  --bill-all-sel-tx:     #FFFFFF;
 
-  --bill-adv-bg:         var(--bg-surface);
-  --bill-adv-border:     var(--border);
-  --bill-adv-tx:         var(--text);
-  --bill-adv-hover-bg:   var(--bg-subtle);
-  --bill-adv-sel-bg:     var(--accent);
-  --bill-adv-sel-tx:     #FFFFFF;
-
-  --bill-final-bg:       var(--bg-surface);
-  --bill-final-border:   var(--border);
-  --bill-final-tx:       var(--text);
-  --bill-final-hover-bg: var(--bg-subtle);
-  --bill-final-sel-bg:   var(--accent);
-  --bill-final-sel-tx:   #FFFFFF;
-
-  --bill-done-bg:        var(--bg-surface);
-  --bill-done-border:    var(--border);
-  --bill-done-tx:        var(--text);
-  --bill-done-hover-bg:  var(--bg-subtle);
-  --bill-done-sel-bg:    var(--accent);
-  --bill-done-sel-tx:    #FFFFFF;
 
 
 
@@ -570,8 +544,11 @@ nav button span:first-child svg {
 
 /* Quick Labor active sidebar state (Amber & Blue design) */
 nav button.nav-ql.on,
+nav button.nav-qlabor.on,
 nav button[data-route="ql"].on,
-nav button[onclick*="'ql'"].on {
+nav button[data-route="qlabor"].on,
+nav button[onclick*="'ql'"].on,
+nav button[onclick*="'qlabor'"].on {
   background: var(--ql-amber-soft) !important;
   color: var(--ql-amber-text) !important;
   font-weight: 700;
@@ -3181,351 +3158,306 @@ body.logged-in .login-screen {
   }
 }
 
-/* ECU / OBD Card Styles */
-.obd-status-row {
+/* ECU / OBD DTC Lookup and Record Card Styles */
+.dtc-add-section {
+  margin-bottom: 8px;
+}
+
+.dtc-add-row {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  margin-bottom: 12px;
-  background: var(--bg-surface-alt);
+  gap: 10px;
+  align-items: flex-start;
 }
 
-.elm-status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--danger-soft);
-  color: var(--danger);
-  border: 1px solid var(--danger-border);
-  font-size: 12px;
-  font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 9999px;
+.dtc-combobox-wrap {
+  position: relative;
+  flex: 1.2;
+  min-width: 220px;
 }
 
-.btn-elm-pair {
-  background: #0F172A;
-  color: #FFFFFF;
-  border: none;
-  border-radius: 8px;
-  padding: 6px 14px;
-  min-height: 40px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: opacity 0.15s ease;
-}
-
-.btn-elm-pair:hover {
-  opacity: 0.9;
-}
-
-.btn-elm-pair:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-
-/* Compact OBD Drawer Card (Step 2 Part 3) */
-.obd-drawer-card {
-  transition: box-shadow 0.2s ease;
-}
-
-.obd-drawer-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  cursor: pointer;
-  user-select: none;
-  gap: 12px;
-}
-
-.obd-drawer-chevron {
-  display: inline-block;
-  font-size: 10px;
-  color: var(--text-muted);
-  transition: transform 0.2s ease;
-}
-
-.obd-drawer-chevron.open {
-  transform: rotate(90deg);
-}
-
-.quick-obd-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.quick-code-chip {
-  all: unset;
-  box-sizing: border-box;
-  min-height: 40px;
-  padding: 8px 14px;
-  border-radius: 9999px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-  user-select: none;
-}
-
-.quick-code-chip:hover {
-  background: var(--bg-subtle);
-  border-color: var(--border);
-}
-
-.quick-code-chip.active,
-.quick-code-chip[aria-pressed="true"] {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #FFFFFF;
-  font-weight: 700;
-}
-
-.quick-code-chip:focus-visible {
-  outline: 2px solid #2563EB;
-  outline-offset: 2px;
-}
-
-.btn-elm-scan-compact,
-.btn-elm-scan {
+.dtc-input {
   width: 100%;
   height: 44px;
-  min-height: 44px;
-  background: #FFFFFF;
-  border: 2px solid #2563EB;
-  color: #2563EB;
+  padding: 0 36px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+.dtc-input:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.dtc-clear-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
   font-size: 14px;
-  font-weight: 700;
-  border-radius: 10px;
   cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+}
+
+.dtc-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+}
+
+.dtc-option {
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-subtle, #F1F5F9);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: background 0.1s ease;
+}
+
+.dtc-option:last-child {
+  border-bottom: none;
+}
+
+.dtc-option:hover,
+.dtc-option.highlight {
+  background: var(--bg-subtle, #F1F5F9);
+}
+
+.dtc-option-top {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dtc-option-code {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.dtc-option-part {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.dtc-option-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.dtc-option.custom {
+  background: #F8FAFC;
+}
+
+.dtc-option-custom-label {
+  font-size: 13px;
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.dtc-desc-input {
+  flex: 1.6;
+  min-width: 240px;
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+.dtc-desc-input:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.dtc-add-btn {
+  height: 44px;
+  min-height: 44px;
+  padding: 0 20px;
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.dtc-add-msg {
+  font-size: 12px;
+  margin-top: 6px;
+  min-height: 18px;
+}
+
+.dtc-add-msg.err {
+  color: #DC2626;
+  font-weight: 600;
+}
+
+.dtc-add-msg.muted {
+  color: var(--text-muted);
+}
+
+/* DTC Code Cards */
+.dtc-code-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  padding: 16px;
   margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.dtc-card-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dtc-code-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  background: #1E293B;
+  color: #FFFFFF;
+  font-weight: 700;
+  font-size: 12px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.dtc-err-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  background: #F1F5F9;
+  color: #475569;
+  border: 1px solid #CBD5E1;
+  font-weight: 600;
+  font-size: 11px;
+  border-radius: 4px;
+}
+
+.dtc-caution-line {
+  background: var(--bg-surface-alt, #F8FAFC);
+  border-left: 3px solid var(--primary, #2563EB);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+  margin: 2px 0;
+  line-height: 1.4;
+}
+
+.dtc-step-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.dtc-step-checkbox {
+  margin-top: 3px;
+  cursor: pointer;
+}
+
+.dtc-step-num {
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 16px;
+}
+
+.dtc-step-text {
+  flex: 1;
+}
+
+.dtc-part-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  min-height: 40px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.btn-elm-scan-compact:hover,
-.btn-elm-scan:hover {
-  background: #EFF6FF;
+.dtc-part-chip:hover {
+  border-color: var(--primary);
+  background: var(--bg-subtle, #F8FAFC);
 }
 
-.btn-elm-scan-compact:focus-visible,
-.btn-elm-scan:focus-visible {
-  outline: 2px solid #2563EB;
-  outline-offset: 2px;
+.dtc-part-chip.added {
+  background: #ECFDF5;
+  border-color: #10B981;
+  color: #047857;
+  font-weight: 600;
 }
 
-.obd-spinner {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  border-top-color: #FFFFFF;
-  border-radius: 50%;
-  animation: obd-spin 0.75s linear infinite;
-  vertical-align: middle;
-}
-
-@keyframes obd-spin {
-  to { transform: rotate(360deg); }
-}
-
-.obd-proto-notice {
-  background: #EFF6FF;
-  border: 1px solid #BFDBFE;
-  color: #1D4ED8;
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 13px;
-  line-height: 1.4;
-  margin-bottom: 12px;
-}
-
-.obd-no-scan-placeholder {
-  padding: 20px 16px;
-  text-align: center;
-  color: var(--text-muted);
-  font-size: 13px;
-  background: var(--bg-surface-alt);
-  border: 1px dashed var(--border);
-  border-radius: 10px;
-  margin-top: 10px;
-  line-height: 1.4;
-}
-
-.obd-results-header {
-  margin-top: 14px;
-  margin-bottom: 10px;
-}
-
-.obd-results-title {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-}
-
-.obd-results-sub {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
-
-.obd-results-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  margin-top: 10px;
-  margin-bottom: 12px;
-}
-
-@media (max-width: 768px) {
-  .obd-results-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.obd-result-card {
-  background: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  border-radius: 12px;
-  padding: 14px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.obd-card-top-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.obd-card-pills-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.obd-primary-code-pill {
-  display: inline-block;
-  background: var(--bg-subtle);
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 800;
-  padding: 3px 8px;
-  border-radius: 6px;
-  letter-spacing: 0.02em;
-}
-
-.obd-err-code-pill {
-  display: inline-block;
-  background: var(--bg-subtle);
-  color: var(--text);
+.dtc-desc-edit-input {
+  width: 100%;
   border: 1px solid var(--border);
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 7px;
   border-radius: 6px;
-  white-space: nowrap;
-}
-
-.obd-also-dtc {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-weight: 500;
-}
-
-.obd-card-part {
-  font-weight: 700;
-  font-size: 14px;
-  color: var(--text-primary);
-  margin-bottom: 4px;
-  line-height: 1.3;
-}
-
-.obd-card-desc {
+  padding: 8px 10px;
   font-size: 13px;
-  color: var(--text-secondary);
+  box-sizing: border-box;
+}
+
+.dtc-verified-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 56px;
   line-height: 1.4;
-  margin-bottom: 8px;
 }
 
-.obd-card-section {
-  margin-top: 6px;
+.dtc-verified-input:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
 }
 
-.obd-card-section-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  margin-bottom: 3px;
-}
-
-.obd-card-checks-list {
-  margin: 0;
-  padding-left: 18px;
+.dtc-soft-reminder {
   font-size: 12px;
-  color: var(--text-secondary);
-  line-height: 1.4;
-}
-
-.obd-card-checks-list li {
-  margin-bottom: 2px;
-}
-
-.obd-card-parts-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.obd-part-chip {
-  background: #F1F5F9;
-  border: 1px solid #E2E8F0;
-  color: var(--text-secondary);
-  border-radius: 6px;
-  padding: 2px 8px;
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.3;
-}
-
-.obd-card-action {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-}
-
-.obd-added-hint {
-  font-size: 11px;
   color: var(--text-muted);
-  margin-top: 3px;
-  text-align: right;
-  line-height: 1.2;
+  font-style: italic;
+  margin-top: 4px;
 }
 
 .obd-btn-add {
@@ -3546,12 +3478,12 @@ body.logged-in .login-screen {
 }
 
 .obd-btn-add:hover {
-  background: var(--primary-soft);
+  background: var(--primary-soft, #EFF6FF);
 }
 
-.obd-btn-add:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
+.obd-btn-add.update {
+  border-color: #2563EB;
+  color: #2563EB;
 }
 
 .obd-btn-added {
@@ -3559,7 +3491,7 @@ body.logged-in .login-screen {
   padding: 0 14px;
   background: var(--banner-success-bg, #ECFDF5);
   border: 1px solid var(--banner-success-border, #A7F3D0);
-  color: var(--success);
+  color: var(--success, #047857);
   font-size: 13px;
   font-weight: 700;
   border-radius: 8px;
@@ -3571,22 +3503,17 @@ body.logged-in .login-screen {
   white-space: nowrap;
 }
 
-.obd-codes-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-
-.obd-code-pill {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: #F8FAFC;
-  border: 1px solid #E2E8F0;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 13px;
+@media (max-width: 767px) {
+  .dtc-add-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dtc-combobox-wrap,
+  .dtc-desc-input,
+  .dtc-add-btn {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 .obd-notice-box {
@@ -3604,9 +3531,7 @@ body.logged-in .login-screen {
   margin-top: 12px;
 }
 
-/* ECU / OBD Motorcycle Selection Card */
-
-/* Segmented Toggle */
+/* Segmented Toggle (used in Repairs scope filter) */
 .obd-seg-track {
   display: flex;
   background: #F1F5F9;
@@ -3646,123 +3571,102 @@ body.logged-in .login-screen {
   outline-offset: 2px;
 }
 
-.obd-divider {
-  height: 1px;
-  background: #F1F5F9;
-  margin: 16px 0;
+/* Brand Combobox in Step 1 Intake */
+.brand-combobox-wrap {
+  position: relative;
+  width: 100%;
 }
 
-.obd-field-label {
-  display: block;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  margin-bottom: 8px;
-}
-
-.obd-field-label .muted-hint {
-  font-size: 11px;
-  font-weight: 400;
-  text-transform: none;
-  letter-spacing: normal;
-  color: var(--text-muted);
-  margin-left: 4px;
-}
-
-.obd-brand-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-.obd-brand-chip {
-  all: unset;
-  cursor: pointer;
-  box-sizing: border-box;
-  min-height: 40px;
-  padding: 8px 18px;
-  border-radius: 999px;
-  background: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  color: #0F172A;
-  font-size: 13px;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-  user-select: none;
-}
-
-.obd-brand-chip:hover {
-  background: #F8FAFC;
-  border-color: var(--border);
-}
-
-.obd-brand-chip.active {
-  background: #2563EB;
-  border-color: #2563EB;
-  color: #FFFFFF;
-}
-
-.obd-brand-chip:focus-visible {
-  outline: 2px solid #2563EB;
-  outline-offset: 2px;
-}
-
-.obd-input {
+.brand-combobox-wrap #insp-make {
   box-sizing: border-box;
   width: 100%;
   height: 44px;
   min-height: 44px;
-  background: #F8FAFC;
-  border: 1px solid #E2E8F0;
-  border-radius: 10px;
-  padding: 0 14px;
-  font-size: 16px;
-  color: var(--text-primary);
-  font-family: inherit;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  padding-right: 38px;
 }
 
-.obd-input:focus {
-  outline: none;
-  border-color: #2563EB;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
-  background: #FFFFFF;
+.brand-dropdown-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  width: 100%;
+  background: var(--bg-surface, #FFFFFF);
+  border: 1px solid var(--border, #E2E8F0);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  max-height: 260px;
+  overflow-y: auto;
+  z-index: 100;
+  padding: 4px 0;
+  box-sizing: border-box;
 }
 
-.obd-helper-text {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-top: 6px;
-  line-height: 1.4;
-}
-
-.obd-fields-row {
+.brand-dropdown-item {
   display: flex;
-  gap: 12px;
-  margin-top: 14px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: 14px;
+  color: var(--text-primary, #0F172A);
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: background-color 0.1s ease;
+  user-select: none;
 }
 
-.obd-field-col {
-  flex: 1;
+.brand-dropdown-item:hover,
+.brand-dropdown-item.highlighted {
+  background: var(--bg-surface-alt, #F8FAFC);
 }
 
-.obd-anon-note {
+.brand-dropdown-item.custom-brand-item {
+  font-weight: 600;
+  color: var(--primary, #2563EB);
+}
+
+.brand-dropdown-item .brand-custom-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted, #64748B);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.brand-clear-btn {
+  display: none;
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted, #64748B);
+  border: none;
   font-size: 13px;
-  color: var(--text-muted);
-  padding: 12px 0 6px;
-  line-height: 1.5;
+  line-height: 1;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-@media (max-width: 600px) {
-  .obd-fields-row {
-    flex-direction: column;
-  }
+.brand-clear-btn:hover {
+  background: #F1F5F9;
+  color: var(--text-primary, #0F172A);
+}
+
+.brand-clear-btn:focus-visible {
+  outline: 2px solid #2563EB;
+  outline-offset: 1px;
+}
+
+.brand-clear-btn.visible {
+  display: flex;
 }
 
 /* Physical Inspection Count Pill (Used in Job Card Modal) */
@@ -6856,275 +6760,6 @@ body.is-mobile #pos-switcher .pos-tab .pos-tab-label-short,
   color: var(--text-muted, #94a3b8);
 }
 
-/* ==========================================================
-   ECU / OBD COLLAPSIBLE FAULT CARDS (dtc-)
-   ========================================================== */
-
-/* Results Grid */
-.obd-results-grid.dtc-grid,
-.dtc-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  align-items: start;
-  gap: 12px;
-  margin-top: 10px;
-  margin-bottom: 12px;
-}
-
-@media (min-width: 1100px) {
-  .obd-results-grid.dtc-grid,
-  .dtc-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-/* Mobile UI frame: strictly 1 column at all times */
-.mobile-ui .obd-results-grid,
-.mobile-ui .dtc-grid,
-[data-mobile] .obd-results-grid,
-[data-mobile] .dtc-grid,
-body.is-mobile .obd-results-grid,
-body.is-mobile .dtc-grid,
-.phone-frame .obd-results-grid,
-.phone-frame .dtc-grid {
-  grid-template-columns: 1fr !important;
-}
-
-/* DTC Card */
-.dtc-card {
-  background: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  border-radius: 12px;
-  padding: 16px;
-  min-width: 0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-}
-
-.dtc-top {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-.dtc-top .obd-card-action {
-  margin-left: auto;
-}
-
-.dtc-top .obd-btn-add,
-.dtc-top .obd-btn-added {
-  min-height: 44px;
-}
-
-.dtc-name {
-  margin: 10px 0 0;
-  padding: 0;
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 1.4;
-}
-
-.dtc-toggle {
-  display: flex;
-  width: 100%;
-  justify-content: space-between;
-  align-items: center;
-  min-height: 44px;
-  background: none;
-  border: none;
-  padding: 0;
-  text-align: left;
-  font-family: inherit;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary, #0F172A);
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.dtc-toggle:focus-visible {
-  outline: 2px solid var(--accent, #2563EB);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-
-@media (hover: hover) {
-  .dtc-toggle:hover {
-    opacity: 0.85;
-  }
-}
-
-.dtc-title-text {
-  flex: 1;
-  text-align: left;
-  padding-right: 8px;
-  overflow-wrap: anywhere;
-}
-
-.dtc-toggle-right {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.dtc-toggle-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-muted, #64748B);
-}
-
-.dtc-chevron {
-  display: inline-block;
-  color: var(--text-muted, #64748B);
-  transition: transform 200ms ease;
-  flex-shrink: 0;
-}
-
-.dtc-card.is-open .dtc-chevron {
-  transform: rotate(180deg);
-}
-
-/* Collapsible Details Panel */
-.dtc-details {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 200ms ease;
-  visibility: hidden;
-}
-
-.dtc-card.is-open .dtc-details {
-  grid-template-rows: 1fr;
-  visibility: visible;
-}
-
-.dtc-details-inner {
-  overflow: hidden;
-  min-height: 0;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .dtc-details,
-  .dtc-chevron {
-    transition: none !important;
-  }
-}
-
-/* Content inside details */
-.dtc-desc {
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--text-secondary, #475569);
-  margin: 10px 0 8px;
-  overflow-wrap: anywhere;
-}
-
-.dtc-section {
-  margin-top: 8px;
-}
-
-.dtc-section-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-muted, #64748B);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 4px;
-}
-
-.dtc-checks-list {
-  margin: 0;
-  padding-left: 18px;
-  color: var(--text-secondary, #334155);
-}
-
-.dtc-checks-list li {
-  font-size: 14px;
-  line-height: 1.4;
-  margin-bottom: 6px;
-  overflow-wrap: anywhere;
-}
-
-.dtc-parts-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.dtc-parts-chips .obd-part-chip {
-  overflow-wrap: anywhere;
-}
-
-/* Controls above results wrap: ensure min 44px tap targets */
-.btn-elm-scan-compact,
-.btn-elm-pair {
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.obd-drawer-header {
-  min-height: 44px;
-  flex-wrap: wrap;
-}
-
-/* Phone & Mobile UI frame styles */
-@media (max-width: 640px) {
-  .dtc-card {
-    padding: 14px;
-  }
-  .dtc-top {
-    flex-wrap: wrap;
-  }
-  .dtc-top .obd-card-action {
-    flex: 1 1 100%;
-    margin-left: 0;
-    margin-top: 6px;
-  }
-  .dtc-top .obd-btn-add,
-  .dtc-top .obd-btn-added {
-    width: 100%;
-    text-align: center;
-    min-height: 44px;
-  }
-}
-
-.mobile-ui .dtc-card,
-[data-mobile] .dtc-card,
-body.is-mobile .dtc-card,
-.phone-frame .dtc-card {
-  padding: 14px;
-}
-
-.mobile-ui .dtc-top,
-[data-mobile] .dtc-top,
-body.is-mobile .dtc-top,
-.phone-frame .dtc-top {
-  flex-wrap: wrap;
-}
-
-.mobile-ui .dtc-top .obd-card-action,
-[data-mobile] .dtc-top .obd-card-action,
-body.is-mobile .dtc-top .obd-card-action,
-.phone-frame .dtc-top .obd-card-action {
-  flex: 1 1 100%;
-  margin-left: 0;
-  margin-top: 6px;
-}
-
-.mobile-ui .dtc-top .obd-btn-add,
-[data-mobile] .dtc-top .obd-btn-add,
-body.is-mobile .dtc-top .obd-btn-add,
-.phone-frame .dtc-top .obd-btn-add,
-.mobile-ui .dtc-top .obd-btn-added,
-[data-mobile] .dtc-top .obd-btn-added,
-body.is-mobile .dtc-top .obd-btn-added,
-.phone-frame .dtc-top .obd-btn-added {
-  width: 100%;
-  text-align: center;
-  min-height: 44px;
-}
 
 /* ==========================================================
    RESPONSIVE NARROW LAYOUT FIXES & POLISH (resp-)

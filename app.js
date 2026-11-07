@@ -61,6 +61,7 @@ const ICONS = {
   rep: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><circle cx="7" cy="15" r="4.5" fill="var(--nav-rep-tint, #FED7AA)"/><circle cx="7" cy="15" r="2" fill="var(--nav-rep, #EA580C)"/><path d="M14.8 3.2a4 4 0 0 0-3.6 5.8L4.7 15.5a1.8 1.8 0 0 0 2.5 2.5l6.5-6.5a4 4 0 0 0 5.8-3.6c0-.6-.1-1.1-.4-1.6l-2.6 2.6-1.8-1.8 2.6-2.6a3.9 3.9 0 0 0-2.6-.7z" fill="var(--nav-rep, #EA580C)"/><path d="M9.8 10.4l1.8 1.8" stroke="var(--nav-rep-tint, #FED7AA)" stroke-width="1.5" stroke-linecap="round"/></svg>`,
   pos: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="9" fill="var(--nav-pos-tint, #FDE68A)"/><path d="M12.5 3L5.5 12h5l-1.5 7L16.5 10h-5l1.5-7z" fill="var(--nav-pos, #D97706)" stroke="var(--nav-pos, #D97706)" stroke-width="0.8" stroke-linejoin="round"/></svg>`,
   posMenu: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="9" fill="var(--nav-pos-tint, #FDE68A)"/><path d="M12.5 3L5.5 12h5l-1.5 7L16.5 10h-5l1.5-7z" fill="var(--nav-pos, #D97706)" stroke="var(--nav-pos, #D97706)" stroke-width="0.8" stroke-linejoin="round"/></svg>`,
+  qlabor: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="9" fill="var(--nav-pos-tint, #FDE68A)"/><path d="M12.5 3L5.5 12h5l-1.5 7L16.5 10h-5l1.5-7z" fill="var(--nav-pos, #D97706)" stroke="var(--nav-pos, #D97706)" stroke-width="0.8" stroke-linejoin="round"/></svg>`,
   ql: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"></path><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"></path><line x1="2" y1="13" x2="22" y2="13"></line></svg>`,
   cat: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><path d="M11 2.2L19.5 6.8L11 11.4L2.5 6.8L11 2.2Z" fill="var(--nav-cat-tint, #A7F3D0)"/><path d="M2.5 7.4L11 12V20L2.5 15.4V7.4Z" fill="var(--nav-cat, #059669)"/><path d="M11 12L19.5 7.4V15.4L11 20V12Z" fill="var(--nav-cat, #059669)" opacity="0.85"/><path d="M8.2 10.1L11 11.6L13.8 10.1V7.8L11 9.2L8.2 7.8V10.1Z" fill="var(--nav-cat-tint, #A7F3D0)"/></svg>`,
   bill: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><rect x="2" y="4" width="18" height="14" rx="3" fill="var(--nav-bill-tint, #BBF7D0)"/><rect x="2" y="7.5" width="18" height="3" fill="var(--nav-bill, #16A34A)"/><rect x="4.5" y="12" width="4.5" height="3.5" rx="1" fill="var(--nav-bill, #16A34A)"/><rect x="11" y="13" width="6.5" height="2" rx="1" fill="var(--nav-bill, #16A34A)"/></svg>`,
@@ -390,7 +391,7 @@ const ROLES = {
 const DEFAULT_ROLE_NAV = {
   admin:      ["dash", "cust", "insp", "rep", "pos", "ql", "cat", "bill", "his", "reports"],
   superadmin: ["dash", "cust", "insp", "rep", "pos", "ql", "cat", "bill", "his", "reports", "users"],
-  mechanic:   ["dash", "insp", "rep", "ql"]
+  mechanic:   ["dash", "insp", "rep", "qlabor"]
 };
 const ROLE_NAV = DEFAULT_ROLE_NAV;
 
@@ -398,6 +399,7 @@ const ROLE_NAV = DEFAULT_ROLE_NAV;
  * Returns allowed primary/admin navigation route keys for a role.
  * Reads custom permissions matrix from localStorage key "moto1_nav", falling back to defaults.
  * Automatically migrates legacy matrices (marker _v: 2) to grant full primary nav to Super Admin once.
+ * Migrates mechanic list (marker _q: 1) to grant "qlabor" once.
  * Super Admin always has "users", and Admin and Super Admin always have "dash", regardless of stored matrix.
  * @param {string} role - System role key.
  * @returns {Array<string>} Allowed route keys.
@@ -426,6 +428,22 @@ function getRoleNav(role) {
         });
       }
       matrix._v = 2;
+      localStorage.setItem("moto1_nav", JSON.stringify(matrix));
+    } catch (e) {}
+  }
+
+  // Migration for _q: 1 (adds "qlabor" to saved mechanic list once, replacing legacy "ql")
+  if (matrix && typeof matrix === "object" && !matrix._q) {
+    try {
+      if (Array.isArray(matrix.mechanic)) {
+        matrix.mechanic = matrix.mechanic.filter((k) => k !== "ql");
+        if (!matrix.mechanic.includes("qlabor")) {
+          matrix.mechanic.push("qlabor");
+        }
+      } else {
+        matrix.mechanic = [...DEFAULT_ROLE_NAV.mechanic];
+      }
+      matrix._q = 1;
       localStorage.setItem("moto1_nav", JSON.stringify(matrix));
     } catch (e) {}
   }
@@ -1001,6 +1019,16 @@ if (typeof window !== "undefined") {
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && mobileDrawerOpen) {
       closeSidebarDrawer();
+    }
+  });
+  window.addEventListener("mousedown", (e) => {
+    if (brandDropdownOpen) {
+      const wrap = e.target.closest(".brand-combobox-wrap");
+      if (!wrap) closeBrandDropdown();
+    }
+    if (dtcComboboxOpen) {
+      const wrap = e.target.closest(".dtc-combobox-wrap");
+      if (!wrap) closeDtcDropdown();
     }
   });
 
@@ -2140,6 +2168,7 @@ const V = [
   ["cust", "👥", "Customers & Motorcycles"],
   ["insp", "🔍", "Motorcycle Inspection"],
   ["rep", "🔧", "Active Repairs"],
+  ["qlabor", "🧰", "Quick Labor"],
   ["pos", "⚡", "Quick Sales"],
   ["ql", "🧰", "Quick Labor"],
   ["cat", "📦", "Service & Parts Catalog"],
@@ -2150,7 +2179,7 @@ const V = [
 ];
 
 /** Route keys placed under the PRIMARY NAVIGATION section. */
-const PRIMARY_NAV_KEYS = ["dash", "cust", "insp", "rep", "pos", "ql", "cat", "bill", "his"];
+const PRIMARY_NAV_KEYS = ["dash", "cust", "insp", "rep", "qlabor", "pos", "ql", "cat", "bill", "his"];
 
 /** Route keys placed under the ADMINISTRATION & SUPPORT section. */
 const ADMIN_NAV_KEYS = ["reports", "users"];
@@ -2250,12 +2279,17 @@ function resolvePosTab() {
  * Renders the consolidated 3-button switcher bar at the top of the main content area.
  * Removes any existing switcher first to avoid duplicates.
  * If fewer than 2 tabs are permitted for the active role, adds nothing.
+ * Never renders when on the dedicated Quick Labor view (key "qlabor").
  * @param {string} activeId - The active POS screen ID ("pos", "ql", or "bill").
  */
 function renderPosSwitcher(activeId) {
   const existing = $("pos-switcher");
   if (existing) {
     existing.remove();
+  }
+
+  if (view === "qlabor") {
+    return;
   }
 
   const tabs = getPosTabsForRole();
@@ -2309,21 +2343,23 @@ function loadView(v) {
 /**
  * Renders the primary and administration navigation lists based on permissions of the active role.
  * Shows each section label only when at least one of its routes is accessible.
+ * Shows "Quick Labor" right after Active Repairs for roles with "qlabor" permission.
+ * Shows "POS" for roles with "pos" permission. If both are granted, shows both items.
  */
 function renderNav() {
   const isPosActive = ["pos", "ql", "bill"].includes(view);
-  const posTabs = getPosTabsForRole();
-  const showPos = posTabs.length > 0;
+  const showPos = canOpen("pos");
 
-  // Primary navigation: replace pos, ql, bill with ONE "POS" item in Quick Sales' position
+  // Primary navigation: includes dedicated Quick Labor and consolidated POS
   const primaryItems = [
-    { id: "dash", icon: "dash", label: "Dashboard", allowed: canOpen("dash") },
-    { id: "cust", icon: "cust", label: "Customers & Motorcycles", allowed: canOpen("cust") },
-    { id: "insp", icon: "insp", label: "Motorcycle Inspection", allowed: canOpen("insp") },
-    { id: "rep",  icon: "rep",  label: "Active Repairs", allowed: canOpen("rep") },
-    { id: "pos",  icon: "posMenu", label: "POS", isPos: true, allowed: showPos },
-    { id: "cat",  icon: "cat",  label: "Service & Parts Catalog", allowed: canOpen("cat") },
-    { id: "his",  icon: "his",  label: "Service History", allowed: canOpen("his") }
+    { id: "dash",   icon: "dash",    label: "Dashboard",                allowed: canOpen("dash") },
+    { id: "cust",   icon: "cust",    label: "Customers & Motorcycles",  allowed: canOpen("cust") },
+    { id: "insp",   icon: "insp",    label: "Motorcycle Inspection",    allowed: canOpen("insp") },
+    { id: "rep",    icon: "rep",     label: "Active Repairs",           allowed: canOpen("rep") },
+    { id: "qlabor", icon: "qlabor",  label: "Quick Labor",              allowed: canOpen("qlabor") },
+    { id: "pos",    icon: "posMenu", label: "POS", isPos: true,         allowed: showPos },
+    { id: "cat",    icon: "cat",     label: "Service & Parts Catalog",  allowed: canOpen("cat") },
+    { id: "his",    icon: "his",     label: "Service History",          allowed: canOpen("his") }
   ].filter((it) => it.allowed);
 
   const adminAllowed = V.filter((x) => ADMIN_NAV_KEYS.includes(x[0]) && canOpen(x[0]));
@@ -2388,7 +2424,7 @@ function go(v) {
     closeSidebarDrawer();
   }
   if (!canOpen(v)) return;
-  if (view !== v) {
+  if (view !== v || v === "bill") {
     userMgmtTab = "directory";
     userSearch = "";
     userRoleFilter = "all";
@@ -2427,6 +2463,11 @@ function go(v) {
   if (["pos", "ql", "bill"].includes(v)) {
     posLastTab = v;
     renderPosSwitcher(v);
+  } else {
+    const existingSwitcher = $("pos-switcher");
+    if (existingSwitcher) {
+      existingSwitcher.remove();
+    }
   }
 
   // Persist current view in session immediately
@@ -3473,6 +3514,17 @@ ${isMech ? `
   },
 
   /**
+   * Dedicated Quick Labor view for the Mechanic role.
+   * Renders the existing Quick Labor tab content with the 3-tab POS switcher hidden.
+   * Reuses the exact same getQuickLaborViewHtml() without code duplication.
+   * @returns {string} HTML string.
+   */
+  qlabor() {
+    initDefaultQuickLaborMech();
+    return getQuickLaborViewHtml();
+  },
+
+  /**
    * Service & Parts Catalog view: Quick-Select Price Menu.
    * Displays labor services and parts in one unified price menu with live search.
    * @returns {string} HTML string.
@@ -4033,16 +4085,8 @@ function openRecord(id) {
           </div>
         ` : `<div style="font-size:12px;color:var(--text-muted);margin-top:4px">All inspected items OK.</div>`}
         ${recObdCodes.length > 0 ? `
-          <div style="display:flex;flex-direction:column;gap:4px;margin-top:6px">
-            ${recObdCodes.map((c) => {
-              const label = c.part && !c.desc.startsWith(c.part) ? `${c.part}: ${c.desc}` : (c.desc || "");
-              return `
-                <div style="font-size:12px;display:flex;align-items:baseline;gap:6px">
-                  <span style="display:inline-block;padding:1px 5px;border-radius:4px;background:var(--danger-soft);color:var(--danger);border:1px solid var(--danger-border);font-weight:700;font-size:11px">${escHtml(c.code)}</span>
-                  <span>· ${escHtml(label)}</span>
-                </div>
-              `;
-            }).join("")}
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
+            ${recObdCodes.map((c) => getObdCodeSummaryDisplayHtml(c)).join("")}
           </div>
         ` : ""}
       </div>
@@ -5042,15 +5086,16 @@ const INSP_STAGES = [
 ];
 
 /**
- * Supported motorcycle brands for ECU/OBD scanner fast-selection.
+ * Supported motorcycle brands for ECU/OBD scanner and Step 1 brand combobox.
  */
-const OBD_BRANDS = ["Yamaha", "Honda", "Rusi", "Kawasaki", "Motoposh"];
+const OBD_BRANDS = ["Yamaha", "Honda", "Rusi", "Kawasaki", "Motoposh", "Other"];
 
 /**
  * Sample data from the Yamaha Sniper 150 V2 DTC reference.
  * Replace or extend later with real scan results and other models.
  */
-const ECU_SAMPLES = [
+// Sample data from the Yamaha Sniper 150 V2 DTC reference. Extend later with other models and codes.
+const DTC_LIBRARY = [
   {
     dtc: ["P0120", "P0122", "P0123"],
     code: "P0122",
@@ -5064,7 +5109,9 @@ const ECU_SAMPLES = [
     parts: [
       "Throttle Position Sensor (TPS)"
     ],
-    common: true
+    common: true,
+    model: "Yamaha Sniper 150 V2",
+    caution: "Verify first. Do not replace the part until the checks below are done."
   },
   {
     dtc: ["P0105", "P0107", "P0108"],
@@ -5079,7 +5126,9 @@ const ECU_SAMPLES = [
     parts: [
       "Manifold Absolute Pressure (MAP) Sensor"
     ],
-    common: true
+    common: true,
+    model: "Yamaha Sniper 150 V2",
+    caution: "Verify first. Do not replace the part until the checks below are done."
   },
   {
     dtc: ["P1601", "P1901"],
@@ -5094,7 +5143,9 @@ const ECU_SAMPLES = [
     parts: [
       "Side Stand Switch"
     ],
-    common: true
+    common: true,
+    model: "Yamaha Sniper 150 V2",
+    caution: "Verify first. Do not replace the part until the checks below are done."
   },
   {
     dtc: ["P0110", "P0112", "P0113"],
@@ -5109,7 +5160,9 @@ const ECU_SAMPLES = [
     parts: [
       "Intake Air Temperature (IAT) Sensor"
     ],
-    common: true
+    common: true,
+    model: "Yamaha Sniper 150 V2",
+    caution: "Verify first. Do not replace the part until the checks below are done."
   },
   {
     dtc: ["P0130", "P0131", "P0132"],
@@ -5124,7 +5177,9 @@ const ECU_SAMPLES = [
     parts: [
       "Oxygen (O2) Sensor"
     ],
-    common: true
+    common: true,
+    model: "Yamaha Sniper 150 V2",
+    caution: "Verify first. Do not replace the part until the checks below are done."
   },
   {
     dtc: ["P1500", "P1999"],
@@ -5139,7 +5194,9 @@ const ECU_SAMPLES = [
     parts: [
       "Lean Angle Sensor (Bank Angle Sensor)"
     ],
-    common: true
+    common: true,
+    model: "Yamaha Sniper 150 V2",
+    caution: "Verify first. Do not replace the part until the checks below are done."
   },
   {
     dtc: ["P0201"],
@@ -5155,7 +5212,9 @@ const ECU_SAMPLES = [
       "Fuel Injector coupler",
       "Fuel Injector"
     ],
-    common: true
+    common: true,
+    model: "Yamaha Sniper 150 V2",
+    caution: "Verify first. Do not replace the part until the checks below are done."
   },
   {
     dtc: ["P0500"],
@@ -5170,7 +5229,9 @@ const ECU_SAMPLES = [
     parts: [
       "Speedometer Cable / Speed Sensor"
     ],
-    common: true
+    common: true,
+    model: "Yamaha Sniper 150 V2",
+    caution: "Verify first. Do not replace the part until the checks below are done."
   },
   {
     dtc: ["P0335", "P0336"],
@@ -5185,7 +5246,9 @@ const ECU_SAMPLES = [
     parts: [
       "Stator assembly"
     ],
-    common: false
+    common: false,
+    model: "Yamaha Sniper 150 V2",
+    caution: "Verify first. Do not replace the part until the checks below are done."
   },
   {
     dtc: ["P0115", "P0117", "P0118"],
@@ -5201,7 +5264,9 @@ const ECU_SAMPLES = [
       "Engine Coolant Temperature (ECT) Sensor",
       "Cooling fan"
     ],
-    common: false
+    common: false,
+    model: "Yamaha Sniper 150 V2",
+    caution: "Verify first. Do not replace the part until the checks below are done."
   },
   {
     dtc: ["P0351"],
@@ -5217,7 +5282,9 @@ const ECU_SAMPLES = [
       "Yamaha Ignition Coil",
       "Spark Plug"
     ],
-    common: false
+    common: false,
+    model: "Yamaha Sniper 150 V2",
+    caution: "Verify first. Do not replace the part until the checks below are done."
   },
   {
     dtc: ["P0560", "P0562", "P0563"],
@@ -5233,9 +5300,119 @@ const ECU_SAMPLES = [
       "Yamaha Regulator Rectifier",
       "Motorcycle Battery (12V)"
     ],
-    common: false
+    common: false,
+    model: "Yamaha Sniper 150 V2",
+    caution: "Verify first. Do not replace the part until the checks below are done."
   }
 ];
+
+/**
+ * Searches DTC_LIBRARY by code, variant, error text, component name, or description.
+ * Case-insensitive, spaces and dashes ignored ("p122" matches P0122).
+ * Returns up to 8 matches, with common codes first when query is empty.
+ * @param {string} rawQuery - Search string.
+ * @returns {Array<{ entry: Object, matchedCode: string }>} Matched items.
+ */
+function searchDtcLibrary(rawQuery) {
+  const raw = (rawQuery || "").trim();
+  const qClean = raw.toLowerCase().replace(/[\s\-_]/g, "");
+
+  if (!qClean) {
+    const list = [...DTC_LIBRARY];
+    list.sort((a, b) => (b.common ? 1 : 0) - (a.common ? 1 : 0));
+    return list.slice(0, 8).map((entry) => ({ entry, matchedCode: entry.code }));
+  }
+
+  const results = [];
+  const qWords = raw.toLowerCase().split(/\s+/).filter(Boolean);
+
+  for (const entry of DTC_LIBRARY) {
+    let matchedCode = null;
+    let score = 0;
+
+    // 1. Check all DTC variants
+    const variants = Array.isArray(entry.dtc) ? entry.dtc : [entry.code];
+    for (const v of variants) {
+      const nv = v.toLowerCase().replace(/[\s\-_]/g, "");
+      const nvShort = nv.replace(/^([a-z])0+([0-9]+)$/, "$1$2");
+      const qShort = qClean.replace(/^([a-z])0+([0-9]+)$/, "$1$2");
+
+      if (nv === qClean || nvShort === qClean || nv === qShort || nvShort === qShort) {
+        matchedCode = v;
+        score = Math.max(score, 100);
+        break;
+      } else if (nv.includes(qClean) || nvShort.includes(qClean) || nv.includes(qShort)) {
+        if (!matchedCode) matchedCode = v;
+        score = Math.max(score, 85);
+      }
+    }
+
+    // 2. Check error code (e.g. "Error 15")
+    if (entry.err) {
+      const ne = entry.err.toLowerCase().replace(/[\s\-_]/g, "");
+      const errNumMatch = entry.err.match(/\d+/g);
+      if (ne.includes(qClean) || qClean.includes(ne)) {
+        score = Math.max(score, 80);
+      } else if (errNumMatch && errNumMatch.includes(qClean)) {
+        score = Math.max(score, 75);
+      }
+    }
+
+    // 3. Check component / part name
+    if (entry.part) {
+      const partLower = entry.part.toLowerCase();
+      if (partLower.includes(raw.toLowerCase()) || partLower.replace(/[\s\-_]/g, "").includes(qClean)) {
+        score = Math.max(score, 70);
+      } else if (qWords.length > 0 && qWords.some((w) => partLower.includes(w))) {
+        score = Math.max(score, 55);
+      }
+    }
+
+    // 4. Check description
+    if (entry.desc) {
+      const descLower = entry.desc.toLowerCase();
+      if (descLower.includes(raw.toLowerCase())) {
+        score = Math.max(score, 60);
+      } else if (qWords.length > 0 && qWords.some((w) => descLower.includes(w))) {
+        score = Math.max(score, 45);
+      }
+    }
+
+    if (score > 0) {
+      results.push({ entry, matchedCode: matchedCode || entry.code, score, common: Boolean(entry.common) });
+    }
+  }
+
+  results.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return (b.common ? 1 : 0) - (a.common ? 1 : 0);
+  });
+
+  return results.slice(0, 8).map((r) => ({ entry: r.entry, matchedCode: r.matchedCode }));
+}
+
+/**
+ * Finds a DTC library entry by exact or variant code match.
+ * @param {string} code - DTC code string (e.g. "P0122" or "P0123").
+ * @returns {{ entry: Object, matchedCode: string }|null}
+ */
+function findDtcInLibrary(code) {
+  if (!code) return null;
+  const q = code.trim().toUpperCase().replace(/[\s\-_]/g, "");
+  const qShort = q.replace(/^([A-Z])0+([0-9]+)$/, "$1$2");
+
+  for (const entry of DTC_LIBRARY) {
+    const variants = Array.isArray(entry.dtc) ? entry.dtc : [entry.code];
+    for (const v of variants) {
+      const nv = v.toUpperCase().replace(/[\s\-_]/g, "");
+      const nvShort = nv.replace(/^([A-Z])0+([0-9]+)$/, "$1$2");
+      if (nv === q || nvShort === q || nv === qShort || nvShort === qShort) {
+        return { entry, matchedCode: v };
+      }
+    }
+  }
+  return null;
+}
 
 /**
  * 27-item physical inspection checklist divided into 6 distinct categories.
@@ -5629,27 +5806,20 @@ const CANNED_JOBS = {
   ]
 };
 
-/**
- * 8 Quick Fault Codes chips for the compact OBD drawer.
- */
-const QUICK_OBD_CODES = [
-  { code: "P0105", label: "P0105 MAP Sensor" },
-  { code: "P0122", label: "P0122 Throttle Position" },
-  { code: "P0335", label: "P0335 Crankshaft" },
-  { code: "P0562", label: "P0562 Low Battery Voltage" },
-  { code: "P1601", label: "P1601 Side Stand Switch" },
-  { code: "P0130", label: "P0130 O2 Sensor" },
-  { code: "P0201", label: "P0201 Fuel Injector" },
-  { code: "P1500", label: "P1500 Lean Angle Sensor" }
-];
-
 let selectedInspectionZone = null;
-let obdDrawerOpen = false;
 let cannedJobToastTimer = null;
 
 /**
- * In-memory map of auto-inserted OBD finding text by fault code: { [code]: string }.
- * Used to cleanly remove exact auto-inserted text when a fault code is removed.
+ * In-memory state for DTC combobox and selection.
+ */
+let dtcComboboxOpen = false;
+let dtcComboboxHighlight = -1;
+let dtcSelectedLibraryEntry = null;
+let dtcSelectedVariantCode = null;
+
+/**
+ * In-memory map of auto-inserted OBD finding text by fault code: { [code]: { baseEntry: string, lastVerified: string } | string }.
+ * Used to cleanly remove exact auto-inserted text and detect verified updates.
  */
 let obdFindingText = {};
 
@@ -5669,8 +5839,6 @@ let inspDraft = createFreshInspDraft();
 let inspDraftStep = 1;
 let selectedPhysRailCat = null;
 let inspPendingObdCode = null;
-let obdScanResults = null;
-let isObdScanning = false;
 
 /**
  * Resets the inspection draft to initial empty state.
@@ -5678,12 +5846,16 @@ let isObdScanning = false;
 function resetInspDraft() {
   inspDraft = createFreshInspDraft();
   inspDraftStep = 1;
+  brandDropdownOpen = false;
+  brandHighlightIndex = -1;
+  dtcComboboxOpen = false;
+  dtcComboboxHighlight = -1;
+  dtcSelectedLibraryEntry = null;
+  dtcSelectedVariantCode = null;
+  syncDraftObdBike();
   selectedPhysRailCat = null;
   inspPendingObdCode = null;
-  obdScanResults = null;
-  isObdScanning = false;
   selectedInspectionZone = null;
-  obdDrawerOpen = false;
   obdFindingText = {};
   physFindingText = {};
   if (cannedJobToastTimer) {
@@ -5741,6 +5913,7 @@ function setInspDraftStep(newStep) {
   } else if (inspDraftStep === 3) {
     readConfirmDomIntoDraft();
   }
+  syncDraftObdBike();
 
   inspDraftStep = Math.max(1, Math.min(3, newStep));
   if (view === "insp") {
@@ -5951,7 +6124,7 @@ function renderInspModal(id) {
       <div><b>Plate Number:</b> ${b ? escHtml(b.plate) : "NO PLATE"}</div>
       <div><b>Motorcycle:</b> ${b ? escHtml(b.make + " " + b.model + (b.year ? " (" + b.year + ")" : "")) : "Unknown"}</div>
       <div><b>Customer:</b> ${c ? escHtml(c.name + (c.phone ? " (" + c.phone + ")" : "")) : "Walk-in Customer"}</div>
-      <div><b>Odometer:</b> ${((o.odo !== undefined ? o.odo : b ? b.odo : 0) || 0).toLocaleString()} km</div>
+      <div><b>Odometer:</b> ${o.odo ? `${Number(o.odo).toLocaleString()} km` : (b && b.odo ? `${Number(b.odo).toLocaleString()} km` : "—")}</div>
       <div>
         <b>Assigned Mechanic:</b>
         ${!isMech ? `
@@ -6073,18 +6246,9 @@ function renderInspModal(id) {
     if (obdCodes.length > 0) {
       html += `
         <div style="margin-bottom:12px">
-          <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:6px">ECU / OBD Trouble Codes:</div>
-          <div style="display:flex;flex-direction:column;gap:4px">
-            ${obdCodes.map((c) => {
-              const label = c.part && !c.desc.startsWith(c.part) ? `${c.part}: ${c.desc}` : (c.desc || "");
-              return `
-                <div style="font-size:13px;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap">
-                  <span style="display:inline-block;padding:2px 6px;border-radius:4px;background:var(--danger-soft);color:var(--danger);border:1px solid var(--danger-border);font-weight:700;font-size:11px">${escHtml(c.code)}</span>
-                  ${c.err ? `<span class="obd-err-code-pill" style="font-size:11px;padding:1px 6px">${escHtml(c.err)}</span>` : ""}
-                  <span>${escHtml(label)}</span>
-                </div>
-              `;
-            }).join("")}
+          <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:6px">ECU / OBD Diagnostic Codes:</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${obdCodes.map((c) => getObdCodeSummaryDisplayHtml(c)).join("")}
           </div>
         </div>
       `;
@@ -6357,15 +6521,293 @@ function reopenJob(woId) {
 }
 
 /**
+ * Global state for Step 1 Make / Brand combobox.
+ */
+let brandDropdownOpen = false;
+let brandHighlightIndex = -1;
+
+/**
+ * Synchronizes draft vehicle fields into draft.inspection.obd.bike
+ * for backward compatibility and Step 3 Scanned line display.
+ */
+function syncDraftObdBike() {
+  if (!inspDraft.inspection) {
+    inspDraft.inspection = {
+      enablePhysical: true,
+      enableObd: true,
+      obd: { codes: [], bike: null },
+      items: {},
+      expandedCats: {}
+    };
+  }
+  if (!inspDraft.inspection.obd) {
+    inspDraft.inspection.obd = { codes: [], bike: null };
+  }
+  inspDraft.inspection.obd.bike = {
+    mode: "select",
+    brand: (inspDraft.make || "").trim(),
+    model: (inspDraft.model || "").trim(),
+    plate: (inspDraft.plate || "").trim()
+  };
+}
+
+/**
+ * Returns brand options for the combobox given current query.
+ * @param {string} val
+ * @returns {Array<{label: string, value: string, isCustom: boolean}>}
+ */
+function getBrandOptions(val) {
+  const q = (val || "").trim().toLowerCase();
+  const known = OBD_BRANDS.filter((b) => b !== "Other");
+
+  if (!q) {
+    return [
+      ...known.map((b) => ({ label: b, value: b, isCustom: false })),
+      { label: "Other", value: "Other", isCustom: false }
+    ];
+  }
+
+  const matches = known.filter((b) => b.toLowerCase().includes(q));
+  const items = [];
+  if (matches.length > 0) {
+    matches.forEach((b) => items.push({ label: b, value: b, isCustom: false }));
+  } else {
+    items.push({
+      label: `Use "${(val || "").trim()}"`,
+      value: (val || "").trim(),
+      isCustom: true
+    });
+  }
+  items.push({ label: "Other", value: "Other", isCustom: false });
+  return items;
+}
+
+/**
+ * Opens the Step 1 brand dropdown listbox.
+ */
+function openBrandDropdown() {
+  const listbox = $("insp-brand-listbox");
+  const inp = $("insp-make");
+  if (!listbox) return;
+  renderBrandDropdownList();
+  listbox.style.display = "block";
+  brandDropdownOpen = true;
+  if (inp) {
+    inp.setAttribute("aria-expanded", "true");
+  }
+}
+
+/**
+ * Closes the Step 1 brand dropdown listbox.
+ */
+function closeBrandDropdown() {
+  const listbox = $("insp-brand-listbox");
+  const inp = $("insp-make");
+  if (!listbox) return;
+  listbox.style.display = "none";
+  brandDropdownOpen = false;
+  brandHighlightIndex = -1;
+  if (inp) {
+    inp.setAttribute("aria-expanded", "false");
+    inp.removeAttribute("aria-activedescendant");
+  }
+}
+
+/**
+ * Re-renders the dropdown list without stealing focus from the input.
+ */
+function renderBrandDropdownList() {
+  const listbox = $("insp-brand-listbox");
+  const inp = $("insp-make");
+  if (!listbox) return;
+
+  const currentVal = inp ? inp.value : (inspDraft.make || "");
+  const options = getBrandOptions(currentVal);
+
+  listbox.innerHTML = options
+    .map((opt, idx) => {
+      const isHighlighted = idx === brandHighlightIndex;
+      const isCustom = opt.isCustom;
+      const isOther = opt.value === "Other";
+      return `
+        <div
+          id="brand-opt-${idx}"
+          class="brand-dropdown-item ${isHighlighted ? "highlighted" : ""} ${isCustom ? "custom-brand-item" : ""}"
+          role="option"
+          aria-selected="${isHighlighted ? "true" : "false"}"
+          onmousedown="event.preventDefault(); selectBrandOptionByIndex(${idx})"
+          style="${isOther ? "color:var(--text-muted);border-top:1px solid var(--border,#E2E8F0);margin-top:2px;" : ""}"
+        >
+          <span>${escHtml(opt.label)}</span>
+          ${isCustom ? `<span class="brand-custom-tag">Custom</span>` : ""}
+        </div>
+      `;
+    })
+    .join("");
+
+  updateBrandHighlight();
+}
+
+/**
+ * Updates aria and classes for highlighted combobox option.
+ */
+function updateBrandHighlight() {
+  const listbox = $("insp-brand-listbox");
+  const inp = $("insp-make");
+  if (!listbox) return;
+
+  const items = listbox.querySelectorAll(".brand-dropdown-item");
+  items.forEach((el, idx) => {
+    const isHigh = idx === brandHighlightIndex;
+    el.classList.toggle("highlighted", isHigh);
+    el.setAttribute("aria-selected", isHigh ? "true" : "false");
+    if (isHigh) {
+      el.scrollIntoView({ block: "nearest" });
+      if (inp) inp.setAttribute("aria-activedescendant", `brand-opt-${idx}`);
+    }
+  });
+
+  if (brandHighlightIndex < 0 && inp) {
+    inp.removeAttribute("aria-activedescendant");
+  }
+}
+
+/**
+ * Selects an option by index in the current option list.
+ * @param {number} idx
+ */
+function selectBrandOptionByIndex(idx) {
+  const inp = $("insp-make");
+  const currentVal = inp ? inp.value : (inspDraft.make || "");
+  const options = getBrandOptions(currentVal);
+  if (idx >= 0 && idx < options.length) {
+    selectBrandOption(options[idx]);
+  }
+}
+
+/**
+ * Selects a brand option object and applies behavior.
+ * @param {{label: string, value: string, isCustom: boolean}} opt
+ */
+function selectBrandOption(opt) {
+  const inp = $("insp-make");
+  const known = OBD_BRANDS.filter((b) => b !== "Other");
+
+  if (opt.value === "Other") {
+    const curVal = inp ? inp.value.trim() : (inspDraft.make || "").trim();
+    const isListed = known.some((b) => b.toLowerCase() === curVal.toLowerCase());
+    if (isListed) {
+      if (inp) inp.value = "";
+      inspDraft.make = "";
+    }
+    closeBrandDropdown();
+    if (inp) inp.focus();
+    syncDraftObdBike();
+    const clearBtn = $("insp-brand-clear");
+    if (clearBtn) clearBtn.classList.toggle("visible", Boolean(inspDraft.make));
+    return;
+  }
+
+  const chosenVal = opt.value;
+  if (inp) inp.value = chosenVal;
+  inspDraft.make = chosenVal;
+  closeBrandDropdown();
+  syncDraftObdBike();
+  const clearBtn = $("insp-brand-clear");
+  if (clearBtn) clearBtn.classList.toggle("visible", Boolean(chosenVal));
+}
+
+/**
+ * Handles typing in the Step 1 brand combobox.
+ * @param {string} val
+ */
+function onBrandInput(val) {
+  const inp = $("insp-make");
+  if (inp && inp.value !== val) {
+    inp.value = val;
+  }
+  inspDraft.make = val;
+  syncDraftObdBike();
+  const clearBtn = $("insp-brand-clear");
+  if (clearBtn) {
+    clearBtn.classList.toggle("visible", Boolean(val));
+  }
+  brandHighlightIndex = -1;
+  renderBrandDropdownList();
+  openBrandDropdown();
+}
+
+/**
+ * Clears the Step 1 brand input and re-opens the brand list.
+ */
+function clearBrandInput() {
+  const inp = $("insp-make");
+  if (inp) {
+    inp.value = "";
+    inp.focus();
+  }
+  inspDraft.make = "";
+  syncDraftObdBike();
+  const clearBtn = $("insp-brand-clear");
+  if (clearBtn) clearBtn.classList.remove("visible");
+  brandHighlightIndex = -1;
+  renderBrandDropdownList();
+  openBrandDropdown();
+}
+
+/**
+ * Keyboard navigation handler for the Step 1 brand combobox.
+ * @param {KeyboardEvent} e
+ */
+function handleBrandKeydown(e) {
+  const listbox = $("insp-brand-listbox");
+  const isOpen = brandDropdownOpen && listbox && listbox.style.display !== "none";
+  const inp = $("insp-make");
+  const currentVal = inp ? inp.value : (inspDraft.make || "");
+  const options = getBrandOptions(currentVal);
+
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    if (!isOpen) {
+      openBrandDropdown();
+      brandHighlightIndex = 0;
+      updateBrandHighlight();
+    } else {
+      brandHighlightIndex = Math.min(options.length - 1, brandHighlightIndex + 1);
+      updateBrandHighlight();
+    }
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    if (isOpen) {
+      brandHighlightIndex = Math.max(0, brandHighlightIndex - 1);
+      updateBrandHighlight();
+    }
+  } else if (e.key === "Enter") {
+    e.preventDefault();
+    if (isOpen && brandHighlightIndex >= 0 && brandHighlightIndex < options.length) {
+      selectBrandOption(options[brandHighlightIndex]);
+    } else {
+      if (inp) inspDraft.make = inp.value;
+      closeBrandDropdown();
+      syncDraftObdBike();
+    }
+  } else if (e.key === "Escape") {
+    e.preventDefault();
+    closeBrandDropdown();
+  } else if (e.key === "Tab") {
+    closeBrandDropdown();
+  }
+}
+
+/**
  * Reads all current values from Step 1 Intake inputs into inspDraft.
  */
 function readIntakeDomIntoDraft() {
   const p = $("insp-plate"); if (p) inspDraft.plate = p.value.trim();
-  const o = $("insp-odo"); if (o) inspDraft.odo = o.value ? +o.value : "";
   const m = $("insp-make"); if (m) inspDraft.make = m.value.trim();
   const mo = $("insp-model"); if (mo) inspDraft.model = mo.value.trim();
-  const y = $("insp-year"); if (y) inspDraft.year = y.value ? +y.value : "";
   const n = $("insp-notes"); if (n) inspDraft.notes = n.value.trim();
+  syncDraftObdBike();
 }
 
 /**
@@ -6374,15 +6816,6 @@ function readIntakeDomIntoDraft() {
 function readDiagDomIntoDraft() {
   const f = $("insp-diag-findings");
   if (f) inspDraft.findings = f.value;
-  if (inspDraft.inspection && inspDraft.inspection.obd && inspDraft.inspection.obd.bike) {
-    const bike = inspDraft.inspection.obd.bike;
-    const otherInp = $("obd-other-brand-input");
-    const modelInp = $("obd-model-input");
-    const plateInp = $("obd-plate-input");
-    if (otherInp) bike.otherBrand = otherInp.value;
-    if (modelInp) bike.model = modelInp.value;
-    if (plateInp) bike.plate = plateInp.value.toUpperCase();
-  }
   if (typeof document !== "undefined" && document.querySelectorAll) {
     const noteInputs = document.querySelectorAll(".phys-item-note");
     noteInputs.forEach((inp) => {
@@ -6394,6 +6827,15 @@ function readDiagDomIntoDraft() {
         if (inspDraft.inspection && inspDraft.inspection.items && inspDraft.inspection.items[itemKey]) {
           inspDraft.inspection.items[itemKey].note = inp.value;
         }
+      }
+    });
+
+    const verifiedInputs = document.querySelectorAll(".dtc-verified-input");
+    verifiedInputs.forEach((ta) => {
+      const code = ta.dataset.code;
+      if (code && inspDraft.inspection && inspDraft.inspection.obd && Array.isArray(inspDraft.inspection.obd.codes)) {
+        const found = inspDraft.inspection.obd.codes.find((c) => c.code === code);
+        if (found) found.verified = ta.value;
       }
     });
   }
@@ -6434,29 +6876,18 @@ function getInspStep1Html() {
 
       ${isReturning ? `
         <!-- Returning Vehicle Summary Badge Card -->
-        <div class="row" style="margin-bottom:16px;gap:16px;align-items:flex-end">
+        <div class="row" style="margin-bottom:16px">
           <div class="vehicle-summary-badge" style="flex:1">
             <div style="display:flex;align-items:center;margin-right:12px;line-height:1;color:var(--accent)">${ICONS.bike}</div>
             <div style="flex:1;min-width:0">
               <div style="font-size:15px;font-weight:700;color:var(--text-primary);line-height:1.3">
-                ${escHtml([inspDraft.make, inspDraft.model].filter(Boolean).join(" "))}${inspDraft.plate ? ` • ${escHtml(inspDraft.plate)}` : ""}${inspDraft.year ? ` • ${inspDraft.year}` : ""}
+                ${escHtml([inspDraft.make, inspDraft.model].filter(Boolean).join(" "))}${inspDraft.plate ? ` • ${escHtml(inspDraft.plate)}` : ""}
               </div>
               <div style="font-size:13px;color:var(--text-muted);margin-top:2px">
                 ${escHtml([inspDraft.custName, inspDraft.custPhone].filter(Boolean).join(" • ") || "Walk-in Customer")}
               </div>
             </div>
             <button type="button" class="btn-change-vehicle" onclick="clearSelectedIntakeBike()">Change vehicle</button>
-          </div>
-          <div class="insp-field-group" style="width:200px;flex:0 0 200px;margin-bottom:0">
-            <label for="insp-odo">Current Odometer (km)</label>
-            <input
-              id="insp-odo"
-              type="number"
-              min="0"
-              placeholder="e.g. 15000"
-              value="${inspDraft.odo !== undefined && inspDraft.odo !== null ? inspDraft.odo : ""}"
-              oninput="inspDraft.odo=this.value"
-            />
           </div>
         </div>
       ` : `
@@ -6469,33 +6900,49 @@ function getInspStep1Html() {
               type="text"
               placeholder="e.g. ABC-1234"
               value="${escHtml(inspDraft.plate)}"
-              oninput="inspDraft.plate=this.value"
+              oninput="inspDraft.plate=this.value; syncDraftObdBike()"
             />
           </div>
-          <div class="insp-field-group">
-            <label for="insp-odo">Current Odometer (km)</label>
-            <input
-              id="insp-odo"
-              type="number"
-              min="0"
-              placeholder="e.g. 15000"
-              value="${inspDraft.odo !== undefined && inspDraft.odo !== null ? inspDraft.odo : ""}"
-              oninput="inspDraft.odo=this.value"
-            />
+          <div class="insp-field-group" style="position:relative">
+            <label for="insp-make">MAKE / BRAND</label>
+            <div class="brand-combobox-wrap">
+              <input
+                id="insp-make"
+                type="text"
+                role="combobox"
+                aria-expanded="false"
+                aria-controls="insp-brand-listbox"
+                aria-autocomplete="list"
+                autocomplete="off"
+                placeholder="Type a brand or tap to choose (e.g. Honda, Yamaha, Suzuki)"
+                value="${escHtml(inspDraft.make)}"
+                oninput="onBrandInput(this.value)"
+                onfocus="openBrandDropdown()"
+                onclick="openBrandDropdown()"
+                onkeydown="handleBrandKeydown(event)"
+              />
+              <button
+                type="button"
+                id="insp-brand-clear"
+                class="brand-clear-btn ${inspDraft.make ? "visible" : ""}"
+                onclick="clearBrandInput()"
+                aria-label="Clear brand"
+                tabindex="-1"
+              >✕</button>
+              <div
+                id="insp-brand-listbox"
+                class="brand-dropdown-list"
+                role="listbox"
+                style="display:none"
+              ></div>
+            </div>
+            <div class="brand-field-helper" style="font-size:12px;color:var(--text-muted);margin-top:4px">
+              Pick a brand or type your own.
+            </div>
           </div>
         </div>
 
         <div class="row">
-          <div class="insp-field-group">
-            <label for="insp-make">Make / Brand</label>
-            <input
-              id="insp-make"
-              type="text"
-              placeholder="e.g. Honda, Yamaha, Suzuki"
-              value="${escHtml(inspDraft.make)}"
-              oninput="inspDraft.make=this.value"
-            />
-          </div>
           <div class="insp-field-group">
             <label for="insp-model">Model</label>
             <input
@@ -6503,22 +6950,7 @@ function getInspStep1Html() {
               type="text"
               placeholder="e.g. Click 125, Mio i125"
               value="${escHtml(inspDraft.model)}"
-              oninput="inspDraft.model=this.value"
-            />
-          </div>
-        </div>
-
-        <div class="row">
-          <div class="insp-field-group">
-            <label for="insp-year">Model Year</label>
-            <input
-              id="insp-year"
-              type="number"
-              min="1990"
-              max="2035"
-              placeholder="e.g. 2021"
-              value="${inspDraft.year || ""}"
-              oninput="inspDraft.year=this.value"
+              oninput="inspDraft.model=this.value; syncDraftObdBike()"
             />
           </div>
           <div></div>
@@ -6591,8 +7023,8 @@ function onIntakeSearch(val) {
     .map(
       (m) => `
       <div class="insp-suggest-item" onmousedown="selectIntakeSuggestion('${m.b.id}')">
-        <b>${escHtml(m.b.plate)} · ${escHtml(m.b.make + " " + m.b.model)} (${m.b.year || "—"})</b>
-        <small>${escHtml(m.c ? m.c.name : "—")} · ${escHtml(m.c ? m.c.phone : "—")} · Last odo: ${(m.b.odo || 0).toLocaleString()} km</small>
+        <b>${escHtml(m.b.plate)} · ${escHtml(m.b.make + " " + m.b.model)}</b>
+        <small>${escHtml(m.c ? m.c.name : "—")} · ${escHtml(m.c ? m.c.phone : "—")}</small>
       </div>
     `
     )
@@ -6610,14 +7042,13 @@ function selectIntakeSuggestion(bikeId) {
 
   inspDraft.selectedBikeId = bikeId;
   inspDraft.plate = b.plate || "";
-  inspDraft.odo = b.odo || "";
   inspDraft.make = b.make || "";
   inspDraft.model = b.model || "";
-  inspDraft.year = b.year || "";
   if (c) {
     inspDraft.custName = c.name || "";
     inspDraft.custPhone = c.phone || "";
   }
+  syncDraftObdBike();
 
   if (view === "insp" && inspDraftStep === 1) {
     const mainEl = $("main");
@@ -6631,6 +7062,7 @@ function selectIntakeSuggestion(bikeId) {
 function clearSelectedIntakeBike() {
   readIntakeDomIntoDraft();
   inspDraft.selectedBikeId = null;
+  syncDraftObdBike();
   if (view === "insp" && inspDraftStep === 1) {
     const mainEl = $("main");
     if (mainEl) mainEl.innerHTML = R.insp();
@@ -6915,10 +7347,7 @@ function toggleCannedJob(catKey, itKey, jobLabel) {
  */
 function selectInspectionZone(zoneKey) {
   if (zoneKey === "ecu_obd") {
-    if (!obdDrawerOpen) {
-      toggleObdDrawer();
-    }
-    const card = $("obd-drawer-card");
+    const card = $("ecu-obd-card") || $("obd-card");
     if (card) {
       card.scrollIntoView({ behavior: "smooth", block: "start" });
     }
@@ -7187,61 +7616,6 @@ function renderPhysicalInspectionWorkspace() {
   }
 }
 
-/**
- * Toggles the compact OBD drawer open or closed.
- */
-function toggleObdDrawer() {
-  obdDrawerOpen = !obdDrawerOpen;
-  const body = $("obd-drawer-body");
-  const chevron = document.querySelector(".obd-drawer-chevron");
-  if (body) body.style.display = obdDrawerOpen ? "block" : "none";
-  if (chevron) chevron.classList.toggle("open", obdDrawerOpen);
-}
-
-/**
- * Generates HTML for the 8 Quick Fault Codes chips in the compact OBD drawer.
- * @returns {string}
- */
-function getQuickObdChipsHtml() {
-  const codes = (inspDraft.inspection && inspDraft.inspection.obd && inspDraft.inspection.obd.codes) || [];
-  return QUICK_OBD_CODES.map((q) => {
-    const isAdded = codes.some((c) => c.code === q.code);
-    return `
-      <button
-        type="button"
-        class="quick-code-chip ${isAdded ? 'active' : ''}"
-        aria-pressed="${isAdded ? 'true' : 'false'}"
-        onclick="toggleQuickObdCode('${q.code}')"
-      >
-        ${isAdded ? '✓ ' : '+ '}${escHtml(q.label)}
-      </button>
-    `;
-  }).join("");
-}
-
-/**
- * Re-renders only the quick OBD chips row.
- */
-function renderQuickObdChips() {
-  const chipsEl = $("quick-obd-chips");
-  if (chipsEl) chipsEl.innerHTML = getQuickObdChipsHtml();
-}
-
-/**
- * Toggles a quick fault code into or out of draft OBD codes.
- * @param {string} code
- */
-function toggleQuickObdCode(code) {
-  readDiagDomIntoDraft();
-  const codes = (inspDraft.inspection && inspDraft.inspection.obd && inspDraft.inspection.obd.codes) || [];
-  if (codes.some((c) => c.code === code)) {
-    removeObdCode(code);
-  } else {
-    addSampleCodeToFindings(code);
-  }
-  renderQuickObdChips();
-  updateHotspotsAndTiles();
-}
 
 /**
  * Updates status dots on bike hotspots and tiles.
@@ -7274,19 +7648,18 @@ function sanitizeInspDraftInspectionItems() {
 
 /**
  * Generates HTML for Step 2 Diagnosis form.
- * Order: MOTORCYCLE card, 1. Setup toggles, Workspace (Interactive Map + Zone panel),
- * Compact OBD drawer, Shared "Add to findings" bar, 4. Final Findings, 5. Recommended Services & Items.
+ * Order: 1. Setup toggles, 2. ECU / OBD Diagnostic Codes (if enabled),
+ * 3. Physical Inspection Log (if enabled), Shared "Add to findings" bar,
+ * 4. Final Findings & Diagnosis Verification, 5. Recommended Services & Items.
  * @returns {string} HTML string.
  */
 function getInspStep2Html() {
   sanitizeInspDraftInspectionItems();
   const insp = inspDraft.inspection;
+  syncDraftObdBike();
 
   return `
     <div class="insp-stage-body">
-      <!-- MOTORCYCLE CARD -->
-      ${getInspMotorcycleCardHtml()}
-
       <!-- Card 1. INSPECTION SETUP -->
       <div class="insp-card" style="margin-bottom:16px">
         <div class="insp-diag-card-title">1. INSPECTION SETUP</div>
@@ -7315,51 +7688,11 @@ function getInspStep2Html() {
         ` : ""}
       </div>
 
-      <!-- Card 3: PHYSICAL INSPECTION LOG -->
+      <!-- Card 2: 2. ECU / OBD DIAGNOSTIC CODES (placed between Card 1 and Card 3) -->
+      ${insp.enableObd ? getEcuObdCardHtml() : ""}
+
+      <!-- Card 3: 3. PHYSICAL INSPECTION LOG -->
       ${insp.enablePhysical ? getPhysicalInspectionLogCardHtml() : ""}
-
-      <!-- COMPACT OBD DRAWER CARD (Step 2 Part 3) -->
-      ${insp.enableObd ? `
-        <div class="insp-card obd-drawer-card" id="obd-drawer-card" style="margin-bottom:16px">
-          <div class="obd-drawer-header" onclick="toggleObdDrawer()">
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-              <span class="obd-drawer-chevron ${obdDrawerOpen ? 'open' : ''}">▶</span>
-              <span class="insp-diag-card-title" style="margin:0">ECU / OBD DIAGNOSTIC (optional)</span>
-              <span class="elm-status-pill">● Disconnected</span>
-            </div>
-            <button type="button" class="btn-elm-pair" onclick="event.stopPropagation(); showObdNotice()">
-              ᛒ Pair / Connect
-            </button>
-          </div>
-
-          <div id="obd-proto-notice" class="obd-proto-notice" style="display:none;margin-top:10px">
-            ECU/OBD hardware connection is not available in this prototype yet. Run the scan to load sample fault codes.
-          </div>
-
-          <div id="obd-drawer-body" style="display:${obdDrawerOpen ? 'block' : 'none'};margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
-            <!-- Compact Run Scan button -->
-            <button type="button" class="btn-elm-scan-compact" id="btn-run-ecu-scan" onclick="runEcuScan()">
-              <span style="display:inline-flex;align-items:center;margin-right:6px">${ICONS.cpu}</span>Run ECU/OBD Scan
-            </button>
-
-            <!-- Scan Results Area -->
-            <div id="obd-scan-results-wrap" aria-live="polite" aria-label="Scan results">
-              ${getObdScanResultsAreaHtml()}
-            </div>
-
-            <!-- Added Codes List -->
-            <div id="obd-added-codes" class="obd-codes-list">
-              ${getObdAddedCodesHtml()}
-            </div>
-
-            <!-- Decision support notice -->
-            <div class="obd-notice-box" style="margin-top:14px">
-              <span style="font-size:16px">ℹ️</span>
-              <span>Diagnostic outputs are for reference and decision support only. Final diagnosis requires mechanic verification.</span>
-            </div>
-          </div>
-        </div>
-      ` : ""}
 
       <!-- Shared Add to Findings Bar -->
       ${getSharedAddToFindingsBarHtml()}
@@ -7368,7 +7701,7 @@ function getInspStep2Html() {
       <div class="insp-card" style="margin-bottom:16px">
         <div class="insp-diag-card-title">4. FINAL FINDINGS &amp; DIAGNOSIS VERIFICATION</div>
         <p style="font-size:12px;color:var(--text-muted);margin:-8px 0 12px">
-          Codes you add from the scan appear here. Review, edit, and add anything else to finalize the diagnosis.
+          Codes you record appear here. Review, edit, and add anything else to finalize the diagnosis.
         </p>
         <div class="insp-field-group" style="margin-bottom:0">
           <label for="insp-diag-findings">Findings / Mechanic Notes (optional)</label>
@@ -7418,135 +7751,28 @@ function toggleInspectionType(type, checked) {
 }
 
 /**
- * Displays the inline prototype message when Pair or Run Scan are clicked.
- */
-function showObdNotice() {
-  const el = $("obd-proto-notice");
-  if (el) {
-    el.style.display = "block";
-  }
-}
-
-/**
  * Ensures the OBD scanner motorcycle selection object is initialized.
  * Prefills from inspDraft when not yet set.
  * @returns {Object} The bike selection object.
  */
 function initObdScanDraft() {
-  if (!inspDraft.inspection) {
-    inspDraft.inspection = {
-      enablePhysical: true,
-      enableObd: true,
-      obd: { codes: [], bike: null },
-      items: {},
-      expandedCats: {}
-    };
-  }
-  if (!inspDraft.inspection.obd) {
-    inspDraft.inspection.obd = { codes: [], bike: null };
-  }
-
-  let bike = inspDraft.inspection.obd.bike;
-  const makeTrim = (inspDraft.make || "").trim();
-  const modelTrim = (inspDraft.model || "").trim();
-  const plateTrim = (inspDraft.plate || "").trim();
-
-  if (!bike) {
-    let brand = "";
-    let otherBrand = "";
-    if (makeTrim) {
-      const match = OBD_BRANDS.find((b) => b.toLowerCase() === makeTrim.toLowerCase());
-      if (match) {
-        brand = match;
-      } else {
-        brand = "Other";
-        otherBrand = makeTrim;
-      }
-    }
-    bike = {
-      mode: "select",
-      brand: brand,
-      otherBrand: otherBrand,
-      model: modelTrim,
-      plate: plateTrim
-    };
-    inspDraft.inspection.obd.bike = bike;
-  } else {
-    if (bike.mode === "select") {
-      if (!bike.brand && !bike.otherBrand && makeTrim) {
-        const match = OBD_BRANDS.find((b) => b.toLowerCase() === makeTrim.toLowerCase());
-        if (match) {
-          bike.brand = match;
-        } else {
-          bike.brand = "Other";
-          bike.otherBrand = makeTrim;
-        }
-      }
-      if (!bike.model && modelTrim) {
-        bike.model = modelTrim;
-      }
-      if (!bike.plate && plateTrim) {
-        bike.plate = plateTrim;
-      }
-    }
-  }
-
-  return bike;
+  syncDraftObdBike();
+  return inspDraft.inspection.obd.bike;
 }
 
 /**
  * Computes the reference string for the ECU card subtitle.
- * @returns {string} Reference string.
+ * @returns {string} Reference string ("Unknown" when blank).
  */
 function getObdReferenceText() {
-  const bike = inspDraft.inspection && inspDraft.inspection.obd && inspDraft.inspection.obd.bike;
-  if (bike) {
-    if (bike.mode === "anon") {
-      return "Anonymous";
-    }
-    const brand = bike.brand === "Other" ? (bike.otherBrand || "").trim() : (bike.brand || "").trim();
-    const model = (bike.model || "").trim();
-    const combined = [brand, model].filter(Boolean).join(" ");
-    if (combined) return combined;
-    if (bike.mode === "select" && !brand && !model) {
-      return "Unknown";
-    }
-  }
-  const intakeCombined = [inspDraft.make, inspDraft.model].filter(Boolean).join(" ");
-  return intakeCombined || "Unknown";
+  const brand = (inspDraft.make || "").trim();
+  const model = (inspDraft.model || "").trim();
+  const combined = [brand, model].filter(Boolean).join(" ");
+  return combined || "Unknown";
 }
 
 /**
- * Copies non-empty scanner motorcycle values into empty Intake draft fields.
- * Never overwrites already filled Intake fields.
- */
-function syncObdBikeToIntake() {
-  const bike = inspDraft.inspection && inspDraft.inspection.obd && inspDraft.inspection.obd.bike;
-  if (!bike || bike.mode === "anon") return;
-
-  const brandVal = bike.brand === "Other" ? (bike.otherBrand || "").trim() : (bike.brand || "").trim();
-  const modelVal = (bike.model || "").trim();
-  const plateVal = (bike.plate || "").trim();
-
-  if (!inspDraft.make && brandVal) {
-    inspDraft.make = brandVal;
-    const inp = $("insp-make");
-    if (inp && !inp.value) inp.value = brandVal;
-  }
-  if (!inspDraft.model && modelVal) {
-    inspDraft.model = modelVal;
-    const inp = $("insp-model");
-    if (inp && !inp.value) inp.value = modelVal;
-  }
-  if (!inspDraft.plate && plateVal) {
-    inspDraft.plate = plateVal;
-    const inp = $("insp-plate");
-    if (inp && !inp.value) inp.value = plateVal;
-  }
-}
-
-/**
- * Updates the live Reference text in Card 2 ECU / OBD DIAGNOSTIC.
+ * Updates the live Reference text in Card 2 ECU / OBD DIAGNOSTIC CODES.
  */
 function updateObdReferenceSubtitle() {
   const subEl = $("ecu-reference-sub");
@@ -7556,426 +7782,784 @@ function updateObdReferenceSubtitle() {
 }
 
 /**
- * Generates HTML for the Motorcycle selection card in Step 2 Diagnosis.
- * Rendered inline as the first card on the page.
+ * Formats local date and time as YYYY-MM-DD HH:MM.
+ * @returns {string}
+ */
+function getNowLocalString() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const h = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${y}-${m}-${day} ${h}:${min}`;
+}
+
+/**
+ * Builds HTML for Card 2 "2. ECU / OBD DIAGNOSTIC CODES".
+ * Mechanic types or searches code read from scanner, system fills in description and steps.
  * @returns {string} HTML string.
  */
-function getInspMotorcycleCardHtml() {
-  const bike = initObdScanDraft();
-  const isSelect = bike.mode !== "anon";
-  const isOther = bike.brand === "Other";
-
-  const chipsHtml = [...OBD_BRANDS, "Other"].map((b) => {
-    const isSelected = bike.brand === b;
-    return `
-      <button
-        type="button"
-        class="obd-brand-chip ${isSelected ? "active" : ""}"
-        data-brand="${escHtml(b)}"
-        aria-pressed="${isSelected ? "true" : "false"}"
-        onclick="selectObdScanBrand('${escHtml(b)}')"
-      >
-        ${escHtml(b)}
-      </button>
-    `;
-  }).join("");
-
+function getEcuObdCardHtml() {
   return `
-    <!-- MOTORCYCLE CARD -->
-    <div class="insp-card" style="margin-bottom:16px">
-      <div class="insp-diag-card-title">MOTORCYCLE</div>
-      <p style="font-size:12px;color:var(--text-muted);margin:-8px 0 12px">
-        Select the motorcycle you are scanning. This also fills the Reference line below.
+    <div class="insp-card" id="ecu-obd-card" style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:4px">
+        <div class="insp-diag-card-title" style="margin:0">2. ECU / OBD DIAGNOSTIC CODES</div>
+        <div style="display:flex;align-items:center;gap:12px;font-size:12px;color:var(--text-muted);flex-wrap:wrap">
+          <span id="ecu-reference-sub">Reference: ${escHtml(getObdReferenceText())}</span>
+          <span>Library: Yamaha Sniper 150 V2</span>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin:0 0 14px">
+        Type the code you read on your scanner. We fill in the description and steps.
       </p>
 
-      <!-- Segmented Toggle -->
-      <div class="obd-seg-track" role="tablist" aria-label="Motorcycle Selection Mode">
-        <button
-          type="button"
-          role="tab"
-          id="obd-tab-select"
-          class="obd-seg-btn ${isSelect ? "active" : ""}"
-          aria-selected="${isSelect ? "true" : "false"}"
-          onclick="setObdScanMode('select')"
-        >
-          Select Motorcycle
-        </button>
-        <button
-          type="button"
-          role="tab"
-          id="obd-tab-anon"
-          class="obd-seg-btn ${!isSelect ? "active" : ""}"
-          aria-selected="${!isSelect ? "true" : "false"}"
-          onclick="setObdScanMode('anon')"
-        >
-          Walk-in / Anonymous
-        </button>
+      <!-- 3a. Add row -->
+      ${getDtcAddRowHtml()}
+
+      <!-- 3b. Recorded codes list -->
+      <div id="dtc-recorded-codes-wrap" class="dtc-recorded-codes-wrap" style="margin-top:16px">
+        ${getDtcRecordedCodesHtml()}
       </div>
 
-      <div class="obd-divider"></div>
+      <!-- Decision support notice -->
+      <div class="obd-notice-box" style="margin-top:16px">
+        <span style="font-size:16px">ℹ️</span>
+        <span>Diagnostic outputs are for reference and decision support only. Final diagnosis requires mechanic verification.</span>
+      </div>
+    </div>
+  `;
+}
 
-      <!-- MODE: Select Motorcycle -->
-      <div id="obd-mode-select-wrap" style="display:${isSelect ? "block" : "none"}">
-        <div class="obd-field-label">BRAND <span class="muted-hint">(tap one)</span></div>
-        <div class="obd-brand-chips" id="obd-brand-chips" role="group" aria-label="Motorcycle Brand">
-          ${chipsHtml}
-        </div>
-
-        <!-- Brand Name input for Other -->
-        <div id="obd-brand-other-wrap" style="display:${isOther ? "block" : "none"};margin-bottom:14px">
-          <label class="obd-field-label" for="obd-other-brand-input">BRAND NAME</label>
+/**
+ * Builds HTML for 3a: Add row (combobox, stored description input, Add Code button).
+ * @returns {string}
+ */
+function getDtcAddRowHtml() {
+  return `
+    <div class="dtc-add-section">
+      <div class="dtc-add-row">
+        <!-- DTC Code Combobox -->
+        <div class="dtc-combobox-wrap">
           <input
             type="text"
-            id="obd-other-brand-input"
-            class="obd-input"
-            placeholder="e.g. exact brand"
-            value="${escHtml(bike.otherBrand || "")}"
-            oninput="updateObdScanOtherBrand(this.value)"
+            id="dtc-search-input"
+            class="dtc-input"
+            role="combobox"
+            aria-expanded="false"
+            aria-controls="dtc-dropdown-list"
+            aria-autocomplete="list"
+            placeholder="Type or search a code (e.g. P0122, Error 15, throttle)"
+            autocomplete="off"
+            onfocus="openDtcDropdown()"
+            onclick="openDtcDropdown()"
+            oninput="onDtcSearchInput(this.value)"
+            onkeydown="onDtcSearchKeyDown(event)"
           />
-          <div class="obd-helper-text">Please type the exact brand so it can be recorded correctly.</div>
+          <button
+            type="button"
+            id="dtc-clear-btn"
+            class="dtc-clear-btn"
+            style="display:none"
+            onclick="clearDtcSearchInput()"
+            aria-label="Clear code input"
+          >✕</button>
+          <div id="dtc-dropdown-list" class="dtc-dropdown" role="listbox" style="display:none"></div>
         </div>
 
-        <!-- Side-by-side Model & Plate fields -->
-        <div class="obd-fields-row">
-          <div class="obd-field-col">
-            <label class="obd-field-label" for="obd-model-input">
-              MODEL <span class="muted-hint">(optional)</span>
-            </label>
-            <input
-              type="text"
-              id="obd-model-input"
-              class="obd-input"
-              placeholder="${isOther ? "e.g. exact model" : "e.g. model name"}"
-              value="${escHtml(bike.model || "")}"
-              oninput="updateObdScanModel(this.value)"
-            />
-          </div>
-          <div class="obd-field-col">
-            <label class="obd-field-label" for="obd-plate-input">
-              PLATE NUMBER <span class="muted-hint">(optional)</span>
-            </label>
-            <input
-              type="text"
-              id="obd-plate-input"
-              class="obd-input"
-              placeholder="ABC 123"
-              value="${escHtml(bike.plate || "")}"
-              oninput="this.value = this.value.toUpperCase(); updateObdScanPlate(this.value)"
-            />
-          </div>
-        </div>
-      </div>
+        <!-- Stored Description Input -->
+        <input
+          type="text"
+          id="dtc-desc-input"
+          class="dtc-desc-input"
+          placeholder="Type the description (custom or manufacturer code)"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();addDtcCodeFromInputs();}"
+        />
 
-      <!-- MODE: Walk-in / Anonymous -->
-      <div id="obd-mode-anon-wrap" style="display:${!isSelect ? "block" : "none"}">
-        <div class="obd-anon-note">This scan won't be linked to a specific motorcycle.</div>
+        <!-- Add Code Button -->
+        <button
+          type="button"
+          id="btn-add-dtc-code"
+          class="btn dtc-add-btn"
+          onclick="addDtcCodeFromInputs()"
+        >
+          Add Code
+        </button>
       </div>
+      <div id="dtc-add-msg" class="dtc-add-msg" aria-live="polite"></div>
     </div>
   `;
 }
 
 /**
- * Sets the motorcycle selection mode ('select' or 'anon').
- * @param {'select'|'anon'} mode
+ * Opens the DTC combobox dropdown and filters by current input text.
  */
-function setObdScanMode(mode) {
-  const bike = initObdScanDraft();
-  bike.mode = mode;
-  const isSelect = mode !== "anon";
-
-  const tabSelect = $("obd-tab-select");
-  const tabAnon = $("obd-tab-anon");
-  const wrapSelect = $("obd-mode-select-wrap");
-  const wrapAnon = $("obd-mode-anon-wrap");
-
-  if (tabSelect) {
-    tabSelect.classList.toggle("active", isSelect);
-    tabSelect.setAttribute("aria-selected", isSelect ? "true" : "false");
-  }
-  if (tabAnon) {
-    tabAnon.classList.toggle("active", !isSelect);
-    tabAnon.setAttribute("aria-selected", !isSelect ? "true" : "false");
-  }
-  if (wrapSelect) wrapSelect.style.display = isSelect ? "block" : "none";
-  if (wrapAnon) wrapAnon.style.display = !isSelect ? "block" : "none";
-
-  syncObdBikeToIntake();
-  updateObdReferenceSubtitle();
+function openDtcDropdown() {
+  dtcComboboxOpen = true;
+  dtcComboboxHighlight = -1;
+  const input = $("dtc-search-input");
+  const val = input ? input.value : "";
+  renderDtcDropdown(val);
+  const dropdown = $("dtc-dropdown-list");
+  if (dropdown) dropdown.style.display = "block";
+  if (input) input.setAttribute("aria-expanded", "true");
 }
 
 /**
- * Handles tapping a brand chip. Tapping active chip clears it.
- * @param {string} brand
+ * Closes the DTC combobox dropdown.
  */
-function selectObdScanBrand(brand) {
-  const bike = initObdScanDraft();
-  if (bike.brand === brand) {
-    bike.brand = "";
+function closeDtcDropdown() {
+  dtcComboboxOpen = false;
+  dtcComboboxHighlight = -1;
+  const dropdown = $("dtc-dropdown-list");
+  if (dropdown) dropdown.style.display = "none";
+  const input = $("dtc-search-input");
+  if (input) input.setAttribute("aria-expanded", "false");
+}
+
+/**
+ * Renders options in the DTC combobox dropdown.
+ * @param {string} query
+ */
+function renderDtcDropdown(query) {
+  const dropdown = $("dtc-dropdown-list");
+  if (!dropdown) return;
+
+  const matches = searchDtcLibrary(query);
+  const cleanQ = (query || "").trim();
+
+  let html = "";
+  if (matches.length > 0) {
+    html = matches.map((item, idx) => {
+      const isHigh = idx === dtcComboboxHighlight;
+      return `
+        <div
+          class="dtc-option ${isHigh ? 'highlight' : ''}"
+          role="option"
+          id="dtc-opt-${idx}"
+          aria-selected="${isHigh}"
+          onmousedown="selectDtcOption(${idx}, '${escHtml(item.matchedCode)}')"
+        >
+          <div class="dtc-option-top">
+            <b class="dtc-option-code">${escHtml(item.matchedCode)}</b>
+            ${item.entry.err ? `<span class="dtc-err-pill">${escHtml(item.entry.err)}</span>` : ""}
+            <span class="dtc-option-part">${escHtml(item.entry.part || "")}</span>
+          </div>
+          <div class="dtc-option-desc">${escHtml(item.entry.desc || "")}</div>
+        </div>
+      `;
+    }).join("");
+  } else if (cleanQ) {
+    const isHigh = dtcComboboxHighlight === 0;
+    html = `
+      <div
+        class="dtc-option custom ${isHigh ? 'highlight' : ''}"
+        role="option"
+        id="dtc-opt-0"
+        aria-selected="${isHigh}"
+        onmousedown="selectCustomDtcOption('${escHtml(cleanQ)}')"
+      >
+        <span class="dtc-option-custom-label">+ Add custom code "<b>${escHtml(cleanQ.toUpperCase())}</b>"</span>
+      </div>
+    `;
   } else {
-    bike.brand = brand;
+    html = `<div style="padding:10px 12px;font-size:12px;color:var(--text-muted);font-style:italic">No matching codes found.</div>`;
   }
 
-  const chips = document.querySelectorAll("#obd-brand-chips .obd-brand-chip");
-  chips.forEach((c) => {
-    const isAct = c.getAttribute("data-brand") === bike.brand;
-    c.classList.toggle("active", isAct);
-    c.setAttribute("aria-pressed", isAct ? "true" : "false");
-  });
+  dropdown.innerHTML = html;
+  dropdown.style.display = "block";
+}
 
-  const otherWrap = $("obd-brand-other-wrap");
-  const isOther = bike.brand === "Other";
-  if (otherWrap) {
-    otherWrap.style.display = isOther ? "block" : "none";
-    if (isOther) {
-      const otherInp = $("obd-other-brand-input");
-      if (otherInp) otherInp.focus();
+/**
+ * Handles typing in the DTC search combobox input.
+ * @param {string} val
+ */
+function onDtcSearchInput(val) {
+  const clearBtn = $("dtc-clear-btn");
+  if (clearBtn) clearBtn.style.display = val ? "block" : "none";
+  const msgEl = $("dtc-add-msg");
+  if (msgEl) {
+    msgEl.textContent = "";
+    msgEl.className = "dtc-add-msg";
+  }
+  openDtcDropdown();
+}
+
+/**
+ * Keyboard navigation for DTC combobox: ArrowUp/Down, Enter, Escape, Tab.
+ * @param {KeyboardEvent} e
+ */
+function onDtcSearchKeyDown(e) {
+  const dropdown = $("dtc-dropdown-list");
+  const options = dropdown ? dropdown.querySelectorAll(".dtc-option") : [];
+  const count = options.length;
+
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    if (!dtcComboboxOpen) {
+      openDtcDropdown();
+      return;
     }
-  }
-
-  const modelInp = $("obd-model-input");
-  if (modelInp) {
-    modelInp.placeholder = isOther ? "e.g. exact model" : "e.g. model name";
-  }
-
-  syncObdBikeToIntake();
-  updateObdReferenceSubtitle();
-}
-
-/**
- * Handles typing in the "Other" Brand Name input.
- * @param {string} val
- */
-function updateObdScanOtherBrand(val) {
-  const bike = initObdScanDraft();
-  bike.otherBrand = val;
-  syncObdBikeToIntake();
-  updateObdReferenceSubtitle();
-}
-
-/**
- * Handles typing in the Model input.
- * @param {string} val
- */
-function updateObdScanModel(val) {
-  const bike = initObdScanDraft();
-  bike.model = val;
-  syncObdBikeToIntake();
-  updateObdReferenceSubtitle();
-}
-
-/**
- * Handles typing in the Plate input.
- * @param {string} val
- */
-function updateObdScanPlate(val) {
-  const bike = initObdScanDraft();
-  bike.plate = (val || "").toUpperCase();
-  syncObdBikeToIntake();
-}
-
-/**
- * Picks random fault code entries from ECU_SAMPLES using Fisher-Yates shuffle.
- * @param {number} [count=4] Number of sample items to pick.
- * @returns {Array<Object>} Shuffled sample objects without duplicates.
- */
-function pickRandomEcuSamples(count = 4) {
-  if (!Array.isArray(ECU_SAMPLES) || ECU_SAMPLES.length === 0) return [];
-  const pool = [...ECU_SAMPLES];
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
-  }
-  return pool.slice(0, Math.min(count, pool.length));
-}
-
-/**
- * Simulates an ECU/OBD scan for fault codes.
- * Plays a ~1.2s spinner animation, then selects 4 random sample faults.
- */
-function runEcuScan() {
-  if (isObdScanning) return;
-  isObdScanning = true;
-
-  const btn = $("btn-run-ecu-scan");
-  if (btn) {
-    btn.innerHTML = `<span class="obd-spinner"></span> Scanning...`;
-  }
-
-  setTimeout(() => {
-    isObdScanning = false;
-    const b = $("btn-run-ecu-scan");
-    if (b) {
-      b.innerHTML = `<span style="display:inline-flex;align-items:center;margin-right:6px">${ICONS.cpu}</span>Run ECU/OBD Scan`;
+    if (count > 0) {
+      dtcComboboxHighlight = (dtcComboboxHighlight + 1) % count;
+      updateDtcDropdownHighlight(options);
     }
-    obdScanResults = pickRandomEcuSamples(4);
-    renderObdScanResultsArea();
-    updateSharedAddToFindingsBar();
-  }, 1200);
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    if (!dtcComboboxOpen) {
+      openDtcDropdown();
+      return;
+    }
+    if (count > 0) {
+      dtcComboboxHighlight = (dtcComboboxHighlight - 1 + count) % count;
+      updateDtcDropdownHighlight(options);
+    }
+  } else if (e.key === "Enter") {
+    e.preventDefault();
+    if (dtcComboboxOpen && dtcComboboxHighlight >= 0 && dtcComboboxHighlight < count) {
+      options[dtcComboboxHighlight].dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    } else {
+      addDtcCodeFromInputs();
+    }
+  } else if (e.key === "Escape" || e.key === "Tab") {
+    closeDtcDropdown();
+  }
 }
 
 /**
- * Binds delegated click listener on OBD scan results wrap once.
+ * Visually updates the highlighted row in the DTC dropdown list.
+ * @param {NodeList} options
  */
-function initDtcCardListeners() {
-  const container = $("obd-scan-results-wrap");
-  if (!container || container.dataset.dtcBound === "true") return;
-  container.dataset.dtcBound = "true";
-  container.addEventListener("click", (e) => {
-    const toggle = e.target.closest(".dtc-toggle");
-    if (!toggle) return;
-    const card = toggle.closest(".dtc-card");
-    if (!card) return;
-    const isOpen = card.classList.toggle("is-open");
-    toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+function updateDtcDropdownHighlight(options) {
+  options.forEach((opt, idx) => {
+    const isHigh = idx === dtcComboboxHighlight;
+    opt.classList.toggle("highlight", isHigh);
+    opt.setAttribute("aria-selected", isHigh ? "true" : "false");
+    if (isHigh) {
+      opt.scrollIntoView({ block: "nearest" });
+    }
   });
 }
 
 /**
- * Generates HTML for the OBD scan results area.
- * Displays placeholder when no scan has been run, or collapsible result cards.
- * @returns {string} HTML string.
+ * Clears the DTC search combobox and resets selections.
  */
-function getObdScanResultsAreaHtml() {
-  if (!obdScanResults || obdScanResults.length === 0) {
-    return `<div class="obd-no-scan-placeholder">No scan yet. Press Run ECU/OBD Scan to read fault codes.</div>`;
+function clearDtcSearchInput() {
+  const input = $("dtc-search-input");
+  const descInput = $("dtc-desc-input");
+  const clearBtn = $("dtc-clear-btn");
+  if (input) {
+    input.value = "";
+    input.focus();
+  }
+  if (descInput && dtcSelectedLibraryEntry) {
+    descInput.value = "";
+  }
+  if (clearBtn) clearBtn.style.display = "none";
+  dtcSelectedLibraryEntry = null;
+  dtcSelectedVariantCode = null;
+  const msgEl = $("dtc-add-msg");
+  if (msgEl) {
+    msgEl.textContent = "";
+    msgEl.className = "dtc-add-msg";
+  }
+  closeDtcDropdown();
+}
+
+/**
+ * Selects a library entry from the DTC dropdown.
+ * @param {number} idx
+ * @param {string} matchedCode
+ */
+function selectDtcOption(idx, matchedCode) {
+  const input = $("dtc-search-input");
+  const descInput = $("dtc-desc-input");
+  const clearBtn = $("dtc-clear-btn");
+
+  const query = input ? input.value : "";
+  const matches = searchDtcLibrary(query);
+  const match = matches[idx];
+
+  if (match) {
+    dtcSelectedLibraryEntry = match.entry;
+    dtcSelectedVariantCode = matchedCode || match.matchedCode;
+    if (input) input.value = dtcSelectedVariantCode;
+    if (descInput) descInput.value = match.entry.desc || "";
+  }
+  if (clearBtn) clearBtn.style.display = "block";
+  closeDtcDropdown();
+}
+
+/**
+ * Selects custom code from the DTC dropdown.
+ * @param {string} code
+ */
+function selectCustomDtcOption(code) {
+  const input = $("dtc-search-input");
+  const clearBtn = $("dtc-clear-btn");
+  dtcSelectedLibraryEntry = null;
+  dtcSelectedVariantCode = null;
+  if (input) input.value = (code || "").trim().toUpperCase();
+  if (clearBtn) clearBtn.style.display = "block";
+  closeDtcDropdown();
+}
+
+/**
+ * Adds a DTC code record from the input fields into draft.inspection.obd.codes.
+ */
+function addDtcCodeFromInputs() {
+  const input = $("dtc-search-input");
+  const descInput = $("dtc-desc-input");
+  const msgEl = $("dtc-add-msg");
+  const clearBtn = $("dtc-clear-btn");
+
+  const rawCode = (input ? input.value : "").trim();
+  const rawDesc = (descInput ? descInput.value : "").trim();
+
+  if (!rawCode) {
+    if (msgEl) {
+      msgEl.textContent = "Enter a code first.";
+      msgEl.className = "dtc-add-msg err";
+    }
+    return;
   }
 
-  const addedCodes = (inspDraft.inspection && inspDraft.inspection.obd && Array.isArray(inspDraft.inspection.obd.codes))
+  const normCode = rawCode.toUpperCase();
+
+  if (!inspDraft.inspection) {
+    inspDraft.inspection = { enablePhysical: true, enableObd: true, obd: { codes: [] } };
+  }
+  if (!inspDraft.inspection.obd) {
+    inspDraft.inspection.obd = { codes: [] };
+  }
+  if (!Array.isArray(inspDraft.inspection.obd.codes)) {
+    inspDraft.inspection.obd.codes = [];
+  }
+
+  const isDuplicate = inspDraft.inspection.obd.codes.some(
+    (c) => (c.code || "").trim().toUpperCase() === normCode
+  );
+  if (isDuplicate) {
+    if (msgEl) {
+      msgEl.textContent = "Already added.";
+      msgEl.className = "dtc-add-msg muted";
+    }
+    return;
+  }
+
+  // Lookup in library
+  let entry = null;
+  let codeToRecord = normCode;
+  if (dtcSelectedLibraryEntry && dtcSelectedVariantCode === normCode) {
+    entry = dtcSelectedLibraryEntry;
+    codeToRecord = normCode;
+  } else {
+    const libMatch = findDtcInLibrary(normCode);
+    if (libMatch) {
+      entry = libMatch.entry;
+      codeToRecord = libMatch.matchedCode || normCode;
+    }
+  }
+
+  const nowAt = getNowLocalString();
+
+  if (entry) {
+    const otherVariants = Array.isArray(entry.dtc) ? entry.dtc.filter((v) => v !== codeToRecord) : [];
+    const checks = Array.isArray(entry.checks) ? [...entry.checks] : [];
+    const parts = Array.isArray(entry.parts) ? [...entry.parts] : [];
+    const newRecord = {
+      code: codeToRecord,
+      desc: rawDesc || entry.desc || "",
+      err: entry.err || "",
+      part: entry.part || "",
+      checks: checks,
+      parts: parts,
+      done: new Array(checks.length).fill(false),
+      verified: "",
+      custom: false,
+      at: nowAt,
+      model: entry.model || "Yamaha Sniper 150 V2",
+      caution: entry.caution || "Verify first. Do not replace the part until the checks below are done.",
+      variants: otherVariants
+    };
+    inspDraft.inspection.obd.codes.push(newRecord);
+  } else {
+    const newRecord = {
+      code: normCode,
+      desc: rawDesc || "",
+      err: "",
+      part: "",
+      checks: [],
+      parts: [],
+      done: [],
+      verified: "",
+      custom: true,
+      at: nowAt
+    };
+    inspDraft.inspection.obd.codes.push(newRecord);
+  }
+
+  // Clear inputs
+  if (input) input.value = "";
+  if (descInput) descInput.value = "";
+  if (clearBtn) clearBtn.style.display = "none";
+  if (msgEl) {
+    msgEl.textContent = "";
+    msgEl.className = "dtc-add-msg";
+  }
+  dtcSelectedLibraryEntry = null;
+  dtcSelectedVariantCode = null;
+  closeDtcDropdown();
+
+  renderDtcRecordedCodes();
+  updateSharedAddToFindingsBar();
+  updateHotspotsAndTiles();
+}
+
+/**
+ * Builds HTML for 3b: Recorded codes list (one card per code).
+ * @returns {string}
+ */
+function getDtcRecordedCodesHtml() {
+  const codes = (inspDraft.inspection && inspDraft.inspection.obd && Array.isArray(inspDraft.inspection.obd.codes))
     ? inspDraft.inspection.obd.codes
     : [];
 
-  const cardsHtml = obdScanResults.map((item, idx) => {
-    const isAdded = addedCodes.some((c) => c.code === item.code);
-    const otherCodes = Array.isArray(item.dtc) ? item.dtc.filter((c) => c !== item.code) : [];
+  if (codes.length === 0) {
+    return `<div class="dtc-empty-placeholder" style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;border:1px dashed var(--border);border-radius:12px;background:var(--bg-surface-alt,#F8FAFC)">No codes recorded yet. Type a code from your scanner above.</div>`;
+  }
+
+  return codes.map((c) => {
+    const code = escHtml(c.code || "");
+    const errPill = c.err ? `<span class="dtc-err-pill">${escHtml(c.err)}</span>` : "";
+    const otherVariants = Array.isArray(c.variants) && c.variants.length > 0
+      ? `<span class="dtc-also-text" style="font-size:12px;color:var(--text-muted)">Also: ${escHtml(c.variants.join(", "))}</span>`
+      : "";
+    const actionBtnHtml = getDtcCardActionBtnHtml(c);
+
+    const checks = Array.isArray(c.checks) ? c.checks : [];
+    const parts = Array.isArray(c.parts) ? c.parts : [];
+    const doneList = Array.isArray(c.done) ? c.done : [];
 
     return `
-      <article class="dtc-card obd-result-card" data-dtc="${escHtml(item.code || "")}">
-        <div class="dtc-top">
-          <div class="obd-card-pills-row">
-            <span class="obd-primary-code-pill">${escHtml(item.code || "")}</span>
-            ${item.err ? `<span class="obd-err-code-pill">${escHtml(item.err)}</span>` : ""}
-            ${otherCodes.length > 0 ? `<span class="obd-also-dtc">Also: ${escHtml(otherCodes.join(", "))}</span>` : ""}
+      <div class="dtc-code-card" id="dtc-card-${code}" data-code="${code}">
+        <!-- Top row -->
+        <div class="dtc-card-top-row">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span class="dtc-code-pill">${code}</span>
+            ${errPill}
+            ${otherVariants}
           </div>
-          <div class="obd-card-action">
-            ${isAdded ? `
-              <span class="obd-btn-added" role="status" aria-label="Fault code added to findings">✓ Added</span>
-              <div class="obd-added-hint">Added to Final Findings below</div>
-            ` : `
-              <button type="button" class="obd-btn-add" onclick="addSampleCodeToFindings('${escHtml(item.code || "")}')">
-                Add to findings
-              </button>
-            `}
-          </div>
-        </div>
-
-        <h3 class="dtc-name">
-          <button type="button" class="dtc-toggle" aria-expanded="false" aria-controls="dtc-panel-${idx}">
-            <span class="dtc-title-text">${escHtml(item.part || item.name || "")}</span>
-            <span class="dtc-toggle-right">
-              <span class="dtc-toggle-label">Details</span>
-              <svg class="dtc-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span id="dtc-btn-wrap-${code}">
+              ${actionBtnHtml}
             </span>
-          </button>
-        </h3>
-
-        <div class="dtc-details" id="dtc-panel-${idx}">
-          <div class="dtc-details-inner">
-            ${item.desc ? `<p class="dtc-desc">${escHtml(item.desc)}</p>` : ""}
-
-            ${Array.isArray(item.checks) && item.checks.length > 0 ? `
-              <div class="dtc-section">
-                <div class="dtc-section-label">Verification:</div>
-                <ul class="dtc-checks-list">
-                  ${item.checks.map((chk) => `<li>${escHtml(chk)}</li>`).join("")}
-                </ul>
-              </div>
-            ` : ""}
-
-            <div class="dtc-section" style="margin-top:8px">
-              <div class="dtc-section-label">Suggested parts:</div>
-              ${Array.isArray(item.parts) && item.parts.length > 0 ? `
-                <div class="dtc-parts-chips">
-                  ${item.parts.map((pt) => `<span class="obd-part-chip">${escHtml(pt)}</span>`).join("")}
-                </div>
-              ` : `
-                <div class="dtc-empty-parts" style="font-size:13px;color:var(--text-muted)">No suggested parts listed.</div>
-              `}
-            </div>
+            <button
+              type="button"
+              class="btn g sm dtc-remove-btn"
+              onclick="removeDtcCode('${code}')"
+              title="Remove code"
+              aria-label="Remove ${code}"
+              style="padding:2px 8px;font-size:12px;min-height:36px"
+            >✕</button>
           </div>
         </div>
-      </article>
-    `;
-  }).join("");
 
-  return `
-    <div class="obd-results-grid dtc-grid">
-      ${cardsHtml}
-    </div>
-  `;
-}
-
-/**
- * Re-renders only the scan results area.
- */
-function renderObdScanResultsArea() {
-  const container = $("obd-scan-results-wrap");
-  if (container) {
-    container.innerHTML = getObdScanResultsAreaHtml();
-    initDtcCardListeners();
-    if (typeof window !== "undefined" && window.lucide && typeof window.lucide.createIcons === "function") {
-      window.lucide.createIcons();
-    }
-  }
-}
-
-/**
- * Generates HTML for the list of added OBD fault codes.
- * @returns {string} HTML string.
- */
-function getObdAddedCodesHtml() {
-  const obdCodes = (inspDraft.inspection && inspDraft.inspection.obd && Array.isArray(inspDraft.inspection.obd.codes))
-    ? inspDraft.inspection.obd.codes
-    : [];
-  if (obdCodes.length === 0) return "";
-
-  return obdCodes.map((c) => {
-    const label = c.part && !c.desc.startsWith(c.part) ? `${c.part}: ${c.desc}` : (c.desc || "");
-    return `
-      <div class="obd-code-pill">
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-          <b>${escHtml(c.code)}</b>
-          ${c.err ? `<span class="obd-err-code-pill" style="font-size:11px;padding:1px 6px">${escHtml(c.err)}</span>` : ""}
-          <span>· ${escHtml(label)}</span>
+        <!-- Component & Stored Description -->
+        <div class="dtc-card-component-desc">
+          ${c.part ? `<b class="dtc-card-part-name" style="font-size:13px;color:var(--text-primary)">${escHtml(c.part)}:</b> ` : ""}
+          ${!c.custom ? `
+            <span id="dtc-desc-view-${code}" class="dtc-desc-view-text" style="font-size:13px;color:var(--text-secondary)">
+              ${escHtml(c.desc || "")}
+              <a href="javascript:void(0)" class="dtc-edit-desc-link" onclick="toggleEditDtcDesc('${code}')" style="font-size:12px;color:var(--primary);margin-left:4px">Edit</a>
+            </span>
+            <div id="dtc-desc-edit-wrap-${code}" class="dtc-desc-edit-wrap" style="display:none;margin-top:6px">
+              <textarea
+                id="dtc-desc-edit-input-${code}"
+                class="dtc-desc-edit-input"
+                rows="2"
+                oninput="updateDtcDesc('${code}', this.value)"
+              >${escHtml(c.desc || "")}</textarea>
+              <div style="margin-top:4px">
+                <button type="button" class="btn sm" onclick="toggleEditDtcDesc('${code}')">Done</button>
+              </div>
+            </div>
+          ` : `
+            <div style="margin-top:4px">
+              <textarea
+                class="dtc-desc-edit-input"
+                rows="2"
+                placeholder="Type description..."
+                oninput="updateDtcDesc('${code}', this.value)"
+              >${escHtml(c.desc || "")}</textarea>
+            </div>
+          `}
         </div>
-        <button type="button" class="btn g sm" onclick="removeObdCode('${escHtml(c.code)}')" style="padding:2px 8px;font-size:12px;min-height:32px" title="Remove code">✕</button>
+
+        <!-- Caution Line -->
+        ${c.caution ? `
+          <div class="dtc-caution-line">
+            ${escHtml(c.caution)}
+          </div>
+        ` : ""}
+
+        <!-- Troubleshooting Steps -->
+        <div class="dtc-card-section">
+          <div class="dtc-section-title" style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">
+            TROUBLESHOOTING STEPS
+          </div>
+          ${checks.length > 0 ? `
+            <div class="dtc-steps-list" style="display:flex;flex-direction:column;gap:6px">
+              ${checks.map((chk, sIdx) => {
+                const isDone = Boolean(doneList[sIdx]);
+                return `
+                  <label class="dtc-step-item">
+                    <input
+                      type="checkbox"
+                      class="dtc-step-checkbox"
+                      ${isDone ? "checked" : ""}
+                      onchange="toggleDtcStepDone('${code}', ${sIdx}, this.checked)"
+                    />
+                    <span class="dtc-step-num">${sIdx + 1}.</span>
+                    <span class="dtc-step-text">${escHtml(chk)}</span>
+                  </label>
+                `;
+              }).join("")}
+            </div>
+          ` : `
+            <div style="font-size:12px;color:var(--text-muted);font-style:italic">
+              No steps in the library. Add your own checks in the notes below.
+            </div>
+          `}
+        </div>
+
+        <!-- Suggested Parts -->
+        <div class="dtc-card-section">
+          <div class="dtc-section-title" style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">
+            SUGGESTED PARTS
+          </div>
+          ${parts.length > 0 ? `
+            <div class="dtc-parts-chips-wrap" style="display:flex;flex-wrap:wrap;gap:6px">
+              ${parts.map((pt) => {
+                const fromId = `dtc.${c.code}|${pt}`;
+                const isAdded = Array.isArray(inspDraft.items) && inspDraft.items.some((it) => it.from === fromId);
+                return `
+                  <button
+                    type="button"
+                    class="dtc-part-chip ${isAdded ? 'added' : ''}"
+                    aria-pressed="${isAdded ? 'true' : 'false'}"
+                    onclick="toggleDtcPartChip('${code}', '${escHtml(pt)}')"
+                  >
+                    ${isAdded ? '✓ Added: ' + escHtml(pt) : '+ ' + escHtml(pt)}
+                  </button>
+                `;
+              }).join("")}
+            </div>
+          ` : `
+            <div style="font-size:12px;color:var(--text-muted);font-style:italic">
+              No suggested parts listed.
+            </div>
+          `}
+        </div>
+
+        <!-- Mechanic's verified findings * -->
+        <div class="dtc-verified-section" style="margin-top:4px">
+          <label class="dtc-verified-label" for="dtc-verified-${code}" style="display:block;font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:4px">
+            Mechanic's verified findings <span style="color:var(--text-muted)">*</span>
+          </label>
+          <textarea
+            id="dtc-verified-${code}"
+            class="dtc-verified-input"
+            data-code="${code}"
+            rows="2"
+            placeholder="What did you actually confirm? e.g. Checked sensor wiring; found loose connector pin, sensor itself is good."
+            oninput="updateDtcVerified('${code}', this.value)"
+          >${escHtml(c.verified || "")}</textarea>
+          <div
+            id="dtc-verified-reminder-${code}"
+            class="dtc-soft-reminder"
+            style="font-size:12px;color:var(--text-muted);margin-top:4px;${(c.verified || '').trim() ? 'display:none;' : ''}"
+          >
+            Add what you verified before finalizing.
+          </div>
+        </div>
       </div>
     `;
   }).join("");
 }
 
 /**
- * Re-renders only the added-codes list without re-rendering the whole page.
+ * Re-renders only the recorded codes list.
  */
-function renderObdAddedCodes() {
-  const container = $("obd-added-codes");
-  if (container) {
-    container.innerHTML = getObdAddedCodesHtml();
+function renderDtcRecordedCodes() {
+  const wrap = $("dtc-recorded-codes-wrap");
+  if (wrap) {
+    wrap.innerHTML = getDtcRecordedCodesHtml();
   }
 }
 
 /**
- * Formats a scan result fault code entry for auto-insertion into the findings text box.
+ * Toggles a troubleshooting step checkbox.
+ * @param {string} code
+ * @param {number} stepIdx
+ * @param {boolean} checked
+ */
+function toggleDtcStepDone(code, stepIdx, checked) {
+  const codes = (inspDraft.inspection && inspDraft.inspection.obd && Array.isArray(inspDraft.inspection.obd.codes))
+    ? inspDraft.inspection.obd.codes
+    : [];
+  const c = codes.find((x) => x.code === code);
+  if (c) {
+    if (!Array.isArray(c.done)) c.done = [];
+    c.done[stepIdx] = checked;
+  }
+}
+
+/**
+ * Toggles a suggested part chip, linking to Recommended Services & Items.
+ * @param {string} code
+ * @param {string} partName
+ */
+function toggleDtcPartChip(code, partName) {
+  readDiagDomIntoDraft();
+  const fromId = `dtc.${code}|${partName}`;
+  if (!Array.isArray(inspDraft.items)) inspDraft.items = [];
+
+  const isAdded = inspDraft.items.some((it) => it.from === fromId);
+  if (isAdded) {
+    inspDraft.items = inspDraft.items.filter((it) => it.from !== fromId);
+  } else {
+    const price = resolveCannedJobPrice("part", partName, 0);
+    inspDraft.items.push({
+      id: uid(),
+      kind: "part",
+      name: partName,
+      src: "shop",
+      qty: 1,
+      price: price,
+      from: fromId,
+      done: false
+    });
+  }
+
+  renderDtcRecordedCodes();
+  renderItemsManager("draft");
+}
+
+/**
+ * Live updates mechanic's verified findings textarea value for a code.
+ * Keeps textarea focused and updates reminders and findings button without re-rendering card.
+ * @param {string} code
+ * @param {string} val
+ */
+function updateDtcVerified(code, val) {
+  const codes = (inspDraft.inspection && inspDraft.inspection.obd && Array.isArray(inspDraft.inspection.obd.codes))
+    ? inspDraft.inspection.obd.codes
+    : [];
+  const c = codes.find((x) => x.code === code);
+  if (c) {
+    c.verified = val;
+  }
+  const rem = $("dtc-verified-reminder-" + code);
+  if (rem) {
+    rem.style.display = (val || "").trim() ? "none" : "block";
+  }
+  renderDtcCardActionBtn(code);
+  updateSharedAddToFindingsBar();
+}
+
+/**
+ * Toggles between plain text view and textarea edit mode for stored description.
+ * @param {string} code
+ */
+function toggleEditDtcDesc(code) {
+  const wrap = $("dtc-desc-edit-wrap-" + code);
+  const viewEl = $("dtc-desc-view-" + code);
+  if (!wrap || !viewEl) return;
+  const isHidden = wrap.style.display === "none";
+  wrap.style.display = isHidden ? "block" : "none";
+  viewEl.style.display = isHidden ? "none" : "inline";
+  if (isHidden) {
+    const inp = $("dtc-desc-edit-input-" + code);
+    if (inp) inp.focus();
+  }
+}
+
+/**
+ * Updates stored description value for a code.
+ * @param {string} code
+ * @param {string} val
+ */
+function updateDtcDesc(code, val) {
+  const codes = (inspDraft.inspection && inspDraft.inspection.obd && Array.isArray(inspDraft.inspection.obd.codes))
+    ? inspDraft.inspection.obd.codes
+    : [];
+  const c = codes.find((x) => x.code === code);
+  if (c) {
+    c.desc = val;
+  }
+  const viewEl = $("dtc-desc-view-" + code);
+  if (viewEl) {
+    viewEl.innerHTML = `${escHtml(val || "")} <a href="javascript:void(0)" class="dtc-edit-desc-link" onclick="toggleEditDtcDesc('${escHtml(code)}')" style="font-size:12px;color:var(--primary);margin-left:4px">Edit</a>`;
+  }
+}
+
+/**
+ * Removes a recorded DTC code, its linked items in draft.items, and its untouched auto-inserted findings.
+ * @param {string} code
+ */
+function removeDtcCode(code) {
+  readDiagDomIntoDraft();
+  if (inspDraft.inspection && inspDraft.inspection.obd && Array.isArray(inspDraft.inspection.obd.codes)) {
+    inspDraft.inspection.obd.codes = inspDraft.inspection.obd.codes.filter((x) => x.code !== code);
+  }
+
+  // Remove linked parts added from its chips
+  const prefix = `dtc.${code}|`;
+  if (Array.isArray(inspDraft.items)) {
+    inspDraft.items = inspDraft.items.filter((it) => !(it.from && it.from.startsWith(prefix)));
+    renderItemsManager("draft");
+  }
+
+  // Remove untouched auto-inserted findings entry
+  const inserted = obdFindingText[code];
+  if (inserted) {
+    const ta = $("insp-diag-findings");
+    const curVal = ta ? ta.value : (inspDraft.findings || "");
+    const baseEntry = typeof inserted === "object" ? inserted.baseEntry : inserted;
+    const cleaned = removeExactInsertedEntry(curVal, baseEntry);
+    if (cleaned !== null) {
+      let finalVal = cleaned;
+      if (finalVal.trim() === "ECU/OBD CODES" || finalVal.trim() === "ECU/OBD SCAN") {
+        finalVal = "";
+      }
+      if (ta) {
+        ta.value = finalVal;
+        autoGrowTextarea(ta);
+      }
+      inspDraft.findings = finalVal;
+    }
+    delete obdFindingText[code];
+  }
+
+  renderDtcRecordedCodes();
+  updateSharedAddToFindingsBar();
+  updateHotspotsAndTiles();
+}
+
+/**
+ * Formats a recorded DTC code entry for auto-insertion into final findings.
  * Format:
  * Code [(err)] - Component: Description
- * Verify: check1; check2
- * @param {Object} item - Scan fault code object.
+ * Verified: {verified findings, or "Not yet verified"}
+ * @param {Object} c - Recorded code object.
  * @returns {string} Plain text entry block.
  */
-function formatObdFindingText(item) {
-  const codePart = item.code || "";
-  const errPart = item.err ? ` (${item.err})` : "";
-  const component = item.part || "";
-  let desc = item.desc || "";
+function formatDtcFindingEntry(c) {
+  const codePart = c.code || "";
+  const errPart = c.err ? ` (${c.err})` : "";
+  const component = c.part || "";
+  let desc = c.desc || "";
   if (component && desc.startsWith(component + ": ")) {
     desc = desc.slice(component.length + 2).trim();
   }
@@ -7989,89 +8573,117 @@ function formatObdFindingText(item) {
     line1 += ` - ${desc}`;
   }
 
-  let line2 = "";
-  if (Array.isArray(item.checks) && item.checks.length > 0) {
-    const cleanChecks = item.checks.map((c, i, arr) => {
-      let s = String(c).trim();
-      if (i < arr.length - 1) {
-        s = s.replace(/\.+$/, "");
-      }
-      return s;
-    }).filter(Boolean);
-    if (cleanChecks.length > 0) {
-      line2 = `\nVerify: ${cleanChecks.join("; ")}`;
-    }
-  }
+  const verText = (c.verified && c.verified.trim()) ? c.verified.trim() : "Not yet verified";
+  const line2 = `Verified: ${verText}`;
 
-  return `${line1}${line2}`;
+  return `${line1}\n${line2}`;
 }
 
 /**
- * Adds an ECU sample fault code to the findings list and automatically appends to the findings textarea.
- * Updates draft.inspection.obd.codes, writes entry into draft.findings, highlights textarea, and updates results UI.
- * @param {string} code - Primary fault code.
+ * Generates action button HTML for an individual code card: "Add to findings", "✓ Added", or "Add update".
+ * @param {Object} c
+ * @returns {string}
  */
-function addSampleCodeToFindings(code) {
+function getDtcCardActionBtnHtml(c) {
+  const f = $("insp-diag-findings");
+  const curVal = f ? f.value : (inspDraft.findings || "");
+  const inserted = obdFindingText[c.code];
+  const isInserted = inserted && (typeof inserted === "object" ? curVal.includes(inserted.baseEntry) : curVal.includes(inserted));
+
+  if (!isInserted) {
+    return `
+      <button type="button" class="obd-btn-add" onclick="addSingleDtcToFindings('${escHtml(c.code)}')">
+        Add to findings
+      </button>
+    `;
+  }
+
+  const lastVer = typeof inserted === "object" ? (inserted.lastVerified || "") : "";
+  const curVer = (c.verified || "").trim();
+
+  if (curVer && curVer !== lastVer) {
+    return `
+      <button type="button" class="obd-btn-add update" onclick="addSingleDtcToFindings('${escHtml(c.code)}')">
+        Add update
+      </button>
+    `;
+  }
+
+  return `
+    <span class="obd-btn-added" role="status" aria-label="Fault code added to findings">✓ Added</span>
+  `;
+}
+
+/**
+ * Re-renders only the action button on a single code card.
+ * @param {string} code
+ */
+function renderDtcCardActionBtn(code) {
+  const wrap = $("dtc-btn-wrap-" + code);
+  if (!wrap) return;
+  const codes = (inspDraft.inspection && inspDraft.inspection.obd && Array.isArray(inspDraft.inspection.obd.codes))
+    ? inspDraft.inspection.obd.codes
+    : [];
+  const c = codes.find((x) => x.code === code);
+  if (c) {
+    wrap.innerHTML = getDtcCardActionBtnHtml(c);
+  }
+}
+
+/**
+ * Adds an individual DTC code or verified update into the findings textarea under "ECU/OBD CODES".
+ * @param {string} code
+ */
+function addSingleDtcToFindings(code) {
   readDiagDomIntoDraft();
-  if (!inspDraft.inspection) {
-    inspDraft.inspection = { enablePhysical: true, enableObd: true, obd: { codes: [] } };
-  }
-  if (!inspDraft.inspection.obd) {
-    inspDraft.inspection.obd = { codes: [] };
-  }
-  if (!Array.isArray(inspDraft.inspection.obd.codes)) {
-    inspDraft.inspection.obd.codes = [];
-  }
+  const codes = (inspDraft.inspection && inspDraft.inspection.obd && Array.isArray(inspDraft.inspection.obd.codes))
+    ? inspDraft.inspection.obd.codes
+    : [];
+  const c = codes.find((x) => x.code === code);
+  if (!c) return;
 
-  let item = (Array.isArray(obdScanResults) ? obdScanResults.find((s) => s.code === code) : null)
-    || (Array.isArray(ECU_SAMPLES) ? ECU_SAMPLES.find((s) => s.code === code) : null);
+  const ta = $("insp-diag-findings");
+  let curVal = ta ? ta.value : (inspDraft.findings || "");
 
-  if (!inspDraft.inspection.obd.codes.some((x) => x.code === code)) {
-    if (item) {
-      inspDraft.inspection.obd.codes.push({
-        code: item.code,
-        desc: `${item.part}: ${item.desc}`,
-        part: item.part,
-        err: item.err,
-        checks: Array.isArray(item.checks) ? [...item.checks] : [],
-        parts: Array.isArray(item.parts) ? [...item.parts] : []
-      });
+  const inserted = obdFindingText[code];
+  const isInserted = inserted && (typeof inserted === "object" ? curVal.includes(inserted.baseEntry) : curVal.includes(inserted));
+
+  let blockToInsert = "";
+  if (!isInserted) {
+    const entryText = formatDtcFindingEntry(c);
+    obdFindingText[code] = { baseEntry: entryText, lastVerified: (c.verified || "").trim() };
+    const headingNeeded = !curVal.includes("ECU/OBD CODES");
+    blockToInsert = headingNeeded ? `ECU/OBD CODES\n${entryText}` : entryText;
+  } else {
+    const curVer = (c.verified || "").trim();
+    const updateText = `Verified update (${c.code}): ${curVer || "Not yet verified"}`;
+    if (!curVal.includes(updateText)) {
+      blockToInsert = updateText;
+    }
+    if (typeof inserted === "object") {
+      inserted.lastVerified = curVer;
     }
   }
 
-  if (item) {
-    const entryText = formatObdFindingText(item);
-    obdFindingText[code] = entryText;
-
-    const ta = $("insp-diag-findings");
-    const curVal = ta ? ta.value : (inspDraft.findings || "");
-
-    // Only append if that code's entry is not already in the text
-    if (!curVal.includes(entryText)) {
-      const headingNeeded = !curVal.includes("ECU/OBD SCAN");
-      const blockToInsert = headingNeeded ? `ECU/OBD SCAN\n${entryText}` : entryText;
-
-      let newVal = curVal;
-      if (!newVal.trim()) {
-        newVal = blockToInsert;
+  if (blockToInsert) {
+    let newVal = curVal;
+    if (!newVal.trim()) {
+      newVal = blockToInsert;
+    } else {
+      if (newVal.endsWith("\n\n")) {
+        newVal += blockToInsert;
+      } else if (newVal.endsWith("\n")) {
+        newVal += "\n" + blockToInsert;
       } else {
-        if (newVal.endsWith("\n\n")) {
-          newVal += blockToInsert;
-        } else if (newVal.endsWith("\n")) {
-          newVal += "\n" + blockToInsert;
-        } else {
-          newVal += "\n\n" + blockToInsert;
-        }
+        newVal += "\n\n" + blockToInsert;
       }
-
-      if (ta) {
-        ta.value = newVal;
-        autoGrowTextarea(ta);
-      }
-      inspDraft.findings = newVal;
     }
+    if (ta) {
+      ta.value = newVal;
+      autoGrowTextarea(ta);
+    }
+    inspDraft.findings = newVal;
 
-    // Briefly highlight the textarea border (green for ~1.5 seconds)
     if (ta) {
       ta.classList.add("ta-highlight-green");
       if (taHighlightTimer) clearTimeout(taHighlightTimer);
@@ -8082,10 +8694,7 @@ function addSampleCodeToFindings(code) {
     }
   }
 
-  renderObdScanResultsArea();
-  renderObdAddedCodes();
-  renderQuickObdChips();
-  updateHotspotsAndTiles();
+  renderDtcCardActionBtn(code);
   updateSharedAddToFindingsBar();
 }
 
@@ -8119,41 +8728,6 @@ function removeExactInsertedEntry(text, inserted) {
 }
 
 /**
- * Removes an OBD code from the findings list and removes its untouched auto-inserted entry from the textarea.
- * @param {string} code - Fault code.
- */
-function removeObdCode(code) {
-  readDiagDomIntoDraft();
-  if (inspDraft.inspection && inspDraft.inspection.obd && Array.isArray(inspDraft.inspection.obd.codes)) {
-    inspDraft.inspection.obd.codes = inspDraft.inspection.obd.codes.filter((x) => x.code !== code);
-  }
-
-  // Remove that code's auto-inserted entry from the textarea ONLY if still exactly as inserted
-  const inserted = obdFindingText[code];
-  if (inserted) {
-    const ta = $("insp-diag-findings");
-    const curVal = ta ? ta.value : (inspDraft.findings || "");
-    const cleaned = removeExactInsertedEntry(curVal, inserted);
-    if (cleaned !== null) {
-      let finalVal = cleaned;
-      if (finalVal.trim() === "ECU/OBD SCAN") {
-        finalVal = "";
-      }
-      if (ta) {
-        ta.value = finalVal;
-        autoGrowTextarea(ta);
-      }
-      inspDraft.findings = finalVal;
-    }
-    delete obdFindingText[code];
-  }
-
-  renderObdScanResultsArea();
-  renderObdAddedCodes();
-  updateSharedAddToFindingsBar();
-}
-
-/**
  * Formats a physical inspection fault entry for insertion into findings.
  * Format is strictly:
  * [FIX] Category - Item label: {note, or "No note"}
@@ -8170,26 +8744,33 @@ function formatPhysicalFindingText(catName, itemLabel, state, note) {
 
 /**
  * Calculates counts of pending findings waiting to be added to the findings box.
- * Only includes scan results not yet added to draft.inspection.obd.codes,
+ * Counts recorded DTC codes not yet added or with modified verified text,
  * and physical items (Fix) whose current entry differs from physFindingText and is not in text.
- * @returns {{ scan: number, physical: number, total: number }} Pending findings counts.
+ * @returns {{ dtc: number, physical: number, total: number }} Pending findings counts.
  */
 function getPendingFindingsCounts() {
   const f = $("insp-diag-findings");
   const curVal = f ? f.value : (inspDraft.findings || "");
 
-  // Scan items count
-  let scanCount = 0;
-  const addedCodes = (inspDraft.inspection && inspDraft.inspection.obd && Array.isArray(inspDraft.inspection.obd.codes))
+  // DTC codes count
+  let dtcCount = 0;
+  const codes = (inspDraft.inspection && inspDraft.inspection.obd && Array.isArray(inspDraft.inspection.obd.codes))
     ? inspDraft.inspection.obd.codes
     : [];
-  if (inspDraft.inspection && inspDraft.inspection.enableObd && Array.isArray(obdScanResults)) {
-    obdScanResults.forEach((s) => {
-      if (!addedCodes.some((c) => c.code === s.code)) {
-        scanCount++;
+
+  codes.forEach((c) => {
+    const inserted = obdFindingText[c.code];
+    const isInserted = inserted && (typeof inserted === "object" ? curVal.includes(inserted.baseEntry) : curVal.includes(inserted));
+    if (!isInserted) {
+      dtcCount++;
+    } else {
+      const lastVer = typeof inserted === "object" ? (inserted.lastVerified || "") : "";
+      const curVer = (c.verified || "").trim();
+      if (curVer && curVer !== lastVer) {
+        dtcCount++;
       }
-    });
-  }
+    }
+  });
 
   // Physical items count: counts Fix items not yet added
   let physCount = 0;
@@ -8211,31 +8792,31 @@ function getPendingFindingsCounts() {
     });
   }
 
-  return { scan: scanCount, physical: physCount, total: scanCount + physCount };
+  return { dtc: dtcCount, physical: physCount, total: dtcCount + physCount };
 }
 
 /**
  * Formats the summary line for the shared "Add to findings" bar.
- * Handles singular and plural rules correctly.
- * @param {{ scan: number, physical: number, total: number }} counts
+ * Handles singular and plural rules correctly without "scan results" wording.
+ * @param {{ dtc: number, physical: number, total: number }} counts
  * @returns {string} Summary string.
  */
 function getSharedFindingsSummaryText(counts) {
-  const scanCount = counts.scan;
+  const dtcCount = counts.dtc;
   const physCount = counts.physical;
 
-  if (scanCount === 0 && physCount === 0) {
+  if (dtcCount === 0 && physCount === 0) {
     return "Nothing new to add yet.";
   }
 
-  const scanPart = scanCount > 0 ? `${scanCount} scan result${scanCount === 1 ? "" : "s"}` : "";
+  const dtcPart = dtcCount > 0 ? `${dtcCount} DTC code${dtcCount === 1 ? "" : "s"}` : "";
   const physPart = physCount > 0 ? `${physCount} inspection fault${physCount === 1 ? "" : "s"}` : "";
 
-  if (scanCount > 0 && physCount > 0) {
-    return `${scanPart} and ${physPart} ready to add`;
+  if (dtcCount > 0 && physCount > 0) {
+    return `${dtcPart} and ${physPart} ready to add`;
   }
-  if (scanCount > 0) {
-    return `${scanPart} ready to add`;
+  if (dtcCount > 0) {
+    return `${dtcPart} ready to add`;
   }
   return `${physPart} ready to add`;
 }
@@ -8309,10 +8890,10 @@ function showSharedBarFeedback(msg, duration = 2000) {
 }
 
 /**
- * Adds unadded scan results and physical inspection faults into the findings textarea.
+ * Adds unadded DTC codes and physical inspection faults into the findings textarea.
  * Order:
- * 1. ECU/OBD scan results (with "ECU/OBD SCAN" heading if not already in text)
- * 2. Physical faults: Fix items first, then Watch items, in category order (with "PHYSICAL INSPECTION" heading if not in text)
+ * 1. ECU/OBD codes (with "ECU/OBD CODES" heading if not already in text)
+ * 2. Physical faults: Fix items in category order (with "PHYSICAL INSPECTION" heading if not in text)
  * Never overwrites mechanic text, checks duplicates, updates UI live without full re-render.
  */
 function addSharedResultsToFindings() {
@@ -8334,13 +8915,35 @@ function addSharedResultsToFindings() {
     inspDraft.inspection.items = {};
   }
 
-  // Gather pending scan items
-  const addedCodes = inspDraft.inspection.obd.codes;
-  const pendingScanItems = (inspDraft.inspection.enableObd && Array.isArray(obdScanResults))
-    ? obdScanResults.filter((s) => !addedCodes.some((c) => c.code === s.code))
-    : [];
+  // 1. Gather pending DTC items
+  const dtcBlocks = [];
+  const codes = inspDraft.inspection.obd.codes;
+  codes.forEach((c) => {
+    const inserted = obdFindingText[c.code];
+    const isInserted = inserted && (typeof inserted === "object" ? curVal.includes(inserted.baseEntry) : curVal.includes(inserted));
 
-  // Gather pending physical items: Fix items in category order
+    if (!isInserted) {
+      const entryText = formatDtcFindingEntry(c);
+      obdFindingText[c.code] = { baseEntry: entryText, lastVerified: (c.verified || "").trim() };
+      if (!curVal.includes(entryText)) {
+        dtcBlocks.push(entryText);
+      }
+    } else {
+      const lastVer = typeof inserted === "object" ? (inserted.lastVerified || "") : "";
+      const curVer = (c.verified || "").trim();
+      if (curVer && curVer !== lastVer) {
+        const updateText = `Verified update (${c.code}): ${curVer}`;
+        if (!curVal.includes(updateText)) {
+          dtcBlocks.push(updateText);
+        }
+        if (typeof inserted === "object") {
+          inserted.lastVerified = curVer;
+        }
+      }
+    }
+  });
+
+  // 2. Gather pending physical items: Fix items in category order
   const pendingPhysItems = [];
   if (inspDraft.inspection.enablePhysical && inspDraft.inspection.items) {
     INSPECTION_CHECKLIST.forEach((cat) => {
@@ -8363,7 +8966,7 @@ function addSharedResultsToFindings() {
   }
 
   // If nothing is waiting to be added
-  if (pendingScanItems.length === 0 && pendingPhysItems.length === 0) {
+  if (dtcBlocks.length === 0 && pendingPhysItems.length === 0) {
     showSharedBarFeedback("Nothing new to add.", 2000);
     return;
   }
@@ -8371,33 +8974,13 @@ function addSharedResultsToFindings() {
   // Build blocks to append
   let textToAppend = "";
 
-  // 1. Scan results
-  if (pendingScanItems.length > 0) {
-    const scanBlocks = [];
-    pendingScanItems.forEach((item) => {
-      // Add to draft codes
-      inspDraft.inspection.obd.codes.push({
-        code: item.code,
-        desc: `${item.part}: ${item.desc}`,
-        part: item.part,
-        err: item.err,
-        checks: Array.isArray(item.checks) ? [...item.checks] : [],
-        parts: Array.isArray(item.parts) ? [...item.parts] : []
-      });
-      const entryText = formatObdFindingText(item);
-      obdFindingText[item.code] = entryText;
-      if (!curVal.includes(entryText)) {
-        scanBlocks.push(entryText);
-      }
-    });
-
-    if (scanBlocks.length > 0) {
-      const headingNeeded = !curVal.includes("ECU/OBD SCAN");
-      if (headingNeeded) {
-        textToAppend += (textToAppend ? "\n\n" : "") + "ECU/OBD SCAN\n" + scanBlocks.join("\n\n");
-      } else {
-        textToAppend += (textToAppend ? "\n\n" : "") + scanBlocks.join("\n\n");
-      }
+  // 1. DTC blocks
+  if (dtcBlocks.length > 0) {
+    const headingNeeded = !curVal.includes("ECU/OBD CODES");
+    if (headingNeeded) {
+      textToAppend += (textToAppend ? "\n\n" : "") + "ECU/OBD CODES\n" + dtcBlocks.join("\n\n");
+    } else {
+      textToAppend += (textToAppend ? "\n\n" : "") + dtcBlocks.join("\n\n");
     }
   }
 
@@ -8453,18 +9036,64 @@ function addSharedResultsToFindings() {
     }
   }
 
-  // Update OBD results area (cards flip to "✓ Added" with "Added to Final Findings below")
-  renderObdScanResultsArea();
-  renderObdAddedCodes();
-
-  // Flip per-item buttons to "✓ Added"
+  // Update card buttons
+  codes.forEach((c) => renderDtcCardActionBtn(c.code));
   updateAllItemFindingsButtons();
-
-  // Update the shared bar summary text
   updateSharedAddToFindingsBar();
-
-  // Show shared bar feedback "Added to Final Findings below"
   showSharedBarFeedback("Added to Final Findings below", 2500);
+}
+
+/**
+ * Builds HTML for displaying an OBD code summary row/card in Step 3, Job Card, and Service History.
+ * Displays: code, error code (if any), component, description, verified findings, and "n of m steps done" when steps exist.
+ * Fully compatible with legacy { code, desc } objects.
+ * @param {Object} c - OBD code object.
+ * @returns {string} HTML string.
+ */
+function getObdCodeSummaryDisplayHtml(c) {
+  if (!c || !c.code) return "";
+  const code = escHtml(c.code);
+  const errPill = c.err ? `<span class="dtc-err-pill">${escHtml(c.err)}</span>` : "";
+  const partText = c.part ? `<b>${escHtml(c.part)}</b>` : "";
+  let descText = c.desc || "";
+  if (c.part && descText.startsWith(c.part + ": ")) {
+    descText = descText.slice(c.part.length + 2).trim();
+  }
+  const cleanDesc = escHtml(descText);
+
+  let compAndDesc = "";
+  if (partText && cleanDesc) {
+    compAndDesc = `${partText}: ${cleanDesc}`;
+  } else if (partText) {
+    compAndDesc = partText;
+  } else if (cleanDesc) {
+    compAndDesc = cleanDesc;
+  }
+
+  let stepsDoneBadge = "";
+  if (Array.isArray(c.checks) && c.checks.length > 0) {
+    const total = c.checks.length;
+    const doneCount = Array.isArray(c.done) ? c.done.filter(Boolean).length : 0;
+    stepsDoneBadge = `<span class="obd-steps-badge" style="font-size:11px;color:var(--text-muted);background:var(--bg-subtle, #F1F5F9);padding:1px 6px;border-radius:4px;border:1px solid var(--border)">${doneCount} of ${total} steps done</span>`;
+  }
+
+  const verifiedRaw = typeof c.verified === "string" ? c.verified.trim() : "";
+  const verifiedVal = verifiedRaw ? escHtml(verifiedRaw) : "Not recorded";
+
+  return `
+    <div class="obd-summary-entry" style="font-size:12px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-surface-alt, #F8FAFC);display:flex;flex-direction:column;gap:4px">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <span class="dtc-code-pill">${code}</span>
+        ${errPill}
+        ${compAndDesc ? `<span style="color:var(--text-primary)">${compAndDesc}</span>` : ""}
+        ${stepsDoneBadge}
+      </div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">
+        <span style="font-weight:600;color:var(--text-primary)">Verified:</span>
+        <span style="white-space:pre-wrap;color:${verifiedRaw ? 'inherit' : 'var(--text-muted)'}">${verifiedVal}</span>
+      </div>
+    </div>
+  `;
 }
 
 /* ==========================================================
@@ -10035,6 +10664,10 @@ function getInspStep3Html() {
     ? inspDraft.inspection.obd.codes
     : [];
 
+  const obdBike = (inspDraft.inspection && inspDraft.inspection.obd && inspDraft.inspection.obd.bike) || null;
+  const scannedVehicle = obdBike ? [obdBike.brand, obdBike.model].filter(Boolean).join(" ") : "";
+  const scannedLine = obdBike ? [scannedVehicle, obdBike.plate].filter(Boolean).join(" • ") : "";
+
   return `
     <div class="insp-stage-body">
       <div style="margin-bottom:16px">
@@ -10054,8 +10687,6 @@ function getInspStep3Html() {
             <div style="font-size:13px;line-height:1.6">
               <div><b>Plate:</b> ${escHtml(inspDraft.plate || "NO PLATE")}</div>
               <div><b>Make &amp; Model:</b> ${escHtml([inspDraft.make, inspDraft.model].filter(Boolean).join(" ") || "Unknown")}</div>
-              <div><b>Model Year:</b> ${escHtml(inspDraft.year ? String(inspDraft.year) : "—")}</div>
-              <div><b>Odometer:</b> ${inspDraft.odo ? Number(inspDraft.odo).toLocaleString() + " km" : "—"}</div>
               <div style="margin-top:8px">
                 <b>Customer Complaints:</b>
                 ${(inspDraft.complaints && inspDraft.complaints.length > 0)
@@ -10118,24 +10749,15 @@ function getInspStep3Html() {
             </div>
           </div>
 
-          <!-- 3. ECU / OBD Trouble Codes Card (Hidden when none) -->
+          <!-- 3. ECU / OBD Diagnostic Codes Card (Hidden when none) -->
           ${obdCodes.length > 0 ? `
             <div class="confirm-summary-card">
               <div class="confirm-card-header">
-                <span style="font-weight:700;font-size:13px;color:var(--text-primary)">ECU / OBD Trouble Codes (${obdCodes.length})</span>
+                <span style="font-weight:700;font-size:13px;color:var(--text-primary)">ECU / OBD Diagnostic Codes (${obdCodes.length})</span>
                 <a href="javascript:void(0)" class="insp-edit-link" onclick="setInspDraftStep(2)">Edit</a>
               </div>
               <div style="display:flex;flex-direction:column;gap:6px">
-                ${obdCodes.map((c) => {
-                  const label = c.part && !c.desc.startsWith(c.part) ? `${c.part}: ${c.desc}` : (c.desc || "");
-                  return `
-                    <div style="font-size:13px;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap">
-                      <span class="obd-primary-code-pill" style="font-size:11px;padding:2px 6px">${escHtml(c.code)}</span>
-                      ${c.err ? `<span class="obd-err-code-pill" style="font-size:11px;padding:1px 6px">${escHtml(c.err)}</span>` : ""}
-                      <span>· ${escHtml(label)}</span>
-                    </div>
-                  `;
-                }).join("")}
+                ${obdCodes.map((c) => getObdCodeSummaryDisplayHtml(c)).join("")}
               </div>
             </div>
           ` : ""}
@@ -10183,7 +10805,6 @@ function getInspStep3Html() {
               <div style="font-weight:700">${escHtml([inspDraft.make, inspDraft.model].filter(Boolean).join(" ") || "Unknown")}</div>
               <div style="font-size:12px;color:var(--text-muted);display:flex;gap:8px;margin-top:2px">
                 <span>Plate: <b>${escHtml(inspDraft.plate || "NO PLATE")}</b></span>
-                ${inspDraft.odo ? `<span>· Odo: <b>${Number(inspDraft.odo).toLocaleString()} km</b></span>` : ""}
               </div>
             </div>
 
@@ -10271,14 +10892,13 @@ function getInspStep3Html() {
  */
 function confirmInspectionJobOrder() {
   readConfirmDomIntoDraft();
+  syncDraftObdBike();
 
   const rawPlate = (inspDraft.plate || "").trim();
   const rawMake = (inspDraft.make || "").trim();
   const rawModel = (inspDraft.model || "").trim();
   const rawCustName = (inspDraft.custName || "").trim();
   const rawCustPhone = (inspDraft.custPhone || "").trim();
-  const year = inspDraft.year ? +inspDraft.year : "";
-  const odo = inspDraft.odo ? +inspDraft.odo : 0;
 
   // Fallbacks
   const plate = rawPlate ? rawPlate.toUpperCase() : "NO PLATE";
@@ -10314,17 +10934,16 @@ function confirmInspectionJobOrder() {
       cid: c.id,
       make: make || "Unknown",
       model: model || "",
-      year: year,
+      year: "",
       plate: plate,
-      odo: odo
+      odo: 0
     };
     D.bk.push(b);
   } else {
     b.cid = c.id;
     if (rawMake) b.make = rawMake;
     if (rawModel) b.model = rawModel;
-    if (year) b.year = year;
-    if (odo) b.odo = Math.max(b.odo || 0, odo);
+    // Keep b.year and b.odo untouched; do not update them from this page
   }
 
   // 3. Work order object
@@ -10341,7 +10960,7 @@ function confirmInspectionJobOrder() {
     mech: isMechanic ? u.name : "", // Automatic assignment for Mechanic, unassigned for Admin
     st: "Awaiting Parts/Approval", // per Part 5
     sv: [],
-    odo: odo,
+    // do not set wo.odo
     complaints: complaints,
     notes: notes,
     note: combinedNotes,
@@ -10532,10 +11151,7 @@ function onBillSearchInput(val) {
   if (clr) {
     clr.classList.toggle("visible", val.trim().length > 0);
   }
-  const chipsEl = $("bill-chips");
-  if (chipsEl) {
-    chipsEl.innerHTML = getBillChipsHtml();
-  }
+  updateBillChipsDom();
   const resEl = $("bill-results");
   if (resEl) {
     resEl.innerHTML = getBillResultsHtml();
@@ -10554,10 +11170,43 @@ function clearBillSearch() {
   }
   const clr = $("bill-search-clear");
   if (clr) clr.classList.remove("visible");
-  const chipsEl = $("bill-chips");
-  if (chipsEl) chipsEl.innerHTML = getBillChipsHtml();
+  updateBillChipsDom();
   const resEl = $("bill-results");
   if (resEl) resEl.innerHTML = getBillResultsHtml();
+}
+
+/**
+ * Updates class, aria-pressed, checkmark, and count on all four Transactions & Billing filter chips by filter key.
+ */
+function updateBillChipsDom() {
+  const chips = [
+    { key: "all", label: "All Active", modifier: "all" },
+    { key: "adv", label: "Pending Advances", modifier: "adv" },
+    { key: "final", label: "Pending Final Settlement", modifier: "final" },
+    { key: "done", label: "Completed Transactions", modifier: "done" }
+  ];
+  let allFound = true;
+  chips.forEach((c) => {
+    const el = $(`bill-chip-${c.modifier}`);
+    if (!el) {
+      allFound = false;
+      return;
+    }
+    const isSelected = billFilter === c.key ||
+      (c.key === "adv" && billFilter === "advances") ||
+      (c.key === "final" && billFilter === "settlement") ||
+      (c.key === "done" && billFilter === "completed");
+    const count = getFilteredBillOrders(c.key).length;
+
+    el.className = `bill-chip bill-chip--${c.modifier}${isSelected ? " is-selected" : ""}`;
+    el.setAttribute("aria-pressed", isSelected ? "true" : "false");
+    el.innerHTML = `${isSelected ? '<span class="bill-chip-check" aria-hidden="true">✓ </span>' : ""}${c.label} <span class="bill-chip-count">(${count})</span>`;
+  });
+
+  if (!allFound) {
+    const chipsEl = $("bill-chips");
+    if (chipsEl) chipsEl.innerHTML = getBillChipsHtml();
+  }
 }
 
 /**
@@ -10570,8 +11219,7 @@ function setBillFilter(f) {
   if (f === "settlement") f = "final";
   if (f === "completed") f = "done";
   billFilter = f;
-  const chipsEl = $("bill-chips");
-  if (chipsEl) chipsEl.innerHTML = getBillChipsHtml();
+  updateBillChipsDom();
   const resEl = $("bill-results");
   if (resEl) resEl.innerHTML = getBillResultsHtml();
 }
@@ -10581,8 +11229,7 @@ function setBillFilter(f) {
  */
 function refreshBillView() {
   if (view === "bill") {
-    const chipsEl = $("bill-chips");
-    if (chipsEl) chipsEl.innerHTML = getBillChipsHtml();
+    updateBillChipsDom();
     const resEl = $("bill-results");
     if (resEl) resEl.innerHTML = getBillResultsHtml();
   }
@@ -10672,7 +11319,7 @@ function getBillResultsHtml() {
               }
 
               const isQuickLabor = o.type === "QUICK LABOR" || o.type === "quicklabor";
-              const typeBadge = isQuickLabor ? "QUICK LABOR" : "REPAIR SERVICE";
+              const typeBadge = isQuickLabor ? `QUICK LABOR · ${getQuickLaborSubtypeLabel(o)}` : "REPAIR SERVICE";
               const typeClass = isQuickLabor ? "badge-txn-type ql" : "badge-txn-type";
               const dateLine = isQuickLabor
                 ? formatJobDate(o.done || o.at)
@@ -11321,7 +11968,7 @@ function openReceipt(woId) {
     <div style="text-align:center;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:16px">
       <div style="display:flex;justify-content:center;margin-bottom:4px;color:var(--text)">${ICONS.bike}</div>
       <h2 style="margin:4px 0 2px;font-size:22px;color:var(--text)">MotoShop</h2>
-      <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em">${(o.type === "QUICK LABOR" || o.type === "quicklabor") ? "Quick Fix Receipt" : "Official Repair &amp; Service Receipt"}</div>
+      <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em">${(o.type === "QUICK LABOR" || o.type === "quicklabor") ? `Quick Fix Receipt · ${escHtml(getQuickLaborSubtypeLabel(o))}` : "Official Repair &amp; Service Receipt"}</div>
       <div style="font-size:13px;font-weight:700;color:var(--accent);margin-top:6px">${(o.type === "QUICK LABOR" || o.type === "quicklabor") ? (o.no || o.txnId || getTxnId(o)) : jo}</div>
       <div style="font-size:11px;color:var(--text-muted)">${formatJobDate(pay.paidAt || today())} · ${formatJobTime(pay.paidAt || "")}</div>
     </div>
@@ -11344,7 +11991,10 @@ function openReceipt(woId) {
       </div>
       <div>
         <div style="color:var(--text-muted);font-weight:600">STATUS</div>
-        <div>${badge(o.st)}</div>
+        <div>
+          ${badge(o.st)}
+          ${(o.type === "QUICK LABOR" || o.type === "quicklabor") ? `<span class="badge" style="font-size:10px;font-weight:700;margin-left:4px">${escHtml(getQuickLaborSubtypeLabel(o))}</span>` : ""}
+        </div>
       </div>
     </div>
 
@@ -12068,9 +12718,14 @@ function getPermissionsMatrixHtml() {
       </table>
 
       <div style="margin-top:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
-        <p style="margin:0;font-size:13px;color:var(--text-muted);font-style:italic">
-          This controls which pages each role can open. It hides pages in the browser only and is not real security.
-        </p>
+        <div>
+          <p style="margin:0 0 4px;font-size:13px;color:var(--text-muted);font-style:italic">
+            Quick Labor is the Quick Labor tab only. POS includes Quick Sales, Quick Labor, and Transactions &amp; Billing.
+          </p>
+          <p style="margin:0;font-size:13px;color:var(--text-muted);font-style:italic">
+            This controls which pages each role can open. It hides pages in the browser only and is not real security.
+          </p>
+        </div>
         <button
           type="button"
           id="btn-matrix-reset"
@@ -12110,6 +12765,7 @@ function toggleMatrixPermission(role, pageKey, checked) {
   }
   currentNav[role] = list;
   currentNav._v = 2;
+  currentNav._q = 1;
 
   try {
     localStorage.setItem("moto1_nav", JSON.stringify(currentNav));
@@ -12632,21 +13288,12 @@ function getReportResultsHtml() {
     `<div class="card st"><div class="ic" style="background:${bg}">${i}</div><div><small>${l}</small><b>${n}</b>${t}</div></div>`;
 
   // Super Admin extras: Gross Profit and Mechanic Commission
-  let grossProfitCard = "";
   let mechanicCommissionCard = "";
 
   if (isSuper()) {
     const totalRevenue = metrics.revenue + posSalesTotal;
     const partsCost = getPeriodPartsCost(reportPeriod);
     const grossProfit = totalRevenue - partsCost;
-
-    grossProfitCard = stat(
-      ICONS.money,
-      "",
-      "GROSS PROFIT",
-      P(grossProfit),
-      `<span style="display:block;font-size:11px;color:var(--text-muted);margin-top:2px;line-height:1.2">Items without a cost price are counted as 0 cost.</span>`
-    );
 
     let totalCommLabor = 0;
     let totalCommAmt = 0;
@@ -12675,7 +13322,7 @@ function getReportResultsHtml() {
           <span>${ICONS.user}</span>
           <span>Mechanic Commission</span>
         </div>
-        <p style="margin:0 0 16px 0;font-size:13px;color:var(--text-secondary)">Commission earned on labor revenue from completed jobs in the selected period.</p>
+        <p style="margin:0 0 16px 0;font-size:13px;color:var(--text-secondary)">Commission earned on labor revenue from completed jobs in the selected period. Total gross profit: <b>${P(grossProfit)}</b>.</p>
         ${commRows.length ? `
           <div class="tw">
             <table>
@@ -12733,7 +13380,6 @@ function getReportResultsHtml() {
     <!-- KPI Row -->
     <div class="reports-kpi-grid">
       ${stat(ICONS.money, "", "REVENUE", P(metrics.revenue), "Paid in period")}
-      ${grossProfitCard}
       ${stat(LINE_ICONS.rep, "", "LABOR EARNINGS", P(metrics.labor), "From services")}
       ${stat(LINE_ICONS.cat, "", "PARTS BILLED", P(metrics.parts), "From items/fluids")}
       ${stat(LINE_ICONS.pos, "", "QUICK SALES", P(posSalesTotal), `${posSalesCount} sale${posSalesCount === 1 ? "" : "s"}`)}
@@ -14195,12 +14841,12 @@ function getPosViewHtml() {
 /** In-memory cart items for active Quick Labor ticket. */
 let quickLaborCart = [];
 
-/** Active job type: "fix" (Fix + Parts) | "parts" (Parts Only). Default is "fix". */
-let qlJobType = "fix";
+/** Active job type: "labor" (Labor Only) | "laborparts" (Labor + Parts). Default is "labor". */
+let qlJobType = "labor";
 
-/** Two-step inline confirmation flag when switching to "Parts Only" with labor in cart. */
-let qlPartsOnlyConfirmActive = false;
-let qlPartsOnlyConfirmTimer = null;
+/** Two-step inline confirmation flag when switching to "Labor Only" with parts in cart. */
+let qlLaborOnlyConfirmActive = false;
+let qlLaborOnlyConfirmTimer = null;
 
 /** Mechanic name selected in Step 1 "Who did the work". */
 let quickLaborMech = "";
@@ -14252,9 +14898,9 @@ function initDefaultQuickLaborMech() {
  */
 function resetQuickLaborState() {
   quickLaborCart = [];
-  qlJobType = "fix";
-  qlPartsOnlyConfirmActive = false;
-  if (qlPartsOnlyConfirmTimer) clearTimeout(qlPartsOnlyConfirmTimer);
+  qlJobType = "labor";
+  qlLaborOnlyConfirmActive = false;
+  if (qlLaborOnlyConfirmTimer) clearTimeout(qlLaborOnlyConfirmTimer);
   quickLaborSearchLabor = "";
   quickLaborSearchPart = "";
   quickLaborCustomer = "";
@@ -14310,8 +14956,32 @@ function getQuickLaborPartsSubtotal() {
  * @returns {number} Grand total in PHP.
  */
 function getQuickLaborTotal() {
-  const labor = qlJobType === "fix" ? getQuickLaborLaborSubtotal() : 0;
-  return labor + getQuickLaborPartsSubtotal();
+  const labor = getQuickLaborLaborSubtotal();
+  const parts = qlJobType === "laborparts" ? getQuickLaborPartsSubtotal() : 0;
+  return labor + parts;
+}
+
+/**
+ * Returns formatted label for Quick Labor subtype.
+ * New subtypes: "labor" -> "Labor Only", "laborparts" -> "Labor + Parts".
+ * Old subtypes (preserved for display): "fix" -> "Fix + Parts", "parts" -> "Parts Only".
+ * @param {Object|string} oOrSubtype
+ * @returns {string} Formatted subtype label.
+ */
+function getQuickLaborSubtypeLabel(oOrSubtype) {
+  let st = typeof oOrSubtype === "string" ? oOrSubtype : (oOrSubtype && oOrSubtype.subtype);
+  if (!st && typeof oOrSubtype === "object" && oOrSubtype) {
+    const hasParts = Array.isArray(oOrSubtype.items) && oOrSubtype.items.some((it) => it.kind === "part");
+    const hasLabor = Array.isArray(oOrSubtype.items) && oOrSubtype.items.some((it) => it.kind === "labor");
+    if (hasLabor && hasParts) st = "fix";
+    else if (hasParts && !hasLabor) st = "parts";
+    else st = "labor";
+  }
+  if (st === "labor") return "Labor Only";
+  if (st === "laborparts") return "Labor + Parts";
+  if (st === "fix") return "Fix + Parts";
+  if (st === "parts") return "Parts Only";
+  return "Labor Only";
 }
 
 /**
@@ -14335,33 +15005,40 @@ function getQuickLaborInCartQty(catId, kind) {
 }
 
 /**
- * Switches active Quick Labor job type with two-step inline confirmation if labor lines exist.
- * @param {"fix"|"parts"} type - Target job type.
+ * Switches active Quick Labor job type with two-step inline confirmation if parts exist.
+ * Switching to "Labor Only" asks confirmation before removing parts lines.
+ * Switching to "Labor + Parts" keeps all labor lines.
+ * @param {"labor"|"laborparts"} type - Target job type.
  */
 function setQuickLaborJobType(type) {
-  if (type === "parts") {
-    const hasLabor = quickLaborCart.some((it) => it.kind === "labor");
-    if (hasLabor) {
-      if (!qlPartsOnlyConfirmActive) {
-        qlPartsOnlyConfirmActive = true;
-        renderQuickLaborTypeBar();
-        if (qlPartsOnlyConfirmTimer) clearTimeout(qlPartsOnlyConfirmTimer);
-        qlPartsOnlyConfirmTimer = setTimeout(() => {
-          qlPartsOnlyConfirmActive = false;
+  if (type === "labor") {
+    if (qlJobType === "laborparts") {
+      const hasParts = quickLaborCart.some((it) => it.kind === "part");
+      if (hasParts) {
+        if (!qlLaborOnlyConfirmActive) {
+          qlLaborOnlyConfirmActive = true;
           renderQuickLaborTypeBar();
-        }, 3000);
-        return;
+          if (qlLaborOnlyConfirmTimer) clearTimeout(qlLaborOnlyConfirmTimer);
+          qlLaborOnlyConfirmTimer = setTimeout(() => {
+            qlLaborOnlyConfirmActive = false;
+            renderQuickLaborTypeBar();
+          }, 3000);
+          return;
+        }
+        // Confirmed second tap: strip part lines from cart
+        quickLaborCart = quickLaborCart.filter((it) => it.kind !== "part");
+        qlLaborOnlyConfirmActive = false;
+        if (qlLaborOnlyConfirmTimer) clearTimeout(qlLaborOnlyConfirmTimer);
       }
-      // Confirmed: strip labor lines from cart
-      quickLaborCart = quickLaborCart.filter((it) => it.kind !== "labor");
-      qlPartsOnlyConfirmActive = false;
-      if (qlPartsOnlyConfirmTimer) clearTimeout(qlPartsOnlyConfirmTimer);
     }
-    qlJobType = "parts";
+    qlJobType = "labor";
+    qlLaborOnlyConfirmActive = false;
+    if (qlLaborOnlyConfirmTimer) clearTimeout(qlLaborOnlyConfirmTimer);
   } else {
-    qlJobType = "fix";
-    qlPartsOnlyConfirmActive = false;
-    if (qlPartsOnlyConfirmTimer) clearTimeout(qlPartsOnlyConfirmTimer);
+    // Target: "laborparts"
+    qlJobType = "laborparts";
+    qlLaborOnlyConfirmActive = false;
+    if (qlLaborOnlyConfirmTimer) clearTimeout(qlLaborOnlyConfirmTimer);
   }
   renderQuickLaborLeftCol();
   renderQuickLaborRightPanel();
@@ -14370,6 +15047,7 @@ function setQuickLaborJobType(type) {
 
 /**
  * Generates HTML for the Job Type segmented control bar.
+ * Two options: "Labor Only" (default) and "Labor + Parts".
  * @returns {string} HTML string.
  */
 function getQuickLaborTypeBarHtml() {
@@ -14377,20 +15055,21 @@ function getQuickLaborTypeBarHtml() {
     <div class="ql-type-bar" role="group" aria-label="Job Type">
       <button
         type="button"
-        class="ql-type-btn ${qlJobType === 'fix' ? 'active' : ''}"
-        onclick="setQuickLaborJobType('fix')"
-        aria-pressed="${qlJobType === 'fix' ? 'true' : 'false'}"
+        id="ql-type-btn-labor"
+        class="ql-type-btn ${qlJobType === 'labor' ? 'active' : ''} ${qlLaborOnlyConfirmActive ? 'confirm-remove' : ''}"
+        onclick="setQuickLaborJobType('labor')"
+        aria-pressed="${qlJobType === 'labor' ? 'true' : 'false'}"
       >
-        Fix + Parts
+        ${qlLaborOnlyConfirmActive ? "Tap again to remove parts" : "Labor Only"}
       </button>
       <button
         type="button"
-        id="ql-type-btn-parts"
-        class="ql-type-btn ${qlJobType === 'parts' ? 'active' : ''} ${qlPartsOnlyConfirmActive ? 'confirm-remove' : ''}"
-        onclick="setQuickLaborJobType('parts')"
-        aria-pressed="${qlJobType === 'parts' ? 'true' : 'false'}"
+        id="ql-type-btn-laborparts"
+        class="ql-type-btn ${qlJobType === 'laborparts' ? 'active' : ''}"
+        onclick="setQuickLaborJobType('laborparts')"
+        aria-pressed="${qlJobType === 'laborparts' ? 'true' : 'false'}"
       >
-        ${qlPartsOnlyConfirmActive ? "Tap again to remove labor" : "Parts Only"}
+        Labor + Parts
       </button>
     </div>
   `;
@@ -14817,10 +15496,7 @@ function addCatalogPartToQuickLabor(catId) {
 function getQuickLaborChosenPartsHtml() {
   const partLines = quickLaborCart.filter((it) => it.kind === "part");
   if (partLines.length === 0) {
-    if (qlJobType === "fix") {
-      return `<div class="ql-empty-hint">No parts added. Add the parts replaced, if any.</div>`;
-    }
-    return `<div class="ql-empty-hint">No parts added yet. Add at least one replacement part.</div>`;
+    return `<div class="ql-empty-hint">Add the parts replaced.</div>`;
   }
 
   const isSuperUser = typeof isSuper === "function" && isSuper();
@@ -15217,7 +15893,7 @@ function setQuickLaborWorkFinished(checked) {
  */
 function renderQuickLaborStep4Badge() {
   const badge = $("ql-step-4-badge");
-  const stepNum = qlJobType === "fix" ? "4" : "3";
+  const stepNum = qlJobType === "laborparts" ? "4" : "3";
   if (badge) {
     badge.className = `ql-step-badge ${qlWorkFinished ? "done" : "active"}`;
     badge.textContent = qlWorkFinished ? "✓" : stepNum;
@@ -15240,6 +15916,11 @@ function getQuickLaborCashCalcHtml(total, tendered) {
 
 /**
  * Computes disabled reason text for the Record Quick Fix button.
+ * Reasons (checked in priority order):
+ * 1. "Select who did the work"
+ * 2. "Add at least one labor"
+ * 3. "Add at least one part" (Labor + Parts only)
+ * 4. "Confirm the work is finished"
  * @param {number} total - Grand total.
  * @returns {string} Reason string or empty if enabled.
  */
@@ -15247,11 +15928,11 @@ function getQuickLaborRecordReason(total = getQuickLaborTotal()) {
   if (!quickLaborMech || !quickLaborMech.trim()) {
     return "Select who did the work";
   }
-  if (qlJobType === "fix" && !quickLaborCart.some((it) => it.kind === "labor")) {
-    return "Add at least one labor service";
+  if (!quickLaborCart.some((it) => it.kind === "labor")) {
+    return "Add at least one labor";
   }
-  if (qlJobType === "parts" && !quickLaborCart.some((it) => it.kind === "part")) {
-    return "Add at least one replacement part";
+  if (qlJobType === "laborparts" && !quickLaborCart.some((it) => it.kind === "part")) {
+    return "Add at least one part";
   }
   if (!qlWorkFinished) {
     return "Confirm the work is finished";
@@ -15289,8 +15970,8 @@ function setQuickLaborMethod(m) {
  */
 function syncQuickLaborSummaryDom() {
   const total = getQuickLaborTotal();
-  const laborSubtotal = qlJobType === "fix" ? getQuickLaborLaborSubtotal() : 0;
-  const partsSubtotal = getQuickLaborPartsSubtotal();
+  const laborSubtotal = getQuickLaborLaborSubtotal();
+  const partsSubtotal = qlJobType === "laborparts" ? getQuickLaborPartsSubtotal() : 0;
 
   const laborEl = $("ql-labor-subtotal");
   if (laborEl) laborEl.textContent = P(laborSubtotal);
@@ -15441,8 +16122,8 @@ function recordQuickFix() {
   const nextNum = maxNum + 1;
   const txnId = "TXN-" + String(nextNum).padStart(4, "0");
 
-  const laborSubtotal = qlJobType === "fix" ? getQuickLaborLaborSubtotal() : 0;
-  const partsSubtotal = getQuickLaborPartsSubtotal();
+  const laborSubtotal = getQuickLaborLaborSubtotal();
+  const partsSubtotal = qlJobType === "laborparts" ? getQuickLaborPartsSubtotal() : 0;
 
   const newFix = {
     id: "w" + uid(),
@@ -15489,6 +16170,8 @@ function recordQuickFix() {
   quickLaborRef = "";
   quickLaborClearConfirmActive = false;
   if (quickLaborClearConfirmTimer) clearTimeout(quickLaborClearConfirmTimer);
+  qlLaborOnlyConfirmActive = false;
+  if (qlLaborOnlyConfirmTimer) clearTimeout(qlLaborOnlyConfirmTimer);
   quickLaborStep1Err = false;
 
   // If logged in as mechanic, keep their name preselected; otherwise reset
@@ -15511,7 +16194,7 @@ function logQuickFix() {
  * @returns {string} HTML string.
  */
 function getQuickLaborLeftColHtml() {
-  const isFix = qlJobType === "fix";
+  const isLaborParts = qlJobType === "laborparts";
 
   return `
     <div id="ql-type-bar-wrap">
@@ -15523,113 +16206,113 @@ function getQuickLaborLeftColHtml() {
       ${getQuickLaborStep1Html()}
     </div>
 
-    <!-- STEP 2: Labor done (Fix + Parts only) -->
-    ${
-      isFix
-        ? `
-          <div class="ql-step-card" id="ql-step-2">
-            <div class="ql-step-header">
-              <div class="ql-step-badge ${quickLaborCart.some((it) => it.kind === 'labor') ? 'done' : 'active'}" id="ql-step-2-badge">
-                ${quickLaborCart.some((it) => it.kind === 'labor') ? '✓' : '2'}
-              </div>
-              <div>
-                <div class="ql-step-title">Labor done</div>
-                <div class="ql-step-subtitle">Select catalog service or add custom labor (required)</div>
-              </div>
-            </div>
-
-            <!-- Search bar with live filter and Enter quick-add -->
-            <div class="rep-search-wrap" style="margin-bottom:12px">
-              <span class="search-icon" onclick="$('ql-search-labor').focus()" title="Search">${LINE_ICONS.insp}</span>
-              <input
-                id="ql-search-labor"
-                type="text"
-                placeholder="Search labor (press Enter to quick-add)..."
-                value="${escHtml(quickLaborSearchLabor)}"
-                autocomplete="off"
-                oninput="onQuickLaborSearchLaborInput(this.value)"
-                onkeydown="if(event.key==='Enter'){event.preventDefault();addFirstQuickLaborMatch('labor');}"
-              />
-              <button
-                id="ql-search-labor-clear"
-                class="search-clear ${quickLaborSearchLabor ? 'visible' : ''}"
-                onclick="clearQuickLaborSearchLabor()"
-                type="button"
-                aria-label="Clear search"
-                title="Clear search"
-              >✕</button>
-            </div>
-
-            <!-- Custom labor inline form container -->
-            <div id="ql-custom-labor-wrap"></div>
-
-            <!-- Labor catalog tiles grid container -->
-            <div id="ql-labor-tiles-grid-wrap">
-              ${getQuickLaborLaborTilesHtml()}
-            </div>
-
-            <!-- Chosen labor lines box -->
-            <div class="ql-chosen-box" id="ql-chosen-labor-wrap">
-              ${getQuickLaborChosenLaborHtml()}
-            </div>
-          </div>
-        `
-        : ""
-    }
-
-    <!-- STEP 3: Parts replaced -->
-    <div class="ql-step-card" id="ql-step-3">
+    <!-- STEP 2: Labor done (Required for both Labor Only and Labor + Parts) -->
+    <div class="ql-step-card" id="ql-step-2">
       <div class="ql-step-header">
-        <div class="ql-step-badge ${quickLaborCart.some((it) => it.kind === 'part') ? 'done' : 'active'}" id="ql-step-3-badge">
-          ${quickLaborCart.some((it) => it.kind === 'part') ? '✓' : (isFix ? '3' : '2')}
+        <div class="ql-step-badge ${quickLaborCart.some((it) => it.kind === 'labor') ? 'done' : 'active'}" id="ql-step-2-badge">
+          ${quickLaborCart.some((it) => it.kind === 'labor') ? '✓' : '2'}
         </div>
         <div>
-          <div class="ql-step-title">Parts replaced</div>
-          <div class="ql-step-subtitle">${isFix ? 'Parts replaced or consumables used (optional)' : 'Replacement parts or consumables sold (required)'}</div>
+          <div class="ql-step-title">Labor done</div>
+          <div class="ql-step-subtitle">Select catalog service or add custom labor (required)</div>
         </div>
       </div>
 
       <!-- Search bar with live filter and Enter quick-add -->
       <div class="rep-search-wrap" style="margin-bottom:12px">
-        <span class="search-icon" onclick="$('ql-search-part').focus()" title="Search">${LINE_ICONS.insp}</span>
+        <span class="search-icon" onclick="$('ql-search-labor').focus()" title="Search">${LINE_ICONS.insp}</span>
         <input
-          id="ql-search-part"
+          id="ql-search-labor"
           type="text"
-          placeholder="Search parts (press Enter to quick-add)..."
-          value="${escHtml(quickLaborSearchPart)}"
+          placeholder="Search labor (press Enter to quick-add)..."
+          value="${escHtml(quickLaborSearchLabor)}"
           autocomplete="off"
-          oninput="onQuickLaborSearchPartInput(this.value)"
-          onkeydown="if(event.key==='Enter'){event.preventDefault();addFirstQuickLaborMatch('part');}"
+          oninput="onQuickLaborSearchLaborInput(this.value)"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();addFirstQuickLaborMatch('labor');}"
         />
         <button
-          id="ql-search-part-clear"
-          class="search-clear ${quickLaborSearchPart ? 'visible' : ''}"
-          onclick="clearQuickLaborSearchPart()"
+          id="ql-search-labor-clear"
+          class="search-clear ${quickLaborSearchLabor ? 'visible' : ''}"
+          onclick="clearQuickLaborSearchLabor()"
           type="button"
           aria-label="Clear search"
           title="Clear search"
         >✕</button>
       </div>
 
-      <!-- Custom part inline form container -->
-      <div id="ql-custom-part-wrap"></div>
+      <!-- Custom labor inline form container -->
+      <div id="ql-custom-labor-wrap"></div>
 
-      <!-- Part catalog tiles grid container -->
-      <div id="ql-part-tiles-grid-wrap">
-        ${getQuickLaborPartTilesHtml()}
+      <!-- Labor catalog tiles grid container -->
+      <div id="ql-labor-tiles-grid-wrap">
+        ${getQuickLaborLaborTilesHtml()}
       </div>
 
-      <!-- Chosen parts lines box -->
-      <div class="ql-chosen-box" id="ql-chosen-part-wrap">
-        ${getQuickLaborChosenPartsHtml()}
+      <!-- Chosen labor lines box -->
+      <div class="ql-chosen-box" id="ql-chosen-labor-wrap">
+        ${getQuickLaborChosenLaborHtml()}
       </div>
     </div>
+
+    <!-- STEP 3: Parts replaced (Labor + Parts only) -->
+    ${
+      isLaborParts
+        ? `
+          <div class="ql-step-card" id="ql-step-3">
+            <div class="ql-step-header">
+              <div class="ql-step-badge ${quickLaborCart.some((it) => it.kind === 'part') ? 'done' : 'active'}" id="ql-step-3-badge">
+                ${quickLaborCart.some((it) => it.kind === 'part') ? '✓' : '3'}
+              </div>
+              <div>
+                <div class="ql-step-title">Parts replaced</div>
+                <div class="ql-step-subtitle">Parts replaced or consumables used (required)</div>
+              </div>
+            </div>
+
+            <!-- Search bar with live filter and Enter quick-add -->
+            <div class="rep-search-wrap" style="margin-bottom:12px">
+              <span class="search-icon" onclick="$('ql-search-part').focus()" title="Search">${LINE_ICONS.insp}</span>
+              <input
+                id="ql-search-part"
+                type="text"
+                placeholder="Search parts (press Enter to quick-add)..."
+                value="${escHtml(quickLaborSearchPart)}"
+                autocomplete="off"
+                oninput="onQuickLaborSearchPartInput(this.value)"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();addFirstQuickLaborMatch('part');}"
+              />
+              <button
+                id="ql-search-part-clear"
+                class="search-clear ${quickLaborSearchPart ? 'visible' : ''}"
+                onclick="clearQuickLaborSearchPart()"
+                type="button"
+                aria-label="Clear search"
+                title="Clear search"
+              >✕</button>
+            </div>
+
+            <!-- Custom part inline form container -->
+            <div id="ql-custom-part-wrap"></div>
+
+            <!-- Part catalog tiles grid container -->
+            <div id="ql-part-tiles-grid-wrap">
+              ${getQuickLaborPartTilesHtml()}
+            </div>
+
+            <!-- Chosen parts lines box -->
+            <div class="ql-chosen-box" id="ql-chosen-part-wrap">
+              ${getQuickLaborChosenPartsHtml()}
+            </div>
+          </div>
+        `
+        : ""
+    }
 
     <!-- STEP 4: Confirm work is finished -->
     <div class="ql-step-card" id="ql-step-4">
       <div class="ql-step-header">
         <div class="ql-step-badge ${qlWorkFinished ? 'done' : 'active'}" id="ql-step-4-badge">
-          ${qlWorkFinished ? '✓' : (isFix ? '4' : '3')}
+          ${qlWorkFinished ? '✓' : (isLaborParts ? '4' : '3')}
         </div>
         <div>
           <div class="ql-step-title">Confirm work is finished</div>
@@ -15651,7 +16334,9 @@ function getQuickLaborLeftColHtml() {
     </div>
 
     <div class="ql-steps-footer-note">
-      Step 2 and 3 can be done in any order, but the job is recorded only after the work is done.
+      ${isLaborParts
+        ? "Steps 2 and 3 can be done in any order, but the job is recorded only after the work is done."
+        : "The job is recorded after the work is done."}
     </div>
   `;
 }
@@ -15670,8 +16355,8 @@ function renderQuickLaborLeftCol() {
  */
 function getQuickLaborRightPanelHtml() {
   const total = getQuickLaborTotal();
-  const laborSubtotal = qlJobType === "fix" ? getQuickLaborLaborSubtotal() : 0;
-  const partsSubtotal = getQuickLaborPartsSubtotal();
+  const laborSubtotal = getQuickLaborLaborSubtotal();
+  const partsSubtotal = qlJobType === "laborparts" ? getQuickLaborPartsSubtotal() : 0;
   const reason = getQuickLaborRecordReason(total);
   const isDisabled = Boolean(reason);
   const isSuperUser = typeof isSuper === "function" && isSuper();
@@ -15682,7 +16367,7 @@ function getQuickLaborRightPanelHtml() {
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-size:15px;font-weight:800;color:var(--text-primary)">Quick Fix Summary</span>
           <span class="badge" style="font-size:11px;font-weight:700;background:var(--bg-subtle);color:var(--text-primary);padding:2px 8px;border-radius:999px;border:1px solid var(--border)">
-            ${qlJobType === 'fix' ? 'Fix + Parts' : 'Parts Only'}
+            ${qlJobType === 'laborparts' ? 'Labor + Parts' : 'Labor Only'}
           </span>
         </div>
         <div style="display:flex;align-items:center;gap:6px">
@@ -15798,20 +16483,20 @@ function getQuickLaborRightPanelHtml() {
 
       <!-- Totals Block -->
       <div class="pos-totals-block" style="margin-top:12px">
+        <div class="pos-totals-row" style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);margin-bottom:4px">
+          <span>Labor Subtotal</span>
+          <span id="ql-labor-subtotal">${P(laborSubtotal)}</span>
+        </div>
         ${
-          qlJobType === "fix"
+          qlJobType === "laborparts"
             ? `
-              <div class="pos-totals-row" style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);margin-bottom:4px">
-                <span>Labor Subtotal</span>
-                <span id="ql-labor-subtotal">${P(laborSubtotal)}</span>
+              <div class="pos-totals-row" style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);margin-bottom:6px">
+                <span>Parts Subtotal</span>
+                <span id="ql-parts-subtotal">${P(partsSubtotal)}</span>
               </div>
             `
             : ""
         }
-        <div class="pos-totals-row" style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);margin-bottom:6px">
-          <span>Parts Subtotal</span>
-          <span id="ql-parts-subtotal">${P(partsSubtotal)}</span>
-        </div>
         <div class="pos-totals-row grand-total" style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:8px">
           <span style="font-size:14px;font-weight:700">Total</span>
           <span id="ql-total-val" style="font-size:16px;font-weight:800;color:var(--text)">${P(total)}</span>
@@ -15949,7 +16634,7 @@ function getQuickLaborViewHtml() {
     <div class="card top">
       <div>
         <h1>Quick Labor</h1>
-        <p>Record quick fixes: labor with the parts replaced, or parts only.</p>
+        <p>Record quick fixes: labor only, or labor with the parts replaced.</p>
       </div>
     </div>
 

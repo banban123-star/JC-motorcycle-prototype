@@ -391,15 +391,17 @@ const ROLES = {
 const DEFAULT_ROLE_NAV = {
   admin:      ["dash", "cust", "insp", "rep", "pos", "ql", "cat", "bill", "his", "reports"],
   superadmin: ["dash", "cust", "insp", "rep", "pos", "ql", "cat", "bill", "his", "reports", "users"],
-  mechanic:   ["dash", "insp", "rep", "qlabor"]
+  mechanic:   ["dash", "insp", "rep", "pos", "ql", "bill"]
 };
 const ROLE_NAV = DEFAULT_ROLE_NAV;
 
 /**
  * Returns allowed primary/admin navigation route keys for a role.
  * Reads custom permissions matrix from localStorage key "moto1_nav", falling back to defaults.
- * Automatically migrates legacy matrices (marker _v: 2) to grant full primary nav to Super Admin once.
- * Migrates mechanic list (marker _q: 1) to grant "qlabor" once.
+ * Automatically migrates legacy matrices:
+ *   _v: 2 grants full primary nav to Super Admin once.
+ *   _q: 1 migrated mechanic to dedicated "qlabor".
+ *   _p: 1 grants full POS tabs ("pos", "ql", "bill") to Mechanic and removes "qlabor" once.
  * Super Admin always has "users", and Admin and Super Admin always have "dash", regardless of stored matrix.
  * @param {string} role - System role key.
  * @returns {Array<string>} Allowed route keys.
@@ -444,6 +446,24 @@ function getRoleNav(role) {
         matrix.mechanic = [...DEFAULT_ROLE_NAV.mechanic];
       }
       matrix._q = 1;
+      localStorage.setItem("moto1_nav", JSON.stringify(matrix));
+    } catch (e) {}
+  }
+
+  // Migration for _p: 1 (gives mechanic full POS tabs: "pos", "ql", "bill", removing "qlabor" once)
+  if (matrix && typeof matrix === "object" && !matrix._p) {
+    try {
+      if (Array.isArray(matrix.mechanic)) {
+        matrix.mechanic = matrix.mechanic.filter((k) => k !== "qlabor");
+        ["pos", "ql", "bill"].forEach((k) => {
+          if (!matrix.mechanic.includes(k)) {
+            matrix.mechanic.push(k);
+          }
+        });
+      } else {
+        matrix.mechanic = [...DEFAULT_ROLE_NAV.mechanic];
+      }
+      matrix._p = 1;
       localStorage.setItem("moto1_nav", JSON.stringify(matrix));
     } catch (e) {}
   }
@@ -1752,7 +1772,9 @@ function syncViewForRole() {
   const allowed = getRoleNav(u.activeRole);
   if (allowed.length > 0) {
     if (!allowed.includes(view)) {
-      if (allowed.includes("dash")) {
+      if (view === "qlabor" && (allowed.includes("pos") || allowed.includes("ql"))) {
+        go("pos");
+      } else if (allowed.includes("dash")) {
         go("dash");
       } else {
         go(allowed[0]);
@@ -12720,7 +12742,7 @@ function getPermissionsMatrixHtml() {
       <div style="margin-top:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
         <div>
           <p style="margin:0 0 4px;font-size:13px;color:var(--text-muted);font-style:italic">
-            Quick Labor is the Quick Labor tab only. POS includes Quick Sales, Quick Labor, and Transactions &amp; Billing.
+            POS includes Quick Sales, Quick Labor, and Transactions &amp; Billing. The 'Quick Labor' row opens the Quick Labor tab only.
           </p>
           <p style="margin:0;font-size:13px;color:var(--text-muted);font-style:italic">
             This controls which pages each role can open. It hides pages in the browser only and is not real security.
@@ -12766,6 +12788,7 @@ function toggleMatrixPermission(role, pageKey, checked) {
   currentNav[role] = list;
   currentNav._v = 2;
   currentNav._q = 1;
+  currentNav._p = 1;
 
   try {
     localStorage.setItem("moto1_nav", JSON.stringify(currentNav));
@@ -16714,6 +16737,8 @@ function initAuth() {
       targetPage = hashKey;
     } else if (session.view && canOpen(session.view)) {
       targetPage = session.view;
+    } else if ((hashKey === "qlabor" || session.view === "qlabor") && canOpen("pos")) {
+      targetPage = "pos";
     } else if (allowed.length > 0) {
       targetPage = allowed.includes("dash") ? "dash" : allowed[0];
     }
@@ -16757,8 +16782,12 @@ if (typeof window !== "undefined") {
     const u = getCurrentUser();
     if (!u) return;
     const hashKey = (window.location && window.location.hash ? window.location.hash : "").replace(/^#/, "").trim();
-    if (hashKey && hashKey !== view && canOpen(hashKey)) {
-      go(hashKey);
+    if (hashKey && hashKey !== view) {
+      if (canOpen(hashKey)) {
+        go(hashKey);
+      } else if (hashKey === "qlabor" && canOpen("pos")) {
+        go("pos");
+      }
     }
   });
 }

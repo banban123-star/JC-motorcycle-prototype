@@ -779,17 +779,6 @@ function isCountableSale(s) {
   return true;
 }
 
-/**
- * Generic countable checker for either work order or sale.
- * @param {object} record
- * @returns {boolean}
- */
-function isCountable(record) {
-  if (!record) return false;
-  if (record.reversed || record.cancel || record.st === "Cancelled" || record.void) return false;
-  return true;
-}
-
 
 /**
  * Computes avatar initials from a display name (e.g. "Shop Owner" -> "SO", "Mike" -> "M").
@@ -4536,29 +4525,6 @@ function mCard(id) {
   openInspModal(id);
 }
 
-/**
- * Short for "move". Advances or regresses a work order along the status pipeline.
- * When completed: sets completion date and updates bike odometer.
- * @param {string} id - Work order ID.
- * @param {number} d - Direction delta (+1 to advance, -1 to rewind).
- */
-function mv(id, d) {
-  const o = g("wo", id);
-  o.st = ST[ST.indexOf(o.st) + d];
-
-  if (o.st == "Completed") {
-    o.done = nowLocalIso();
-    const b = bike(o.bid);
-    if (o.odo > b.odo) {
-      b.odo = o.odo;
-    }
-  }
-
-  save();
-  go(view);
-  mCard(id);
-}
-
 let catSearch = "";
 let catModalKind = "labor";
 
@@ -5029,10 +4995,6 @@ function importCatCsv() {
     if (wrap) wrap.innerHTML = getCatTableHtml();
   }
 }
-
-/** Legacy aliases for catalog modals */
-function mPt() { openAddCatalogModal("part"); }
-function mSv() { openAddCatalogModal("labor"); }
 
 
 /* ==========================================================
@@ -7107,21 +7069,6 @@ function getPhysicalInspectionCounts() {
 }
 
 /**
- * Returns formatted header text: "27 items · All OK" or "27 items · 2 Fix · 1 Watch".
- * @param {{ total: number, ok: number, watch: number, fix: number }} counts
- * @returns {string}
- */
-function getPhysicalCountsSummaryText(counts) {
-  if (counts.fix === 0 && counts.watch === 0) {
-    return `${counts.total} items · All OK`;
-  }
-  const parts = [];
-  if (counts.fix > 0) parts.push(`${counts.fix} Fix`);
-  if (counts.watch > 0) parts.push(`${counts.watch} Watch`);
-  return `${counts.total} items · ${parts.join(" · ")}`;
-}
-
-/**
  * Computes the set of zone keys flagged by the active customer complaints.
  * @returns {Set<string>}
  */
@@ -7317,51 +7264,6 @@ function selectInspectionZone(zoneKey) {
 
   selectedInspectionZone = zoneKey;
   renderPhysicalInspectionWorkspace();
-}
-
-/**
- * Clean inline SVG vector illustration of a side-view motorcycle (~360px wide).
- * @returns {string} HTML string.
- */
-function getMotorcycleMapSvgHtml() {
-  return `
-    <svg class="bike-map-svg" viewBox="0 0 360 210" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <ellipse cx="180" cy="186" rx="145" ry="6" fill="#F1F5F9" />
-      <circle cx="70" cy="140" r="42" stroke="#94A3B8" stroke-width="8" fill="#F8FAFC" />
-      <circle cx="70" cy="140" r="30" stroke="#CBD5E1" stroke-width="2" fill="none" />
-      <circle cx="70" cy="140" r="12" fill="#94A3B8" />
-      <circle cx="70" cy="140" r="20" stroke="#64748B" stroke-width="2" stroke-dasharray="3 3" fill="none" />
-      <circle cx="290" cy="140" r="42" stroke="#94A3B8" stroke-width="8" fill="#F8FAFC" />
-      <circle cx="290" cy="140" r="30" stroke="#CBD5E1" stroke-width="2" fill="none" />
-      <circle cx="290" cy="140" r="12" fill="#94A3B8" />
-      <circle cx="290" cy="140" r="24" stroke="#64748B" stroke-width="3" stroke-dasharray="4 2" fill="none" />
-      <rect x="298" y="125" width="10" height="18" rx="3" fill="#DC2626" />
-      <path d="M70 140 L135 130" stroke="#64748B" stroke-width="6" stroke-linecap="round" />
-      <path d="M100 135 L135 88" stroke="#64748B" stroke-width="5" stroke-linecap="round" />
-      <path d="M108 123 L127 98" stroke="#94A3B8" stroke-width="7" stroke-dasharray="3 4" stroke-linecap="round" />
-      <path d="M70 140 L150 142" stroke="#64748B" stroke-width="3" stroke-dasharray="5 3" />
-      <circle cx="150" cy="142" r="10" fill="#64748B" />
-      <path d="M165 140 Q150 162 110 160 L50 148" stroke="#64748B" stroke-width="6" stroke-linecap="round" />
-      <path d="M85 155 L45 147" stroke="#0F172A" stroke-width="10" stroke-linecap="round" />
-      <rect x="140" y="105" width="62" height="45" rx="10" fill="#E2E8F0" stroke="#94A3B8" stroke-width="3" />
-      <line x1="148" y1="116" x2="194" y2="116" stroke="#94A3B8" stroke-width="2" />
-      <line x1="148" y1="124" x2="194" y2="124" stroke="#94A3B8" stroke-width="2" />
-      <line x1="152" y1="132" x2="190" y2="132" stroke="#94A3B8" stroke-width="2" />
-      <circle cx="178" cy="132" r="8" fill="#CBD5E1" stroke="#94A3B8" stroke-width="2" />
-      <path d="M135 130 L160 85 L242 54" stroke="#64748B" stroke-width="6" stroke-linecap="round" />
-      <path d="M160 85 L140 105" stroke="#64748B" stroke-width="5" stroke-linecap="round" />
-      <path d="M202 105 L242 54" stroke="#64748B" stroke-width="5" stroke-linecap="round" />
-      <path d="M290 140 L242 54" stroke="#64748B" stroke-width="6" stroke-linecap="round" />
-      <path d="M285 140 L238 54" stroke="#CBD5E1" stroke-width="3" stroke-linecap="round" />
-      <path d="M242 54 L236 36" stroke="#0F172A" stroke-width="4" stroke-linecap="round" />
-      <line x1="228" y1="36" x2="246" y2="38" stroke="#0F172A" stroke-width="5" stroke-linecap="round" />
-      <path d="M246 54 L258 56 L254 68 Z" fill="#E2E8F0" stroke="#64748B" stroke-width="2" />
-      <path d="M180 58 C195 44, 230 46, 240 56 C232 72, 195 76, 180 72 Z" fill="#E2E8F0" stroke="#94A3B8" stroke-width="3" />
-      <path d="M115 76 C135 70, 165 70, 182 72 C180 82, 130 84, 115 76 Z" fill="#0F172A" stroke="#0F172A" stroke-width="2" />
-      <path d="M115 76 L75 92 C65 106, 60 115, 58 122" stroke="#94A3B8" stroke-width="4" stroke-linecap="round" />
-      <rect x="70" y="88" width="6" height="8" rx="2" fill="#DC2626" />
-    </svg>
-  `;
 }
 
 /**
@@ -7712,16 +7614,6 @@ function toggleInspectionType(type, checked) {
 }
 
 /**
- * Ensures the OBD scanner motorcycle selection object is initialized.
- * Prefills from inspDraft when not yet set.
- * @returns {Object} The bike selection object.
- */
-function initObdScanDraft() {
-  syncDraftObdBike();
-  return inspDraft.inspection.obd.bike;
-}
-
-/**
  * Computes the reference string for the ECU card subtitle.
  * @returns {string} Reference string ("Unknown" when blank).
  */
@@ -7730,16 +7622,6 @@ function getObdReferenceText() {
   const model = (inspDraft.model || "").trim();
   const combined = [brand, model].filter(Boolean).join(" ");
   return combined || "Unknown";
-}
-
-/**
- * Updates the live Reference text in Card 2 ECU / OBD DIAGNOSTIC CODES.
- */
-function updateObdReferenceSubtitle() {
-  const subEl = $("ecu-reference-sub");
-  if (subEl) {
-    subEl.textContent = `Reference: ${getObdReferenceText()}`;
-  }
 }
 
 /**
@@ -10435,119 +10317,6 @@ function updateItemFaultNote(catKey, itKey, note) {
 }
 
 /**
- * Adds a standard service package as a labor line in Stage 2 Diagnosis.
- * @param {string} woId - Work order ID.
- * @param {string} svcId - Service ID from D.sv.
- */
-function addStandardServiceToDiag(woId, svcId) {
-  const o = g("wo", woId);
-  const s = g("sv", svcId);
-  if (!o || !s) return;
-
-  o.items = Array.isArray(o.items) ? o.items : [];
-  o.items.push({
-    id: uid(),
-    kind: "labor",
-    name: s.name,
-    qty: 1,
-    price: s.labor || 0,
-    done: false
-  });
-
-  save();
-  renderInspModal(woId);
-}
-
-/**
- * Adds a custom needed part item in Stage 2 Diagnosis.
- * @param {string} woId - Work order ID.
- */
-function addCustomPartToDiag(woId) {
-  const o = g("wo", woId);
-  if (!o) return;
-
-  const name = v("diag-part-name");
-  const qty = Math.max(1, +v("diag-part-qty") || 1);
-  const price = Math.max(0, +v("diag-part-price") || 0);
-
-  if (!name) return;
-
-  o.items = Array.isArray(o.items) ? o.items : [];
-  o.items.push({
-    id: uid(),
-    kind: "part",
-    name: name,
-    qty: qty,
-    price: price,
-    done: false
-  });
-
-  save();
-  renderInspModal(woId);
-}
-
-/**
- * Removes an estimated item from Stage 2 Diagnosis.
- * @param {string} woId - Work order ID.
- * @param {string} itemId - Item ID.
- */
-/**
- * Updates quantity or unit price of an estimated item in Stage 2 Diagnosis.
- * @param {string} woId - Work order ID.
- * @param {string} itemId - Item ID.
- * @param {string} field - "qty" or "price".
- * @param {string|number} val - New value.
- */
-function updateDiagItem(woId, itemId, field, val) {
-  const o = g("wo", woId);
-  if (!o || !Array.isArray(o.items)) return;
-  const item = o.items.find((i) => i.id === itemId);
-  if (!item) return;
-  if (field === "qty") item.qty = Math.max(1, +val || 1);
-  if (field === "price") item.price = Math.max(0, +val || 0);
-  save();
-  renderInspModal(woId);
-}
-
-/**
- * Updates quantity or unit price of an extra part in Stage 3 Repair.
- * @param {string} woId - Work order ID.
- * @param {string} extraId - Extra part record ID.
- * @param {string} field - "qty" or "price".
- * @param {string|number} val - New value.
- */
-function updateExtraPart(woId, extraId, field, val) {
-  const o = g("wo", woId);
-  if (!o || !Array.isArray(o.extra)) return;
-  const item = o.extra.find((x) => x.id === extraId);
-  if (!item) return;
-  if (field === "qty") item.qty = Math.max(1, +val || 1);
-  if (field === "price") item.price = Math.max(0, +val || 0);
-  save();
-  renderInspModal(woId);
-}
-
-function removeDiagItem(woId, itemId) {
-  const o = g("wo", woId);
-  if (!o || !Array.isArray(o.items)) return;
-  o.items = o.items.filter((x) => x.id !== itemId);
-  save();
-  renderInspModal(woId);
-}
-
-/**
- * Toggles customer estimate approval state in Stage 2 Diagnosis.
- * @param {string} woId - Work order ID.
- */
-function toggleCustomerApproval(woId) {
-  const o = g("wo", woId);
-  if (!o) return;
-  o.approved = !o.approved;
-  save();
-  renderInspModal(woId);
-}
-
-/**
  * Calculates labor, parts, and total amounts for inspDraft.items.
  * Treats items with src: "own" as zero cost.
  * @returns {{ labor: number, parts: number, total: number }}
@@ -10950,19 +10719,6 @@ function confirmInspectionJobOrder() {
   }
 }
 
-
-/**
- * Removes an extra part from Stage 3 Repair.
- * @param {string} woId - Work order ID.
- * @param {string} extraId - Extra part record ID.
- */
-function removeExtraPart(woId, extraId) {
-  const o = g("wo", woId);
-  if (!o || !Array.isArray(o.extra)) return;
-  o.extra = o.extra.filter((x) => x.id !== extraId);
-  save();
-  renderInspModal(woId);
-}
 
 
 /**
@@ -13563,25 +13319,6 @@ function formatPosDateTime(dtStr) {
 }
 
 /**
- * Formats time component of local timestamp (e.g. "2:30 PM").
- * @param {string} dtStr - Timestamp string.
- * @returns {string} Formatted time string.
- */
-function formatPosTime(dtStr) {
-  if (!dtStr) return "";
-  const parts = String(dtStr).split(" ");
-  const timePart = parts[1] || "";
-  if (!timePart) return "";
-  const timePieces = timePart.split(":");
-  let hr = parseInt(timePieces[0], 10);
-  const min = timePieces[1] || "00";
-  if (isNaN(hr)) return timePart;
-  const ampm = hr >= 12 ? "PM" : "AM";
-  hr = hr % 12 || 12;
-  return `${hr}:${min} ${ampm}`;
-}
-
-/**
  * Generates the next sequential sale receipt number based on the highest existing number + 1.
  * Supports both legacy "POS-XXXX" and current "QS-XXXX" numbers.
  * Format: "QS-0001", "QS-0002", etc.
@@ -13635,14 +13372,6 @@ function resetPosState() {
  */
 function getPosSubtotal() {
   return posCart.reduce((sum, item) => sum + (Number(item.price) || 0) * (Number(item.qty) || 0), 0);
-}
-
-/**
- * Returns validated discount amount (always 0 for active sales).
- * @returns {number} Discount in PHP.
- */
-function getPosDiscount() {
-  return 0;
 }
 
 /**
@@ -13952,15 +13681,6 @@ function togglePosCustomForm(open) {
       if (inp) inp.focus();
     }, 50);
   }
-}
-
-/**
- * Sets kind ("labor" or "part") for custom item creation.
- * @param {string} kind - "labor" | "part"
- */
-function setPosCustomKind(kind) {
-  posCustomKind = kind === "part" ? "part" : "labor";
-  renderPosGrid();
 }
 
 /**
@@ -15806,33 +15526,6 @@ function removeQuickLaborCartLine(key) {
 /** Backward compatibility alias */
 function updateQuickLaborCartFee(key, newFee) {
   updateQuickLaborLinePrice(key, newFee);
-}
-
-/** Backward compatibility alias */
-function addToQuickLabor(item) {
-  if (!item) return;
-  if (item.custom) {
-    quickLaborCart.push({
-      key: uid(),
-      id: null,
-      kind: item.kind,
-      name: item.name,
-      price: Number(item.price) || 0,
-      origPrice: Number(item.price) || 0,
-      qty: 1,
-      custom: true,
-      override: false
-    });
-  } else if (item.kind === "labor") {
-    addCatalogLaborToQuickLabor(item.id);
-    return;
-  } else {
-    addCatalogPartToQuickLabor(item.id);
-    return;
-  }
-  renderQuickLaborLeftCol();
-  renderQuickLaborRightPanel();
-  updateQuickLaborMobileBar();
 }
 
 /**

@@ -17,23 +17,6 @@ const $ = (id) => document.getElementById(id);
 const uid = () => Math.random().toString(36).slice(2, 8);
 
 /**
- * Navigation two-tone color specifications (Google Workspace style).
- * Main color + lighter tint pairs.
- */
-const NAV_COLORS = {
-  dash:    { main: "var(--nav-dash, #2563EB)",    tint: "var(--nav-dash-tint, #BFDBFE)" },
-  cust:    { main: "var(--nav-cust, #7C3AED)",    tint: "var(--nav-cust-tint, #DDD6FE)" },
-  insp:    { main: "var(--nav-insp, #0891B2)",    tint: "var(--nav-insp-tint, #A5F3FC)" },
-  rep:     { main: "var(--nav-rep, #EA580C)",     tint: "var(--nav-rep-tint, #FED7AA)" },
-  pos:     { main: "var(--nav-pos, #D97706)",     tint: "var(--nav-pos-tint, #FDE68A)" },
-  cat:     { main: "var(--nav-cat, #059669)",     tint: "var(--nav-cat-tint, #A7F3D0)" },
-  bill:    { main: "var(--nav-bill, #16A34A)",    tint: "var(--nav-bill-tint, #BBF7D0)" },
-  his:     { main: "var(--nav-his, #4F46E5)",     tint: "var(--nav-his-tint, #C7D2FE)" },
-  reports: { main: "var(--nav-reports, #DB2777)", tint: "var(--nav-reports-tint, #FBCFE8)" },
-  users:   { main: "var(--nav-users, #475569)",   tint: "var(--nav-users-tint, #CBD5E1)" }
-};
-
-/**
  * Preserved single-color line icons for non-sidebar elements (KPI cards, search bars, tables).
  */
 const LINE_ICONS = {
@@ -2198,9 +2181,6 @@ const V = [
   ["reports", "📊", "Reports"],
   ["users", "🛡️", "User Management"]
 ];
-
-/** Route keys placed under the PRIMARY NAVIGATION section. */
-const PRIMARY_NAV_KEYS = ["dash", "cust", "insp", "rep", "qlabor", "pos", "ql", "cat", "bill", "his"];
 
 /** Route keys placed under the ADMINISTRATION & SUPPORT section. */
 const ADMIN_NAV_KEYS = ["reports", "users"];
@@ -5821,7 +5801,6 @@ let sharedBarFeedbackTimer = null;
 let inspDraft = createFreshInspDraft();
 let inspDraftStep = 1;
 let selectedPhysRailCat = null;
-let inspPendingObdCode = null;
 
 /**
  * Resets the inspection draft to initial empty state.
@@ -5837,7 +5816,6 @@ function resetInspDraft() {
   dtcSelectedVariantCode = null;
   syncDraftObdBike();
   selectedPhysRailCat = null;
-  inspPendingObdCode = null;
   selectedInspectionZone = null;
   obdFindingText = {};
   physFindingText = {};

@@ -1182,7 +1182,6 @@ function adjustSidebarPopupPosition() {
 }
 
 if (typeof window !== "undefined") {
-  window.addEventListener("resize", adjustSidebarPopupPosition);
   window.addEventListener("scroll", adjustSidebarPopupPosition, true);
   window.addEventListener("orientationchange", adjustSidebarPopupPosition);
 }
@@ -4232,62 +4231,24 @@ function closeRecord() {
 /**
  * Closes modal when user clicks on the backdrop outside the dialog card.
  */
-$("ov").onclick = (e) => {
-  if (e.target.id == "ov") {
-    cm();
+[
+  ["ov", cm],
+  ["rec-ov", closeRecord],
+  ["insp-ov", closeInspModal],
+  ["rcpt-ov", closeReceipt],
+  ["adv-ov", closeAdvanceModal],
+  ["settle-ov", closeSettleBalanceModal],
+  ["pos-void-ov", closePosVoidModal]
+].forEach(([id, fn]) => {
+  const el = $(id);
+  if (el) {
+    el.onclick = (e) => {
+      if (e.target.id === id) {
+        fn();
+      }
+    };
   }
-};
-
-$("rec-ov").onclick = (e) => {
-  if (e.target.id == "rec-ov") {
-    closeRecord();
-  }
-};
-
-const inspOvEl = $("insp-ov");
-if (inspOvEl) {
-  inspOvEl.onclick = (e) => {
-    if (e.target.id === "insp-ov") {
-      closeInspModal();
-    }
-  };
-}
-
-const rcptOvEl = $("rcpt-ov");
-if (rcptOvEl) {
-  rcptOvEl.onclick = (e) => {
-    if (e.target.id === "rcpt-ov") {
-      closeReceipt();
-    }
-  };
-}
-
-const advOvEl = $("adv-ov");
-if (advOvEl) {
-  advOvEl.onclick = (e) => {
-    if (e.target.id === "adv-ov") {
-      closeAdvanceModal();
-    }
-  };
-}
-
-const settleOvEl = $("settle-ov");
-if (settleOvEl) {
-  settleOvEl.onclick = (e) => {
-    if (e.target.id === "settle-ov") {
-      closeSettleBalanceModal();
-    }
-  };
-}
-
-const posVoidOvEl = $("pos-void-ov");
-if (posVoidOvEl) {
-  posVoidOvEl.onclick = (e) => {
-    if (e.target.id === "pos-void-ov") {
-      closePosVoidModal();
-    }
-  };
-}
+});
 
 /**
  * Closes modal when user presses the Escape key.

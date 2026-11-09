@@ -357,6 +357,32 @@ function tbl(L, full) {
 }
 
 /**
+ * Helper to compute the authoritative total for a work order.
+ * If the job has item rows, returns labor subtotal + parts subtotal.
+ * If it has no item rows, returns the recorded job total.
+ * @param {Object} job - Work order object.
+ * @returns {number} Numeric total in PHP.
+ */
+function jobTotalOf(job) {
+  if (!job) return 0;
+  if (Array.isArray(job.items) && job.items.length) {
+    let laborSub = 0;
+    let partsSub = 0;
+    job.items.forEach((it) => {
+      const isLabor = it.kind === "labor";
+      const qty = isLabor ? 1 : Math.max(1, Number(it.qty) || 1);
+      if (it.src !== "own") {
+        const price = Math.max(0, Number(it.price) || 0);
+        if (isLabor) laborSub += qty * price;
+        else partsSub += qty * price;
+      }
+    });
+    return laborSub + partsSub;
+  }
+  return total(job);
+}
+
+/**
  * Short for "Modal". Opens the modal overlay and injects HTML into the dialog body.
  * @param {string} h - HTML content string to display inside modal.
  */

@@ -176,124 +176,11 @@ const nowLocalIso = () => {
  */
 
 /**
- * Generates initial demo data when no saved state exists in localStorage.
- * Spreads realistic completed jobs across today, yesterday, last 7 days, last 30 days, last month, and earlier this year.
- * @returns {Object} Database object containing cu, bk, pt, sv, and wo collections.
+ * Generates initial demo data seed.
+ * @returns {Object} Database object.
  */
 function seed() {
-  const now = new Date();
-  const pad = (n) => (n < 10 ? "0" + n : n);
-  const toLocalIso = (d, h = 9, m = 30) =>
-    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(h)}:${pad(m)}:00`;
-
-  const dToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dYest = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-  const d4DaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 4);
-  const d18DaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 18);
-  const dLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 15);
-  const dEarlierYear = new Date(now.getFullYear(), 0, 20);
-
-  return {
-    cu: [
-      { id: "c1", name: "Juan Dela Cruz", phone: "0917 555 0101" },
-      { id: "c2", name: "Maria Santos", phone: "0918 555 0142" },
-      { id: "c3", name: "Pedro Reyes", phone: "0920 555 0177" }
-    ],
-    bk: [
-      { id: "b1", cid: "c1", make: "Honda", model: "Click 125", year: 2021, plate: "ABC-1234", odo: 18450 },
-      { id: "b2", cid: "c2", make: "Yamaha", model: "Mio i125", year: 2019, plate: "XYZ-9876", odo: 32100 },
-      { id: "b3", cid: "c3", make: "Suzuki", model: "Raider R150", year: 2022, plate: "DEF-5678", odo: 9800 }
-    ],
-    pt: [
-      { id: "p1", sku: "OIL-10W40", name: "Engine oil 10W-40 (1L)", cost: 420 },
-      { id: "p2", sku: "FLT-OIL", name: "Oil filter", cost: 180 },
-      { id: "p3", sku: "BRK-PAD-F", name: "Front brake pads", cost: 650 },
-      { id: "p4", sku: "CVT-BELT", name: "CVT drive belt", cost: 1450 },
-      { id: "p5", sku: "SPK-PLG", name: "Spark plug", cost: 260 },
-      { id: "p6", sku: "GRS-CVT", name: "CVT grease", cost: 150 }
-    ],
-    sv: [
-      { id: "s1", name: "Change oil", labor: 150, parts: ["p1", "p2"] },
-      { id: "s2", name: "Valve clearance", labor: 450, parts: [] },
-      { id: "s3", name: "CVT cleaning", labor: 600, parts: ["p6"] },
-      { id: "s4", name: "Brake overhaul", labor: 500, parts: ["p3"] },
-      { id: "s5", name: "Tune-up", labor: 350, parts: ["p5"] }
-    ],
-    wo: [
-      { id: "w1", bid: "b1", mech: "Larpus", st: "Awaiting Parts/Approval", sv: ["s4"], note: "Squeaking front brake", at: today() },
-      { id: "w2", bid: "b2", mech: "Hiyo", st: "Ready for Pickup", sv: ["s1", "s3"], note: "", at: today() },
-      { id: "w3", bid: "b3", mech: "Hiyo", st: "In Progress", sv: ["s5"], note: "Hard to start", at: today() },
-      {
-        id: "w4",
-        bid: "b1",
-        mech: "Larpus",
-        st: "Completed",
-        sv: ["s1", "s5"],
-        note: "Routine 18,000 km maintenance and oil change",
-        at: toLocalIso(dToday, 8, 30).slice(0, 10),
-        done: toLocalIso(dToday, 11, 15),
-        odo: 18450
-      },
-      {
-        id: "w5",
-        bid: "b2",
-        mech: "Hiyo",
-        st: "Completed",
-        sv: ["s3"],
-        note: "Belt inspection and CVT cleaning due to sluggish acceleration",
-        at: toLocalIso(dYest, 9, 0).slice(0, 10),
-        done: toLocalIso(dYest, 14, 45),
-        odo: 32050
-      },
-      {
-        id: "w6",
-        bid: "b3",
-        mech: "Larpus",
-        st: "Completed",
-        sv: ["s4"],
-        note: "Front brake pads worn down; calipers cleaned and bled",
-        at: toLocalIso(d4DaysAgo, 10, 15).slice(0, 10),
-        done: toLocalIso(d4DaysAgo, 15, 20),
-        odo: 9650
-      },
-      {
-        id: "w7",
-        bid: "b1",
-        mech: "Hiyo",
-        st: "Completed",
-        sv: ["s1", "s2"],
-        note: "Engine tapping sound; valve clearance adjusted to factory specs",
-        at: toLocalIso(d18DaysAgo, 8, 45).slice(0, 10),
-        done: toLocalIso(d18DaysAgo, 13, 10),
-        odo: 17800
-      },
-      {
-        id: "w8",
-        bid: "b2",
-        mech: "Larpus",
-        st: "Completed",
-        sv: ["s1"],
-        note: "Regular 30,000 km oil change and inspection",
-        at: toLocalIso(dLastMonth, 9, 30).slice(0, 10),
-        done: toLocalIso(dLastMonth, 10, 50),
-        odo: 30500
-      },
-      {
-        id: "w9",
-        bid: "b3",
-        mech: "Hiyo",
-        st: "Completed",
-        sv: ["s5"],
-        note: "Full tune-up and spark plug replacement",
-        at: toLocalIso(dEarlierYear, 11, 0).slice(0, 10),
-        done: toLocalIso(dEarlierYear, 16, 30),
-        odo: 7200
-      }
-    ],
-    sales: [],
-    audit: [],
-    commission: {}
-  };
+  return initDatabase();
 }
 
 
@@ -302,48 +189,70 @@ function seed() {
    ========================================================== */
 
 /**
- * In-memory database object. Loads parsed JSON from localStorage key "moto1",
- * or falls back to seed() if not present or invalid.
- * Safely migrates work-order mechanics "Leo" -> "Larpus" and "Mike" -> "Hiyo".
- * Ensures D.sales array exists for Quick Sales records.
+ * Initializes the application database.
+ * Every page reload, overwrites stored state with a fresh deep copy of DEMO_DATA.
+ * Changes made during the session persist to localStorage via save(),
+ * but reset cleanly to the demo seed on the next page reload.
+ * @returns {Object} Fresh database object.
  */
-let D;
-try {
-  D = JSON.parse(localStorage.getItem("moto1"));
-} catch (e) {}
-if (!D) {
-  D = seed();
-} else {
-  let migrated = false;
-  if (!Array.isArray(D.sales)) {
-    D.sales = [];
-    migrated = true;
-  }
-  if (!Array.isArray(D.audit)) {
-    D.audit = [];
-    migrated = true;
-  }
-  if (!D.commission || typeof D.commission !== "object") {
-    D.commission = {};
-    migrated = true;
-  }
-  let mechMigrated = false;
-  if (Array.isArray(D.wo)) {
-    D.wo.forEach((o) => {
-      if (o.mech === "Leo") {
-        o.mech = "Larpus";
-        mechMigrated = true;
-      } else if (o.mech === "Mike") {
-        o.mech = "Hiyo";
-        mechMigrated = true;
-      }
-    });
-  }
-  if (mechMigrated || migrated) {
+function initDatabase() {
+  const seedPt = [
+    { id: "p1", sku: "OIL-10W40", name: "Engine oil 10W-40 (1L)", cost: 420 },
+    { id: "p2", sku: "FLT-OIL", name: "Oil filter", cost: 180 },
+    { id: "p3", sku: "BRK-PAD-F", name: "Front brake pads", cost: 650 },
+    { id: "p4", sku: "CVT-BELT", name: "CVT drive belt", cost: 1450 },
+    { id: "p5", sku: "SPK-PLG", name: "Spark plug", cost: 260 },
+    { id: "p6", sku: "GRS-CVT", name: "CVT grease", cost: 150 }
+  ];
+  const seedSv = [
+    { id: "s1", name: "Change oil", labor: 150, parts: ["p1", "p2"] },
+    { id: "s2", name: "Valve clearance", labor: 450, parts: [] },
+    { id: "s3", name: "CVT cleaning", labor: 600, parts: ["p6"] },
+    { id: "s4", name: "Brake overhaul", labor: 500, parts: ["p3"] },
+    { id: "s5", name: "Tune-up", labor: 350, parts: ["p5"] }
+  ];
+
+  let cu = [];
+  let bk = [];
+  let wo = [];
+  let transactions = [];
+
+  const sourceData = (typeof DEMO_DATA !== "undefined" && DEMO_DATA)
+    ? DEMO_DATA
+    : (typeof window !== "undefined" && window.DEMO_DATA ? window.DEMO_DATA : null);
+
+  if (sourceData) {
     try {
-      localStorage.setItem("moto1", JSON.stringify(D));
+      const raw = JSON.parse(JSON.stringify(sourceData));
+      cu = raw.customers || raw.cu || [];
+      bk = raw.motorcycles || raw.bk || [];
+      wo = raw.jobOrders || raw.wo || [];
+      transactions = raw.transactions || [];
     } catch (e) {}
   }
+
+  const db = {
+    cu: cu,
+    bk: bk,
+    wo: wo,
+    transactions: transactions,
+    pt: seedPt,
+    sv: seedSv,
+    sales: [],
+    audit: [],
+    commission: {}
+  };
+
+  try {
+    localStorage.setItem("moto1", JSON.stringify(db));
+  } catch (e) {}
+
+  return db;
+}
+
+let D = initDatabase();
+if (typeof window !== "undefined") {
+  window.D = D;
 }
 
 /**
@@ -351,6 +260,9 @@ if (!D) {
  */
 const save = () => {
   try {
+    if (typeof window !== "undefined") {
+      window.D = D;
+    }
     localStorage.setItem("moto1", JSON.stringify(D));
   } catch (e) {}
 };
@@ -1015,8 +927,12 @@ if (typeof window !== "undefined") {
   });
   window.addEventListener("mousedown", (e) => {
     if (brandDropdownOpen) {
-      const wrap = e.target.closest(".brand-combobox-wrap");
+      const wrap = e.target.closest("#insp-brand-wrap");
       if (!wrap) closeBrandDropdown();
+    }
+    if (modelDropdownOpen) {
+      const wrap = e.target.closest("#insp-model-wrap");
+      if (!wrap) closeModelDropdown();
     }
     if (dtcComboboxOpen) {
       const wrap = e.target.closest(".dtc-combobox-wrap");
@@ -1860,6 +1776,39 @@ const own = (b) => g("cu", b.cid);
  */
 const bn = (b) => `${b.plate} · ${b.make} ${b.model}`;
 
+/**
+ * Checks if a motorcycle is properly registered:
+ * Must have a valid plate (not empty, not "NO PLATE"),
+ * a known make (not empty, not "Unknown"),
+ * a known model (not empty, not "Unknown"),
+ * and a valid customer/owner (not archived, not "Walk-in Customer").
+ * @param {Object} b - Motorcycle object.
+ * @returns {boolean}
+ */
+function isRegisteredBike(b) {
+  if (!b || b.archived) return false;
+  const plate = (b.plate || "").trim().toUpperCase();
+  if (!plate || plate === "NO PLATE") return false;
+  const make = (b.make || "").trim();
+  if (!make || make.toLowerCase() === "unknown") return false;
+  const model = (b.model || "").trim();
+  if (!model || model.toLowerCase() === "unknown") return false;
+  const c = own(b);
+  if (!c || c.archived) return false;
+  const cname = (c.name || "").trim();
+  if (!cname || cname.toLowerCase() === "walk-in customer") return false;
+  return true;
+}
+
+/**
+ * Returns all properly registered motorcycles with active owners.
+ * Filters out unregistered, unplated ("NO PLATE"), unknown make/model, or walk-in records.
+ * @returns {Array<Object>}
+ */
+function getRegisteredBikes() {
+  return (Array.isArray(D.bk) ? D.bk : []).filter(isRegisteredBike);
+}
+
 
 /* ==========================================================
    5. BILLING CALCULATIONS
@@ -2045,41 +1994,157 @@ const badge = (s) => {
 };
 
 /**
- * Renders an HTML table of work orders.
+ * Helper to compute the authoritative total for a work order.
+ * If the job has item rows, returns labor subtotal + parts subtotal.
+ * If it has no item rows, returns the recorded job total.
+ * @param {Object} job - Work order object.
+ * @returns {number} Numeric total in PHP.
+ */
+function jobTotalOf(job) {
+  if (!job) return 0;
+  const items = getContextItems(job.id, "items");
+  const extra = getContextItems(job.id, "extra");
+  const all = [...items, ...extra];
+  if (all.length > 0) {
+    let laborSub = 0;
+    let partsSub = 0;
+    all.forEach((it) => {
+      const isLabor = it.kind === "labor";
+      const qty = isLabor ? 1 : Math.max(1, Number(it.qty) || 1);
+      if (it.src !== "own") {
+        const price = Math.max(0, Number(it.price) || 0);
+        if (isLabor) laborSub += qty * price;
+        else partsSub += qty * price;
+      }
+    });
+    return laborSub + partsSub;
+  }
+  return total(job);
+}
+
+/**
+ * Returns array of service names for a work order.
+ * @param {Object} o - Work order object.
+ * @returns {Array<string>}
+ */
+function getJobServicesList(o) {
+  if (!o) return [];
+  if (Array.isArray(o.sv) && o.sv.length) {
+    return o.sv.map((i) => (g("sv", i) ? g("sv", i).name : i)).filter(Boolean);
+  }
+  if (Array.isArray(o.items) && o.items.length) {
+    const labor = o.items.filter((i) => i.kind === "labor").map((i) => i.name).filter(Boolean);
+    if (labor.length) return labor;
+    return o.items.map((i) => i.name).filter(Boolean);
+  }
+  if (Array.isArray(o.complaints) && o.complaints.length) {
+    return o.complaints.filter(Boolean);
+  }
+  return [];
+}
+
+/**
+ * Formats services list: first 2 service names separated by commas, then "+N more" if more.
+ * @param {Object} o - Work order object.
+ * @returns {{ display: string, title: string }}
+ */
+function formatJobServicesSummary(o) {
+  const list = getJobServicesList(o);
+  if (!list.length) {
+    return { display: "-", title: "" };
+  }
+  const title = list.join(", ");
+  if (list.length <= 2) {
+    return { display: list.join(", "), title };
+  }
+  const rem = list.length - 2;
+  return { display: `${list.slice(0, 2).join(", ")}, +${rem} more`, title };
+}
+
+/**
+ * Renders an HTML table and responsive mobile cards for work orders.
+ * Shows ONLY: PLATE NO., STATUS, MECHANIC, SERVICES, TOTAL, and Job card button.
  * @param {Array<Object>} L - Array of work order objects.
- * @param {boolean} [full] - True to render services & total columns; false for compact view.
- * @returns {string} HTML table string or empty state placeholder.
+ * @param {boolean} [full] - Unused legacy flag kept for signature compatibility.
+ * @returns {string} HTML string of table and mobile cards.
  */
 function tbl(L, full) {
   if (!L.length) {
     return `<div class="empty">No active jobs. Create a work order to get started.</div>`;
   }
 
-  return `<div class="tw"><table><tr><th>PLATE NO.</th><th>STATUS</th><th>MECHANIC</th>${
-    full ? `<th>SERVICES</th><th class="r">TOTAL</th>` : ""
-  }<th></th></tr>${L.map((o) => {
+  // Desktop Table Rows
+  const tableRows = L.map((o) => {
     const b = bike(o.bid);
-    const svcText = (o.sv && o.sv.length)
-      ? o.sv.map((i) => (g("sv", i) ? g("sv", i).name : i)).join(", ")
-      : (o.items && o.items.length)
-        ? o.items.filter((i) => i.kind === "labor").map((i) => i.name).join(", ") || (o.items[0] ? o.items[0].name : "—")
-        : (o.complaints && o.complaints.length)
-          ? o.complaints.join(", ")
-          : "—";
+    const svc = formatJobServicesSummary(o);
+    const tot = jobTotalOf(o);
 
-    const u = getCurrentUser();
-    const isMech = u && u.activeRole === "mechanic";
-    const isUnassigned = !o.mech || o.mech.trim() === "" || o.mech.trim().toLowerCase() === "unassigned";
-    const mechCell = isMech && isUnassigned
-      ? `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span>Unassigned</span><button type="button" class="btn-take-job" onclick="takeJob('${o.id}')">Take this job</button></div>`
-      : escHtml(o.mech || "Unassigned");
+    return `<tr>
+      <td class="ar-col-plate">
+        <b>${b ? escHtml(b.plate) : "NO PLATE"}</b>
+        ${b ? `<br><small style="color:var(--mu)">${escHtml(b.make + " " + b.model)}</small>` : ""}
+      </td>
+      <td class="ar-col-status">${badge(o.st)}</td>
+      <td class="ar-col-mech">${escHtml(o.mech || "Unassigned")}</td>
+      <td class="ar-col-services" title="${escHtml(svc.title)}">${escHtml(svc.display)}</td>
+      <td class="r ar-col-total" id="ar-row-total-${o.id}">${P(tot)}</td>
+      <td class="r ar-col-action">
+        <button type="button" class="btn g sm ar-btn-jobcard" onclick="openInspModal('${o.id}')">Job card</button>
+      </td>
+    </tr>`;
+  }).join("");
 
-    return `<tr><td><b>${b ? escHtml(b.plate) : "NO PLATE"}</b>${
-      full ? `<br><small style="color:var(--mu)">${b ? escHtml(b.make + " " + b.model) : "Unknown"}</small>` : ""
-    }</td><td>${badge(o.st)}</td><td>${mechCell}</td>${
-      full ? `<td>${svcText}</td><td class="r">${P(total(o))}</td>` : ""
-    }<td class="r"><button class="btn g sm" onclick="openInspModal('${o.id}')">Job card</button></td></tr>`;
-  }).join("")}</table></div>`;
+  // Mobile / Narrow Cards
+  const cards = L.map((o) => {
+    const b = bike(o.bid);
+    const svc = formatJobServicesSummary(o);
+    const tot = jobTotalOf(o);
+
+    return `
+      <div class="ar-card">
+        <div class="ar-card-row ar-card-row-top">
+          <div class="ar-card-plate">
+            <b>${b ? escHtml(b.plate) : "NO PLATE"}</b>
+            ${b ? `<small class="ar-card-sub">${escHtml(b.make + " " + b.model)}</small>` : ""}
+          </div>
+          <div class="ar-card-badge">${badge(o.st)}</div>
+        </div>
+        <div class="ar-card-row ar-card-row-meta">
+          <span class="ar-card-mech">${escHtml(o.mech || "Unassigned")}</span>
+          <b class="ar-card-total" id="ar-card-total-${o.id}">${P(tot)}</b>
+        </div>
+        <div class="ar-card-row ar-card-services" title="${escHtml(svc.title)}">
+          ${escHtml(svc.display)}
+        </div>
+        <button type="button" class="btn g ar-card-btn" onclick="openInspModal('${o.id}')">
+          Job card
+        </button>
+      </div>
+    `;
+  }).join("");
+
+  return `
+    <div class="tw ar-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>PLATE NO.</th>
+            <th>STATUS</th>
+            <th>MECHANIC</th>
+            <th>SERVICES</th>
+            <th class="r">TOTAL</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows}
+        </tbody>
+      </table>
+    </div>
+    <div class="ar-cards" id="ar-cards">
+      ${cards}
+    </div>
+  `;
 }
 
 /**
@@ -2568,15 +2633,96 @@ function getRepChipsHtml() {
 }
 
 /**
- * Builds HTML for the repair results table or friendly empty state.
+ * Clears search and status filters for Active Repairs.
+ */
+function clearRepFilters() {
+  repSearch = "";
+  repFilter = "all";
+  repScope = "all";
+  const inp = $("rep-search-input");
+  if (inp) inp.value = "";
+  const clr = $("rep-search-clear");
+  if (clr) clr.classList.remove("visible");
+  const chipsEl = $("rep-chips");
+  if (chipsEl) chipsEl.innerHTML = getRepChipsHtml();
+  const resEl = $("rep-results");
+  if (resEl) resEl.innerHTML = getRepResultsHtml();
+}
+
+/**
+ * Renders a single active repair work order as a square card in the responsive grid.
+ * Displays plate number, make/model, status badge, mechanic, services, total, and job card button.
+ * Uses safe fallbacks for missing fields to support older saved records.
+ * @param {Object} o - Work order object.
+ * @returns {string} HTML card string.
+ */
+function renderRepCard(o) {
+  if (!o) return "";
+  const b = o.bid ? bike(o.bid) : null;
+  const plate = b && b.plate ? escHtml(b.plate) : "NO PLATE";
+  const makeModel = b ? `${b.make || ""} ${b.model || ""}`.trim() : "";
+  const svcList = getJobServicesList(o);
+  const fullServices = svcList.length ? svcList.join(", ") : "-";
+  const rawTot = jobTotalOf(o);
+  const totVal = (typeof rawTot === "number" && !isNaN(rawTot)) ? rawTot : (Number(rawTot) || 0);
+  const totFormatted = P(totVal);
+  const mechName = o.mech ? escHtml(o.mech) : "Unassigned";
+
+  return `
+    <div class="rep-card" id="rep-card-${o.id}">
+      <div class="rep-card-header">
+        <div class="rep-card-plate-wrap">
+          <b class="rep-card-plate">${plate}</b>
+          ${makeModel ? `<div class="rep-card-sub">${escHtml(makeModel)}</div>` : ""}
+        </div>
+        <div class="rep-card-badge">${badge(o.st)}</div>
+      </div>
+      <div class="rep-card-divider"></div>
+      <div class="rep-card-body">
+        <div class="rep-card-row">
+          <span class="rep-card-label">MECHANIC</span>
+          <span class="rep-card-val">${mechName}</span>
+        </div>
+        <div class="rep-card-row">
+          <span class="rep-card-label">SERVICES</span>
+          <span class="rep-card-val rep-card-services" title="${escHtml(fullServices)}">${escHtml(fullServices)}</span>
+        </div>
+        <div class="rep-card-row">
+          <span class="rep-card-label">TOTAL</span>
+          <b class="rep-card-val rep-card-total" id="ar-card-total-${o.id}">${totFormatted}</b>
+        </div>
+      </div>
+      <button
+        type="button"
+        class="btn g rep-card-btn"
+        onclick="openInspModal('${o.id}')"
+        aria-label="Open job card for ${plate}"
+      >
+        Job card
+      </button>
+    </div>
+  `;
+}
+
+/**
+ * Builds HTML for the repair results grid or friendly empty state.
  * @returns {string} HTML string.
  */
 function getRepResultsHtml() {
   const list = getFilteredRepairs();
   if (!list.length) {
-    return `<div class="empty"><div style="font-weight:700;font-size:15px;color:var(--text-primary);margin-bottom:4px">No repair jobs found.</div><div>Try a different plate number, name, or status.</div></div>`;
+    const hasFilter = Boolean(repSearch || repFilter !== "all" || repScope !== "all");
+    const title = hasFilter ? "No repair jobs found." : "No active repairs found.";
+    const sub = hasFilter ? "Try a different plate number, name, or status." : "Create a work order to get started.";
+    return `
+      <div class="empty rep-empty">
+        <div style="font-weight:700;font-size:15px;color:var(--text-primary);margin-bottom:4px">${title}</div>
+        <div style="margin-bottom:${hasFilter ? '12px' : '0'};color:var(--text-muted)">${sub}</div>
+        ${hasFilter ? `<button type="button" class="btn g sm" onclick="clearRepFilters()">Clear filters</button>` : ""}
+      </div>
+    `;
   }
-  return tbl(list, 1);
+  return list.map((o) => renderRepCard(o)).join("");
 }
 
 /**
@@ -3402,7 +3548,7 @@ const R = {
                 <td>${escHtml(c ? c.name : "-")}<br><small style="color:var(--text-muted)">${escHtml(c ? c.phone : "")}</small></td>
                 <td class="r" style="white-space:nowrap">
                   <button type="button" class="btn g sm" onclick="hisBike='${b.id}';go('his')">History</button>
-                  <button type="button" class="btn sm" onclick="mWO('${b.id}')">New work order</button>
+                  <button type="button" class="btn sm" onclick="startNewInspectionWorkOrder('${b.id}')">New work order</button>
                   <button type="button" class="btn g sm" onclick="openEditBikeModal('${b.id}')">Edit</button>
                   ${isSuper() ? (isArch ? `
                     <button type="button" class="btn g sm" onclick="restoreBike('${b.id}')">Restore</button>
@@ -3436,7 +3582,7 @@ const R = {
     const u = getCurrentUser();
     const isMech = u && u.activeRole === "mechanic";
 
-    return `<div class="card top"><div><h1>Active Repairs</h1><p>Move each job through the work order lifecycle</p></div><button class="btn" onclick="mWO()">+ New work order</button></div>
+    return `<div class="card top"><div><h1>Active Repairs</h1><p>Move each job through the work order lifecycle</p></div><button class="btn" onclick="startNewInspectionWorkOrder()">+ New work order</button></div>
 <div class="rep-search-wrap">
   <span class="search-icon" onclick="$('rep-search-input').focus()" title="Search">${LINE_ICONS.insp}</span>
   <input
@@ -3482,7 +3628,7 @@ ${isMech ? `
   </div>
 ` : ""}
 <div id="rep-chips" class="rep-chips">${getRepChipsHtml()}</div>
-<div id="rep-results" class="card">${getRepResultsHtml()}</div>`;
+<div id="rep-results" class="rep-grid">${getRepResultsHtml()}</div>`;
   },
 
   /**
@@ -4462,56 +4608,25 @@ function deleteBike(bid) {
 }
 
 /**
- * Opens the "New work order" modal.
- * Excludes archived motorcycles from picker.
- * @param {string} [bid] - Optional motorcycle ID to pre-select.
+ * Starts a new work order through the Motorcycle Inspection intake wizard at Step 1.
+ * Optionally pre-populates details if a registered motorcycle ID is provided.
+ * @param {string} [bid] - Optional motorcycle ID.
  */
-function mWO(bid) {
-  const activeBikes = (Array.isArray(D.bk) ? D.bk : []).filter((b) => !b.archived);
-  M(`<h2>New work order</h2><label>Motorcycle</label><select id="wb">${activeBikes.map((b) => `<option value="${b.id}" ${b.id == bid ? "selected" : ""}>${bn(b)} — ${own(b).name}</option>`).join("")}</select>
- <label>Services</label>${D.sv.map((s) => `<label class="chk"><input type="checkbox" name="ws" value="${s.id}">${s.name} — ${P(total({ sv: [s.id] }))}</label>`).join("")}
- <div class="row"><div><label>Mechanic</label><input id="wm" value="Hiyo"></div><div><label>Odometer in (km)</label><input id="wk" type="number"></div></div>
- <label>Customer complaint / notes</label><textarea id="wn" rows="2"></textarea>${acts("addW()")}`);
+function startNewInspectionWorkOrder(bid) {
+  resetInspDraft();
+  inspDraftStep = 1;
+  if (bid) {
+    selectIntakeSuggestion(bid);
+  }
+  go("insp");
 }
 
 /**
- * Validates selected services and saves a new work order to D.wo.
+ * Legacy alias for starting a new work order; redirects to Motorcycle Inspection Step 1.
+ * @param {string} [bid]
  */
-function addW() {
-  // Gathers checked service package checkbox values
-  const sv = [...document.getElementsByName("ws")]
-    .filter((x) => x.checked)
-    .map((x) => x.value);
-
-  if (!sv.length) {
-    let errEl = $("wo-err");
-    if (!errEl) {
-      errEl = document.createElement("div");
-      errEl.id = "wo-err";
-      errEl.style.color = "var(--danger, #DC2626)";
-      errEl.style.fontSize = "13px";
-      errEl.style.fontWeight = "600";
-      errEl.style.marginTop = "8px";
-      const act = document.querySelector(".md .acts") || $("md");
-      if (act) act.parentNode.insertBefore(errEl, act);
-    }
-    errEl.textContent = "Please pick at least one service.";
-    return;
-  }
-
-  const o = {
-    id: uid(),
-    bid: v("wb"),
-    mech: v("wm") || "Unassigned",
-    st: "Queued",
-    sv: sv,
-    note: v("wn"),
-    at: today(),
-    odo: +v("wk") || bike(v("wb")).odo
-  };
-
-  D.wo.push(o);
-  fin();
+function mWO(bid) {
+  startNewInspectionWorkOrder(bid);
 }
 
 
@@ -5013,7 +5128,7 @@ const INSP_STAGES = [
 /**
  * Supported motorcycle brands for ECU/OBD scanner and Step 1 brand combobox.
  */
-const OBD_BRANDS = ["Yamaha", "Honda", "Rusi", "Kawasaki", "Motoposh", "Other"];
+const OBD_BRANDS = ["Yamaha", "Honda", "Suzuki", "Kawasaki", "Rusi", "Motoposh", "Other"];
 
 /**
  * Sample data from the Yamaha Sniper 150 V2 DTC reference.
@@ -5762,6 +5877,7 @@ let sharedBarFeedbackTimer = null;
  */
 let inspDraft = createFreshInspDraft();
 let inspDraftStep = 1;
+let inspDiagView = "inspection";
 let selectedPhysRailCat = null;
 
 /**
@@ -5770,8 +5886,11 @@ let selectedPhysRailCat = null;
 function resetInspDraft() {
   inspDraft = createFreshInspDraft();
   inspDraftStep = 1;
+  inspDiagView = "inspection";
   brandDropdownOpen = false;
   brandHighlightIndex = -1;
+  modelDropdownOpen = false;
+  modelHighlightIndex = -1;
   dtcComboboxOpen = false;
   dtcComboboxHighlight = -1;
   dtcSelectedLibraryEntry = null;
@@ -5839,6 +5958,9 @@ function setInspDraftStep(newStep) {
   syncDraftObdBike();
 
   inspDraftStep = Math.max(1, Math.min(3, newStep));
+  if (inspDraftStep === 2) {
+    inspDiagView = "inspection";
+  }
   if (view === "insp") {
     const mainEl = $("main");
     if (mainEl) mainEl.innerHTML = R.insp();
@@ -5905,47 +6027,225 @@ function getInspViewHtml() {
   `;
 }
 
+/** Active tab in Job Card modal ("cust" | "diag" | "items"). */
+let jcActiveTab = "cust";
+
+/** Previously focused element prior to opening Job Card modal. */
+let lastActiveJobCardTrigger = null;
+
+/**
+ * Switches the active tab in the Job Card modal.
+ * Preserves panel DOM so typed inputs survive switching tabs.
+ * @param {"cust"|"diag"|"items"} tabKey
+ */
+function switchJobCardTab(tabKey) {
+  jcActiveTab = tabKey;
+  const tabs = ["cust", "diag", "items"];
+  tabs.forEach((t) => {
+    const btn = $(`jc-tab-${t}`);
+    const panel = $(`jc-panel-${t}`);
+    const isActive = t === tabKey;
+    if (btn) {
+      btn.classList.toggle("active", isActive);
+      btn.setAttribute("aria-selected", isActive ? "true" : "false");
+    }
+    if (panel) {
+      if (isActive) {
+        panel.removeAttribute("hidden");
+        panel.style.display = "block";
+      } else {
+        panel.setAttribute("hidden", "");
+        panel.style.display = "none";
+      }
+    }
+  });
+  const bodyEl = document.querySelector(".jc-body");
+  if (bodyEl) bodyEl.scrollTop = 0;
+}
+
+/**
+ * Handles Left and Right arrow key navigation across Job Card tabs.
+ * @param {KeyboardEvent} e
+ */
+function handleJobCardTabKeydown(e) {
+  const tabs = ["cust", "diag", "items"];
+  const curIdx = tabs.indexOf(jcActiveTab);
+  if (curIdx === -1) return;
+  if (e.key === "ArrowRight") {
+    e.preventDefault();
+    const nextIdx = (curIdx + 1) % tabs.length;
+    switchJobCardTab(tabs[nextIdx]);
+    const nextBtn = $(`jc-tab-${tabs[nextIdx]}`);
+    if (nextBtn) nextBtn.focus();
+  } else if (e.key === "ArrowLeft") {
+    e.preventDefault();
+    const prevIdx = (curIdx - 1 + tabs.length) % tabs.length;
+    switchJobCardTab(tabs[prevIdx]);
+    const prevBtn = $(`jc-tab-${tabs[prevIdx]}`);
+    if (prevBtn) prevBtn.focus();
+  }
+}
+
+/**
+ * Synchronizes Job Card tab item count, Accounting card numbers, footer total,
+ * and background Active Repairs row/card totals in real time.
+ * @param {string} woId - Work order ID.
+ */
+function syncJobCardTotals(woId) {
+  if (!woId || woId === "draft") return;
+  const o = g("wo", woId);
+  if (!o) return;
+
+  const items = getContextItems(woId, "items");
+  const extra = getContextItems(woId, "extra");
+  const all = [...items, ...extra];
+  const count = all.length;
+
+  const countEl = $("jc-tab-items-count");
+  if (countEl) countEl.textContent = count;
+  const countShortEl = $("jc-tab-items-count-short");
+  if (countShortEl) countShortEl.textContent = count;
+
+  let laborSub = 0;
+  let partsSub = 0;
+  all.forEach((it) => {
+    const isLabor = it.kind === "labor";
+    const qty = isLabor ? 1 : Math.max(1, Number(it.qty) || 1);
+    if (it.src !== "own") {
+      const price = Math.max(0, Number(it.price) || 0);
+      if (isLabor) laborSub += qty * price;
+      else partsSub += qty * price;
+    }
+  });
+
+  const totVal = count > 0 ? (laborSub + partsSub) : jobTotalOf(o);
+
+  const accLabor = $("jc-acc-labor-sub");
+  if (accLabor) accLabor.textContent = P(laborSub);
+  const accParts = $("jc-acc-parts-sub");
+  if (accParts) accParts.textContent = P(partsSub);
+  const accTotal = $("jc-acc-est-total");
+  if (accTotal) accTotal.textContent = P(totVal);
+
+  const accNote = $("jc-acc-stored-note");
+  if (accNote) {
+    accNote.style.display = (count === 0 && totVal > 0) ? "block" : "none";
+  }
+
+  const footerTot = $("jc-footer-total-val");
+  if (footerTot) footerTot.textContent = P(totVal);
+
+  const metaTot = $(`jobcard-meta-total-${woId}`);
+  if (metaTot) metaTot.textContent = P(totVal);
+
+  const listTotCell = $(`ar-row-total-${woId}`);
+  if (listTotCell) listTotCell.textContent = P(totVal);
+  const cardTotCell = $(`ar-card-total-${woId}`);
+  if (cardTotCell) cardTotCell.textContent = P(totVal);
+}
+
 /**
  * Opens the Job Order modal for an active job or new intake.
+ * Always resets active tab to Tab 1 (Customer & bike) and locks scroll.
  * @param {string|null} id - Work order ID.
  */
 function openInspModal(id) {
+  isStageTransitioning = false;
+  lastActiveJobCardTrigger = document.activeElement;
   inspActiveWoId = id;
+  jcActiveTab = "cust";
   renderInspModal(id);
   const ov = $("insp-ov");
   if (ov) {
     ov.classList.add("on");
     ov.focus();
   }
+  document.body.classList.add("jc-scroll-locked");
   document.body.style.overflow = "hidden";
+}
+
+/** Flag to prevent duplicate clicks while a job card stage transition is executing. */
+let isStageTransitioning = false;
+
+/**
+ * Disables all action buttons in the stage bar to prevent duplicate clicks during transition.
+ */
+function disableStageActions() {
+  const actionsEl = document.querySelector(".jobcard-stage-actions");
+  if (actionsEl) {
+    actionsEl.querySelectorAll("button").forEach((btn) => {
+      btn.disabled = true;
+    });
+  }
 }
 
 /**
  * Closes the Job Order inspection modal and refreshes active view if needed.
+ * Returns keyboard focus to the job's "Job card" button if it still exists in the list, otherwise to search input.
  */
 function closeInspModal() {
   const ov = $("insp-ov");
   if (ov) ov.classList.remove("on");
+  const closedWoId = inspActiveWoId;
   inspActiveWoId = null;
+  document.body.classList.remove("jc-scroll-locked");
   document.body.style.overflow = "";
+
   if (view === "rep") {
     const resEl = $("rep-results");
     if (resEl) resEl.innerHTML = getRepResultsHtml();
     const chipsEl = $("rep-chips");
     if (chipsEl) chipsEl.innerHTML = getRepChipsHtml();
+
+    let focused = false;
+    if (closedWoId) {
+      const cardBtn = document.querySelector(`#rep-card-${closedWoId} .rep-card-btn`);
+      if (cardBtn) {
+        try {
+          cardBtn.focus();
+          focused = true;
+        } catch (e) {}
+      }
+    }
+    if (!focused && lastActiveJobCardTrigger && document.body.contains(lastActiveJobCardTrigger)) {
+      try {
+        lastActiveJobCardTrigger.focus();
+        focused = true;
+      } catch (e) {}
+    }
+    if (!focused) {
+      const searchInp = $("rep-search-input");
+      if (searchInp) {
+        try {
+          searchInp.focus();
+        } catch (e) {}
+      }
+    }
   } else if (view === "dash") {
     $("main").innerHTML = R.dash();
+    if (lastActiveJobCardTrigger && document.body.contains(lastActiveJobCardTrigger)) {
+      try {
+        lastActiveJobCardTrigger.focus();
+      } catch (e) {}
+    }
   }
+
+  lastActiveJobCardTrigger = null;
 }
 
 /**
  * Updates status of a work order directly from the Job Card modal.
+ * Closes the Job Card modal upon successful move and returns to Active Repairs.
  * @param {string} woId - Work order ID.
  * @param {string} newStatus - New status from ST array.
  */
 function setJobCardStatus(woId, newStatus) {
+  if (isStageTransitioning) return;
   const o = g("wo", woId);
   if (!o) return;
+  isStageTransitioning = true;
+  disableStageActions();
+
   o.st = newStatus;
   if (newStatus === "Ready for Pickup") {
     o.readyAt = nowLocalIso();
@@ -5958,21 +6258,16 @@ function setJobCardStatus(woId, newStatus) {
     }
   }
   save();
-  renderInspModal(woId);
-  if (view === "rep") {
-    const resEl = $("rep-results");
-    if (resEl) resEl.innerHTML = getRepResultsHtml();
-    const chipsEl = $("rep-chips");
-    if (chipsEl) chipsEl.innerHTML = getRepChipsHtml();
-  } else if (view === "dash") {
-    $("main").innerHTML = R.dash();
-  }
+  closeInspModal();
+  setTimeout(() => {
+    isStageTransitioning = false;
+  }, 100);
 }
 
 /**
- * Renders the read-only Job Card modal for a work order.
- * Displays vehicle metadata, status control strip, complaints, fault inspection,
- * legacy estimates/remarks, and billing redirection if Ready for Pickup.
+ * Renders the 3-tab Job Card modal for a work order.
+ * Tabs: Customer & bike, Complaint & diagnosis, Items & accounting.
+ * Stage bar and total footer remain persistent across all tabs.
  * @param {string|null} id - Work order ID.
  */
 function renderInspModal(id) {
@@ -5981,12 +6276,22 @@ function renderInspModal(id) {
 
   const o = id ? g("wo", id) : null;
   if (!o) {
+    md.className = "insp-md jc-modal";
     md.innerHTML = `
-      <div class="insp-header">
-        <div class="insp-title">Job Card</div>
-        <button type="button" class="insp-close-btn" onclick="closeInspModal()">✕</button>
+      <div class="jc-head">
+        <div class="jc-title-wrap">
+          <div class="jc-title" id="insp-modal-title">Job Card</div>
+          <div class="jc-subtitle">Job card</div>
+        </div>
+        <button type="button" class="jc-close-btn" onclick="closeInspModal()" title="Close" aria-label="Close">✕</button>
       </div>
-      <div class="empty" style="padding:24px">No work order selected.</div>
+      <div class="jc-body">
+        <div class="empty" style="padding:24px">No work order selected.</div>
+      </div>
+      <div class="jc-foot">
+        <div></div>
+        <button type="button" class="btn g jc-btn-close" onclick="closeInspModal()">Close</button>
+      </div>
     `;
     return;
   }
@@ -6001,7 +6306,7 @@ function renderInspModal(id) {
   const isUnassigned = !o.mech || o.mech.trim() === "" || o.mech.trim().toLowerCase() === "unassigned";
   const isAssignedToOther = isMech && !isUnassigned && (o.mech || "").trim().toLowerCase() !== (u.name || "").trim().toLowerCase();
 
-  // Counts & items from inspection: treat unmarked items as OK, list Fix items first, then Watch items
+  // Inspection check totals
   const insp = o.inspection || {};
   const inspItems = insp.items || {};
   let watchCount = 0;
@@ -6025,196 +6330,315 @@ function renderInspModal(id) {
   });
   const watchFixList = [...fixList, ...watchList];
   const okCount = Math.max(0, 27 - (watchCount + fixCount));
-
   const obdCodes = (insp.obd && Array.isArray(insp.obd.codes)) ? insp.obd.codes : [];
-  const legacyItems = Array.isArray(o.items) ? o.items : [];
-  const legacyExtra = Array.isArray(o.extra) ? o.extra : [];
 
-  let html = `
-    <div class="insp-header">
-      <div>
-        <div class="insp-title" id="insp-modal-title">
-          ${b ? escHtml(b.plate) : "NO PLATE"} · ${b ? escHtml(b.make + " " + b.model) : "Unknown"}
-          <span style="color:var(--primary);font-size:16px;margin-left:8px">${jo}</span>
-        </div>
-        <div class="insp-subtitle">Job Order #${o.id} · Read-only Job Card</div>
-      </div>
-      <button type="button" class="insp-close-btn" onclick="closeInspModal()" title="Close dialog" aria-label="Close dialog">✕</button>
-    </div>
+  // Items and Accounting Subtotals
+  const items = getContextItems(o.id, "items");
+  const extraItems = getContextItems(o.id, "extra");
+  const allItems = [...items, ...extraItems];
+  const itemCount = allItems.length;
 
-    <!-- Metadata Grid -->
-    <div class="jobcard-meta-grid">
-      <div><b>Plate Number:</b> ${b ? escHtml(b.plate) : "NO PLATE"}</div>
-      <div><b>Motorcycle:</b> ${b ? escHtml(b.make + " " + b.model + (b.year ? " (" + b.year + ")" : "")) : "Unknown"}</div>
-      <div><b>Customer:</b> ${c ? escHtml(c.name + (c.phone ? " (" + c.phone + ")" : "")) : "Walk-in Customer"}</div>
-      <div><b>Odometer:</b> ${o.odo ? `${Number(o.odo).toLocaleString()} km` : (b && b.odo ? `${Number(b.odo).toLocaleString()} km` : "—")}</div>
-      <div>
-        <b>Assigned Mechanic:</b>
-        ${!isMech ? `
-          <select style="height:32px;font-size:12px;padding:2px 6px;border-radius:6px;border:1px solid var(--border);margin-left:6px" onchange="setJobLeadMechanic('${o.id}', this.value)">
-            <option value="" ${isUnassigned ? "selected" : ""}>Unassigned</option>
-            ${loadUsers().filter(u => u.role === "mechanic" && u.active !== false).map(m => `
-              <option value="${escHtml(m.name)}" ${(!isUnassigned && o.mech && o.mech.trim().toLowerCase() === m.name.toLowerCase()) ? "selected" : ""}>${escHtml(m.name)}</option>
-            `).join("")}
-          </select>
-        ` : `${escHtml(o.mech || "Unassigned")} ${isUnassigned ? `<button type="button" class="btn-take-job" style="margin-left:8px" onclick="takeJob('${o.id}')">Take this job</button>` : ""}`}
-        ${isAssignedToOther ? `<div style="font-size:12px;color:var(--text-muted);margin-top:2px;font-style:italic">Assigned to ${escHtml(o.mech)}</div>` : ""}
-      </div>
-      <div><b>Date In:</b> ${formatJobDate(o.at)}</div>
-      <div><b>Current Status:</b> ${badge(o.st)}</div>
-      <div><b>Total Cost:</b> <b id="jobcard-meta-total-${o.id}">${P(total(o))}</b></div>
-    </div>
+  let laborSub = 0;
+  let partsSub = 0;
+  allItems.forEach((it) => {
+    const isLabor = it.kind === "labor";
+    const qty = isLabor ? 1 : Math.max(1, Number(it.qty) || 1);
+    if (it.src !== "own") {
+      const price = Math.max(0, Number(it.price) || 0);
+      if (isLabor) laborSub += qty * price;
+      else partsSub += qty * price;
+    }
+  });
 
-    <!-- Stage Flow Control Bar -->
-    ${getJobCardStageControlHtml(o)}
-
-    <!-- Recommended Services & Allocated Items Card -->
-    <div class="card" style="padding:16px;margin-bottom:16px;background:#FFFFFF;border:1px solid var(--border)">
-      <div style="font-weight:700;font-size:14px;color:var(--text-primary);margin-bottom:8px">
-        Recommended Services &amp; Allocated Items
-      </div>
-      <div id="${o.id}-items-container">
-        ${getItemsBuilderHtml(o.id, {
-          readOnly: o.st === "Checking" || o.st === "Ready for Pickup" || o.st === "Completed",
-          showLaborDone: o.st === "In Progress",
-          showExtraToggle: o.st === "In Progress"
-        })}
-      </div>
-    </div>
-  `;
-
-  // Ready for pickup notice with direct link to billing
-  if (isReady) {
-    const canBill = canOpen("bill");
-    html += `
-      <div class="card" style="padding:16px;text-align:center;margin-bottom:16px;background:var(--bg-surface-alt);border:1px solid var(--border)">
-        <div style="display:flex;justify-content:center;margin-bottom:4px;color:var(--text-muted)">${ICONS.clipboard}</div>
-        <h4 style="margin:0 0 4px">Vehicle Ready for Billing &amp; Pickup</h4>
-        <p style="color:var(--text-muted);font-size:13px;margin:0 0 12px">All repairs finished. Vehicle awaiting settlement in Transactions &amp; Billing.</p>
-        ${canBill
-          ? `<button type="button" class="btn sm" onclick="closeInspModal(); go('bill');">Go to Transactions &amp; Billing →</button>`
-          : `<div style="font-size:13px;color:var(--text-muted);font-style:italic">Sent to billing. The Admin handles payment.</div>`
-        }
-      </div>
-    `;
-  }
-
-  // Complaints & Notes
+  const totAmount = itemCount > 0 ? (laborSub + partsSub) : jobTotalOf(o);
+  const hasInspData = (okCount + watchCount + fixCount > 0) || obdCodes.length > 0 || Boolean(o.findings && o.findings.trim());
   const compStr = (o.complaints && o.complaints.length) ? o.complaints.map(escHtml).join(", ") : "None";
   const notesStr = o.notes ? escHtml(o.notes) : (o.note ? escHtml(o.note) : "None");
 
-  html += `
-    <div class="card" style="padding:16px;margin-bottom:16px;background:var(--bg-surface-alt);border:1px solid var(--border)">
-      <div style="font-weight:700;font-size:13px;color:var(--text-primary);margin-bottom:8px">Customer Complaints &amp; Requests</div>
-      <div style="font-size:13px;line-height:1.6">
-        <div><b>Complaints:</b> ${compStr}</div>
-        <div><b>Notes:</b> ${notesStr}</div>
+  // Ensure modal container has jc-modal class
+  md.className = "insp-md jc-modal";
+
+  md.innerHTML = `
+    <!-- 1. Header (Always Visible) -->
+    <div class="jc-head">
+      <div class="jc-title-wrap">
+        <div class="jc-title" id="insp-modal-title">
+          <span>${b ? escHtml(b.plate) : "NO PLATE"} · ${b ? escHtml(b.make + " " + b.model + (b.year ? " " + b.year : "")) : "Unknown"}</span>
+          <span class="jc-jo-chip">${escHtml(jo)}</span>
+        </div>
+        <div class="jc-subtitle">Job card</div>
       </div>
+      <button type="button" class="jc-close-btn" onclick="closeInspModal()" title="Close dialog" aria-label="Close dialog">✕</button>
     </div>
-  `;
 
-  // Fault Inspection Summary
-  const hasInspData = (okCount + watchCount + fixCount > 0) || obdCodes.length > 0 || (o.findings && o.findings.trim());
-  html += `
-    <div class="card" style="padding:16px;margin-bottom:16px;background:var(--bg-surface-alt);border:1px solid var(--border)">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div style="display:flex;align-items:center;gap:8px">
-          <div style="font-weight:700;font-size:13px;color:var(--text-primary)">Inspection &amp; Diagnosis Results</div>
-          ${isSuper() && o.st !== "Completed" && o.st !== "Cancelled" ? `
-            <button type="button" class="btn g sm" style="min-height:28px;padding:2px 8px;font-size:11px" onclick="openEditDiagnosisModal('${o.id}')">Edit diagnosis</button>
-          ` : ""}
-        </div>
-        <div style="display:flex;gap:6px">
-          <span class="phys-count-pill ok">OK ${okCount}</span>
-          ${watchCount > 0 ? `<span class="phys-count-pill watch">Watch ${watchCount}</span>` : ""}
-          <span class="phys-count-pill fix">Fix ${fixCount}</span>
-        </div>
-      </div>
-  `;
+    <!-- 2. Stage Bar (Always Visible) -->
+    <div class="jc-stage">
+      ${getJobCardStageControlHtml(o)}
+    </div>
 
-  if (!hasInspData) {
-    html += `
-      <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px">All inspected items OK.</div>
-      <div>
-        <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:4px">Final Findings &amp; Diagnosis Verification:</div>
-        <div style="font-size:13px;color:var(--text-muted)">-</div>
+    <!-- 3. Tabs Navigation Row (Always Visible) -->
+    <div class="jc-tabs" role="tablist" aria-label="Job Card Tabs" onkeydown="handleJobCardTabKeydown(event)">
+      <button
+        type="button"
+        role="tab"
+        id="jc-tab-cust"
+        aria-selected="${jcActiveTab === "cust" ? "true" : "false"}"
+        aria-controls="jc-panel-cust"
+        class="jc-tab ${jcActiveTab === "cust" ? "active" : ""}"
+        onclick="switchJobCardTab('cust')"
+      >
+        <span class="jc-tab-full">Customer &amp; bike</span>
+        <span class="jc-tab-short">Customer</span>
+      </button>
+
+      <button
+        type="button"
+        role="tab"
+        id="jc-tab-diag"
+        aria-selected="${jcActiveTab === "diag" ? "true" : "false"}"
+        aria-controls="jc-panel-diag"
+        class="jc-tab ${jcActiveTab === "diag" ? "active" : ""}"
+        onclick="switchJobCardTab('diag')"
+      >
+        <span class="jc-tab-full">Complaint &amp; diagnosis</span>
+        <span class="jc-tab-short">Complaint</span>
+      </button>
+
+      <button
+        type="button"
+        role="tab"
+        id="jc-tab-items"
+        aria-selected="${jcActiveTab === "items" ? "true" : "false"}"
+        aria-controls="jc-panel-items"
+        class="jc-tab ${jcActiveTab === "items" ? "active" : ""}"
+        onclick="switchJobCardTab('items')"
+      >
+        <span class="jc-tab-full">Items &amp; accounting (<span id="jc-tab-items-count">${itemCount}</span>)</span>
+        <span class="jc-tab-short">Items (<span id="jc-tab-items-count-short">${itemCount}</span>)</span>
+      </button>
+    </div>
+
+    <!-- 4. Tab Panels Container -->
+    <div class="jc-body">
+      <!-- Panel 1: Customer & bike -->
+      <div
+        id="jc-panel-cust"
+        role="tabpanel"
+        aria-labelledby="jc-tab-cust"
+        ${jcActiveTab === "cust" ? "" : "hidden"}
+        style="${jcActiveTab === "cust" ? "display:block" : "display:none"}"
+      >
+        <div class="jc-info-grid">
+          <div class="jc-info-item">
+            <span class="jc-info-label">Plate Number</span>
+            <span class="jc-info-val"><b>${b ? escHtml(b.plate) : "NO PLATE"}</b></span>
+          </div>
+          <div class="jc-info-item">
+            <span class="jc-info-label">Motorcycle</span>
+            <span class="jc-info-val">${b ? escHtml(b.make + " " + b.model + (b.year ? " (" + b.year + ")" : "")) : "Unknown"}</span>
+          </div>
+          <div class="jc-info-item">
+            <span class="jc-info-label">Customer</span>
+            <span class="jc-info-val">${c ? escHtml(c.name + (c.phone ? " (" + c.phone + ")" : "")) : "Walk-in Customer"}</span>
+          </div>
+          <div class="jc-info-item">
+            <span class="jc-info-label">Odometer</span>
+            <span class="jc-info-val">${o.odo ? `${Number(o.odo).toLocaleString()} km` : (b && b.odo ? `${Number(b.odo).toLocaleString()} km` : "—")}</span>
+          </div>
+          <div class="jc-info-item">
+            <span class="jc-info-label">Date In</span>
+            <span class="jc-info-val">${formatJobDate(o.at)}</span>
+          </div>
+          <div class="jc-info-item">
+            <span class="jc-info-label">Assigned Mechanic</span>
+            <div class="jc-info-val" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              ${!isMech ? `
+                <select class="item-inline-select" style="height:36px;font-size:13px;padding:4px 8px;border-radius:6px;border:1px solid var(--border);max-width:240px" onchange="setJobLeadMechanic('${o.id}', this.value)">
+                  <option value="" ${isUnassigned ? "selected" : ""}>Unassigned</option>
+                  ${loadUsers().filter(u => u.role === "mechanic" && u.active !== false).map(m => `
+                    <option value="${escHtml(m.name)}" ${(!isUnassigned && o.mech && o.mech.trim().toLowerCase() === m.name.toLowerCase()) ? "selected" : ""}>${escHtml(m.name)}</option>
+                  `).join("")}
+                </select>
+              ` : `
+                <span>${escHtml(o.mech || "Unassigned")}</span>
+                ${isUnassigned ? `<button type="button" class="btn-take-job" onclick="takeJob('${o.id}')">Take this job</button>` : ""}
+              `}
+              ${isAssignedToOther ? `<span style="font-size:12px;color:var(--text-muted);font-style:italic">Assigned to ${escHtml(o.mech)}</span>` : ""}
+            </div>
+          </div>
+          <div class="jc-info-item">
+            <span class="jc-info-label">Current Status</span>
+            <span class="jc-info-val">${badge(o.st)}</span>
+          </div>
+        </div>
+
+        ${isReady ? `
+          <div class="jc-card" style="padding:16px;text-align:center;background:var(--bg-surface-alt);border:1px solid var(--border)">
+            <div style="display:flex;justify-content:center;margin-bottom:4px;color:var(--text-muted)">${ICONS.clipboard}</div>
+            <h4 style="margin:0 0 4px">Vehicle Ready for Billing &amp; Pickup</h4>
+            <p style="color:var(--text-muted);font-size:13px;margin:0 0 12px">All repairs finished. Vehicle awaiting settlement in Transactions &amp; Billing.</p>
+            ${canOpen("bill")
+              ? `<button type="button" class="btn sm" onclick="closeInspModal(); go('bill');">Go to Transactions &amp; Billing →</button>`
+              : `<div style="font-size:13px;color:var(--text-muted);font-style:italic">Sent to billing. The Admin handles payment.</div>`
+            }
+          </div>
+        ` : ""}
       </div>
-    `;
-  } else {
-    // Watch & Fix list
-    if (watchFixList.length > 0) {
-      html += `
-        <div style="margin-bottom:12px">
-          <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:6px">Noted Faults &amp; Wear Items:</div>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            ${watchFixList.map((wf) => `
-              <div style="font-size:13px;display:flex;align-items:baseline;gap:8px">
-                <span class="fault-badge ${wf.state}">${wf.state.toUpperCase()}</span>
-                <span><b>${escHtml(wf.label)}</b> <span style="font-size:11px;color:var(--text-muted)">(${escHtml(wf.catName)})</span>${wf.note ? ` — <i>${escHtml(wf.note)}</i>` : ""}</span>
+
+      <!-- Panel 2: Complaint & diagnosis -->
+      <div
+        id="jc-panel-diag"
+        role="tabpanel"
+        aria-labelledby="jc-tab-diag"
+        ${jcActiveTab === "diag" ? "" : "hidden"}
+        style="${jcActiveTab === "diag" ? "display:block" : "display:none"}"
+      >
+        <!-- Customer Complaints & Requests Card -->
+        <div class="jc-card">
+          <div style="font-weight:700;font-size:14px;color:var(--text-primary);margin-bottom:10px">Customer Complaints &amp; Requests</div>
+          <div style="font-size:13px;line-height:1.6">
+            <div><b>Complaints:</b> ${compStr}</div>
+            <div style="margin-top:4px"><b>Notes:</b> ${notesStr}</div>
+          </div>
+        </div>
+
+        <!-- Inspection & Diagnosis Results Card -->
+        <div class="jc-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="font-weight:700;font-size:14px;color:var(--text-primary)">Inspection &amp; Diagnosis Results</div>
+              ${isSuper() && o.st !== "Completed" && o.st !== "Cancelled" ? `
+                <button type="button" class="btn g sm" style="min-height:28px;padding:2px 8px;font-size:11px" onclick="openEditDiagnosisModal('${o.id}')">Edit diagnosis</button>
+              ` : ""}
+            </div>
+            <div style="display:flex;gap:6px">
+              <span class="phys-count-pill ok">OK ${okCount}</span>
+              ${watchCount > 0 ? `<span class="phys-count-pill watch">Watch ${watchCount}</span>` : ""}
+              <span class="phys-count-pill fix">Fix ${fixCount}</span>
+            </div>
+          </div>
+
+          ${!hasInspData ? `
+            <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px">All inspected items OK.</div>
+            <div>
+              <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:4px">Final Findings &amp; Diagnosis Verification:</div>
+              <div style="font-size:13px;color:var(--text-muted)">-</div>
+            </div>
+          ` : `
+            ${watchFixList.length > 0 ? `
+              <div style="margin-bottom:12px">
+                <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:6px">Noted Faults &amp; Wear Items:</div>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  ${watchFixList.map((wf) => `
+                    <div style="font-size:13px;display:flex;align-items:baseline;gap:8px">
+                      <span class="fault-badge ${wf.state}">${wf.state.toUpperCase()}</span>
+                      <span><b>${escHtml(wf.label)}</b> <span style="font-size:11px;color:var(--text-muted)">(${escHtml(wf.catName)})</span>${wf.note ? ` — <i>${escHtml(wf.note)}</i>` : ""}</span>
+                    </div>
+                  `).join("")}
+                </div>
               </div>
-            `).join("")}
+            ` : `
+              <div style="margin-bottom:12px">
+                <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:4px">Physical Inspection:</div>
+                <div style="font-size:13px;color:var(--text-muted)">All inspected items OK.</div>
+              </div>
+            `}
+
+            ${obdCodes.length > 0 ? `
+              <div style="margin-bottom:12px">
+                <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:6px">ECU / OBD Diagnostic Codes:</div>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  ${obdCodes.map((c) => getObdCodeSummaryDisplayHtml(c)).join("")}
+                </div>
+              </div>
+            ` : ""}
+
+            <div style="margin-top:8px">
+              <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:4px">Final Findings &amp; Diagnosis Verification:</div>
+              ${o.findings && o.findings.trim()
+                ? `<div style="font-size:13px;white-space:pre-wrap;background:#FFFFFF;border:1px solid var(--border);border-radius:6px;padding:8px 12px">${escHtml(o.findings)}</div>`
+                : `<div style="font-size:13px;color:var(--text-muted)">-</div>`
+              }
+            </div>
+          `}
+        </div>
+
+        ${o.remarks && o.remarks.trim() ? `
+          <div class="jc-card">
+            <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:4px">Mechanic Remarks:</div>
+            <div style="font-size:13px;white-space:pre-wrap">${escHtml(o.remarks)}</div>
+          </div>
+        ` : ""}
+      </div>
+
+      <!-- Panel 3: Items & accounting -->
+      <div
+        id="jc-panel-items"
+        role="tabpanel"
+        aria-labelledby="jc-tab-items"
+        ${jcActiveTab === "items" ? "" : "hidden"}
+        style="${jcActiveTab === "items" ? "display:block" : "display:none"}"
+      >
+        <!-- Recommended Services & Allocated Items Card -->
+        <div class="jc-card">
+          <div style="font-weight:700;font-size:14px;color:var(--text-primary);margin-bottom:10px">
+            Recommended Services &amp; Allocated Items
+          </div>
+          <div id="${o.id}-items-container">
+            ${getItemsBuilderHtml(o.id, {
+              readOnly: o.st === "Checking" || o.st === "Ready for Pickup" || o.st === "Completed",
+              showLaborDone: o.st === "In Progress",
+              showExtraToggle: o.st === "In Progress"
+            })}
           </div>
         </div>
-      `;
-    } else {
-      html += `
-        <div style="margin-bottom:12px">
-          <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:4px">Physical Inspection:</div>
-          <div style="font-size:13px;color:var(--text-muted)">All inspected items OK.</div>
-        </div>
-      `;
-    }
 
-    // OBD Codes
-    if (obdCodes.length > 0) {
-      html += `
-        <div style="margin-bottom:12px">
-          <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:6px">ECU / OBD Diagnostic Codes:</div>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            ${obdCodes.map((c) => getObdCodeSummaryDisplayHtml(c)).join("")}
+        <!-- Accounting Summary Card -->
+        <div class="jc-card">
+          <div style="font-weight:700;font-size:14px;color:var(--text-primary);margin-bottom:10px">
+            Accounting Summary
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
+            <div style="display:flex;justify-content:space-between;color:var(--text-secondary)">
+              <span>Labor Subtotal:</span>
+              <span id="jc-acc-labor-sub" style="font-weight:600;color:var(--text-primary)">${P(laborSub)}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;color:var(--text-secondary)">
+              <span>Parts Subtotal:</span>
+              <span id="jc-acc-parts-sub" style="font-weight:600;color:var(--text-primary)">${P(partsSub)}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);padding-top:8px;margin-top:2px">
+              <span style="font-weight:700;font-size:14px;color:var(--text-primary)">Estimated Total:</span>
+              <b id="jc-acc-est-total" style="font-size:18px;font-weight:800;color:var(--text-primary)">${P(totAmount)}</b>
+            </div>
+            <div id="jc-acc-stored-note" style="font-size:12px;color:var(--text-muted);font-style:italic;display:${itemCount === 0 && totAmount > 0 ? "block" : "none"}">
+              No itemized rows yet. Total comes from the job's recorded amount.
+            </div>
           </div>
         </div>
-      `;
-    }
-
-    // Final Findings & Diagnosis Verification
-    html += `
-      <div style="margin-top:8px">
-        <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:4px">Final Findings &amp; Diagnosis Verification:</div>
-        ${o.findings && o.findings.trim()
-          ? `<div style="font-size:13px;white-space:pre-wrap;background:#FFFFFF;border:1px solid var(--border);border-radius:6px;padding:8px 12px">${escHtml(o.findings)}</div>`
-          : `<div style="font-size:13px;color:var(--text-muted)">-</div>`
-        }
       </div>
-    `;
-  }
-  html += `</div>`;
+    </div>
 
-  // Mechanic Remarks (if present)
-  if (o.remarks && o.remarks.trim()) {
-    html += `
-      <div class="card" style="padding:16px;margin-bottom:16px;background:var(--bg-surface-alt);border:1px solid var(--border)">
-        <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:4px">Mechanic Remarks:</div>
-        <div style="font-size:13px;white-space:pre-wrap">${escHtml(o.remarks)}</div>
+    <!-- 5. Footer (Always Visible) -->
+    <div class="jc-foot">
+      <div class="jc-foot-total">
+        <span>Total</span>
+        <b id="jc-footer-total-val">${P(totAmount)}</b>
       </div>
-    `;
-  }
-
-  // Footer Actions
-  html += `
-    <div class="insp-footer" style="position:static;padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap">
-      ${isSuper() && o.st !== "Completed" && o.st !== "Cancelled" ? `
-        <button type="button" class="btn sm btn-destructive" onclick="forceCancelJob('${o.id}')">Force-Cancel Repair</button>
-      ` : ""}
-      ${isSuper() && (o.st === "Completed" || o.st === "Cancelled" || o.reversed) ? `
-        <button type="button" class="btn g sm" onclick="reopenJob('${o.id}')">Reopen Job</button>
-      ` : ""}
-      <button type="button" class="btn g" onclick="closeInspModal()">Close</button>
-      ${isDone ? `<button type="button" class="btn" onclick="openReceipt('${o.id}')"><span style="display:inline-flex;align-items:center;margin-right:6px">${ICONS.print}</span>View Digital Receipt</button>` : ""}
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        ${isSuper() && o.st !== "Completed" && o.st !== "Cancelled" ? `
+          <button type="button" class="btn sm btn-destructive" onclick="forceCancelJob('${o.id}')">Force-Cancel</button>
+        ` : ""}
+        ${isSuper() && (o.st === "Completed" || o.st === "Cancelled" || o.reversed) ? `
+          <button type="button" class="btn g sm" onclick="reopenJob('${o.id}')">Reopen Job</button>
+        ` : ""}
+        ${isDone ? `
+          <button type="button" class="btn sm" onclick="openReceipt('${o.id}')"><span style="display:inline-flex;align-items:center;margin-right:4px">${ICONS.print}</span>View Digital Receipt</button>
+        ` : ""}
+        <button type="button" class="btn g jc-btn-close" onclick="closeInspModal()">Close</button>
+      </div>
     </div>
   `;
-
-  md.innerHTML = html;
 }
 
 /**
@@ -6723,12 +7147,306 @@ function handleBrandKeydown(e) {
 }
 
 /**
+ * Global state for Step 1 Model combobox.
+ */
+let modelDropdownOpen = false;
+let modelHighlightIndex = -1;
+
+/**
+ * Returns available motorcycle models based on selected brand or all brands if none selected.
+ * Filters results by user input and offers custom values.
+ * Reads from global MOTORCYCLE_MODELS (loaded via motorcycleModels.js).
+ * @param {string} val - Current model input text
+ * @returns {Array<{label: string, value: string, isCustom: boolean}>}
+ */
+function getModelOptions(val) {
+  const currentMake = ((inspDraft.make || "").trim());
+  const modelsCatalog = (typeof MOTORCYCLE_MODELS !== "undefined")
+    ? MOTORCYCLE_MODELS
+    : ((typeof window !== "undefined" && window.MOTORCYCLE_MODELS)
+      ? window.MOTORCYCLE_MODELS
+      : {});
+
+  let modelList = [];
+  if (currentMake) {
+    const brandKey = Object.keys(modelsCatalog).find(
+      (k) => k.toLowerCase() === currentMake.toLowerCase()
+    );
+    if (brandKey && Array.isArray(modelsCatalog[brandKey])) {
+      modelList = [...modelsCatalog[brandKey]];
+    }
+  }
+
+  // If no brand selected or brand has no registered models, combine models from all brands
+  if (!modelList.length) {
+    const all = [];
+    Object.keys(modelsCatalog).forEach((b) => {
+      (modelsCatalog[b] || []).forEach((m) => {
+        if (!all.includes(m)) all.push(m);
+      });
+    });
+    modelList = all;
+  }
+
+  const q = (val || "").trim().toLowerCase();
+  if (!q) {
+    return modelList.map((m) => ({ label: m, value: m, isCustom: false }));
+  }
+
+  const matches = modelList.filter((m) => m.toLowerCase().includes(q));
+  const items = [];
+  const exactMatch = modelList.some((m) => m.toLowerCase() === q);
+
+  if (matches.length > 0) {
+    matches.forEach((m) => items.push({ label: m, value: m, isCustom: false }));
+    if (!exactMatch && (val || "").trim()) {
+      items.push({
+        label: `Use "${(val || "").trim()}"`,
+        value: (val || "").trim(),
+        isCustom: true
+      });
+    }
+  } else if ((val || "").trim()) {
+    items.push({
+      label: `Use "${(val || "").trim()}"`,
+      value: (val || "").trim(),
+      isCustom: true
+    });
+  }
+  return items;
+}
+
+/**
+ * Opens the Step 1 model dropdown listbox.
+ */
+function openModelDropdown() {
+  const listbox = $("insp-model-listbox");
+  const inp = $("insp-model");
+  if (!listbox) return;
+  renderModelDropdownList();
+  listbox.style.display = "block";
+  modelDropdownOpen = true;
+  if (inp) {
+    inp.setAttribute("aria-expanded", "true");
+  }
+}
+
+/**
+ * Closes the Step 1 model dropdown listbox.
+ */
+function closeModelDropdown() {
+  const listbox = $("insp-model-listbox");
+  const inp = $("insp-model");
+  if (!listbox) return;
+  listbox.style.display = "none";
+  modelDropdownOpen = false;
+  modelHighlightIndex = -1;
+  if (inp) {
+    inp.setAttribute("aria-expanded", "false");
+    inp.removeAttribute("aria-activedescendant");
+  }
+}
+
+/**
+ * Renders the model dropdown list with optional hint when no brand is selected.
+ */
+function renderModelDropdownList() {
+  const listbox = $("insp-model-listbox");
+  const inp = $("insp-model");
+  if (!listbox) return;
+
+  const currentVal = inp ? inp.value : (inspDraft.model || "");
+  const currentMake = (inspDraft.make || "").trim();
+  const options = getModelOptions(currentVal);
+
+  let headerHtml = "";
+  if (!currentMake) {
+    headerHtml = `
+      <div style="padding:6px 12px;font-size:11px;color:var(--text-muted);background:#F8FAFC;border-bottom:1px solid var(--border,#E2E8F0);font-weight:600">
+        💡 Pick a brand first for brand-specific models, or choose below:
+      </div>
+    `;
+  } else {
+    headerHtml = `
+      <div style="padding:6px 12px;font-size:11px;color:var(--primary,#2563EB);background:#EFF6FF;border-bottom:1px solid var(--border,#E2E8F0);font-weight:600">
+        🏍️ ${escHtml(currentMake)} Models
+      </div>
+    `;
+  }
+
+  if (!options.length) {
+    listbox.innerHTML = headerHtml + `
+      <div style="padding:10px 14px;color:var(--text-muted);font-size:13px">
+        No models found. Type your own to add.
+      </div>
+    `;
+    return;
+  }
+
+  listbox.innerHTML = headerHtml + options
+    .map((opt, idx) => {
+      const isHighlighted = idx === modelHighlightIndex;
+      const isCustom = opt.isCustom;
+      return `
+        <div
+          id="model-opt-${idx}"
+          class="brand-dropdown-item ${isHighlighted ? "highlighted" : ""} ${isCustom ? "custom-brand-item" : ""}"
+          role="option"
+          aria-selected="${isHighlighted ? "true" : "false"}"
+          onmousedown="event.preventDefault(); selectModelOptionByIndex(${idx})"
+        >
+          <span>${escHtml(opt.label)}</span>
+          ${isCustom ? `<span class="brand-custom-tag">Custom</span>` : ""}
+        </div>
+      `;
+    })
+    .join("");
+
+  updateModelHighlight();
+}
+
+/**
+ * Updates aria and classes for highlighted model combobox option.
+ */
+function updateModelHighlight() {
+  const listbox = $("insp-model-listbox");
+  const inp = $("insp-model");
+  if (!listbox) return;
+
+  const items = listbox.querySelectorAll(".brand-dropdown-item");
+  items.forEach((el, idx) => {
+    const isHigh = idx === modelHighlightIndex;
+    el.classList.toggle("highlighted", isHigh);
+    el.setAttribute("aria-selected", isHigh ? "true" : "false");
+    if (isHigh) {
+      el.scrollIntoView({ block: "nearest" });
+      if (inp) inp.setAttribute("aria-activedescendant", `model-opt-${idx}`);
+    }
+  });
+
+  if (modelHighlightIndex < 0 && inp) {
+    inp.removeAttribute("aria-activedescendant");
+  }
+}
+
+/**
+ * Selects a model option by index in the current option list.
+ * @param {number} idx
+ */
+function selectModelOptionByIndex(idx) {
+  const inp = $("insp-model");
+  const currentVal = inp ? inp.value : (inspDraft.model || "");
+  const options = getModelOptions(currentVal);
+  if (idx >= 0 && idx < options.length) {
+    selectModelOption(options[idx]);
+  }
+}
+
+/**
+ * Selects a model option object and applies behavior.
+ * @param {{label: string, value: string, isCustom: boolean}} opt
+ */
+function selectModelOption(opt) {
+  const inp = $("insp-model");
+  const chosenVal = opt.value;
+  if (inp) inp.value = chosenVal;
+  inspDraft.model = chosenVal;
+  closeModelDropdown();
+  syncDraftObdBike();
+  const clearBtn = $("insp-model-clear");
+  if (clearBtn) clearBtn.classList.toggle("visible", Boolean(chosenVal));
+}
+
+/**
+ * Handles typing in the Step 1 model combobox.
+ * @param {string} val
+ */
+function onModelInput(val) {
+  const inp = $("insp-model");
+  if (inp && inp.value !== val) {
+    inp.value = val;
+  }
+  inspDraft.model = val;
+  syncDraftObdBike();
+  const clearBtn = $("insp-model-clear");
+  if (clearBtn) {
+    clearBtn.classList.toggle("visible", Boolean(val));
+  }
+  modelHighlightIndex = -1;
+  renderModelDropdownList();
+  openModelDropdown();
+}
+
+/**
+ * Clears the Step 1 model input and re-opens the model list.
+ */
+function clearModelInput() {
+  const inp = $("insp-model");
+  if (inp) {
+    inp.value = "";
+    inp.focus();
+  }
+  inspDraft.model = "";
+  syncDraftObdBike();
+  const clearBtn = $("insp-model-clear");
+  if (clearBtn) clearBtn.classList.remove("visible");
+  modelHighlightIndex = -1;
+  renderModelDropdownList();
+  openModelDropdown();
+}
+
+/**
+ * Keyboard navigation handler for the Step 1 model combobox.
+ * @param {KeyboardEvent} e
+ */
+function handleModelKeydown(e) {
+  const listbox = $("insp-model-listbox");
+  const isOpen = modelDropdownOpen && listbox && listbox.style.display !== "none";
+  const inp = $("insp-model");
+  const currentVal = inp ? inp.value : (inspDraft.model || "");
+  const options = getModelOptions(currentVal);
+
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    if (!isOpen) {
+      openModelDropdown();
+      modelHighlightIndex = 0;
+      updateModelHighlight();
+    } else {
+      modelHighlightIndex = Math.min(options.length - 1, modelHighlightIndex + 1);
+      updateModelHighlight();
+    }
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    if (isOpen) {
+      modelHighlightIndex = Math.max(0, modelHighlightIndex - 1);
+      updateModelHighlight();
+    }
+  } else if (e.key === "Enter") {
+    e.preventDefault();
+    if (isOpen && modelHighlightIndex >= 0 && modelHighlightIndex < options.length) {
+      selectModelOption(options[modelHighlightIndex]);
+    } else {
+      if (inp) inspDraft.model = inp.value;
+      closeModelDropdown();
+      syncDraftObdBike();
+    }
+  } else if (e.key === "Escape") {
+    e.preventDefault();
+    closeModelDropdown();
+  } else if (e.key === "Tab") {
+    closeModelDropdown();
+  }
+}
+
+/**
  * Reads all current values from Step 1 Intake inputs into inspDraft.
  */
 function readIntakeDomIntoDraft() {
   const p = $("insp-plate"); if (p) inspDraft.plate = p.value.trim();
   const m = $("insp-make"); if (m) inspDraft.make = m.value.trim();
   const mo = $("insp-model"); if (mo) inspDraft.model = mo.value.trim();
+  const o = $("insp-odo"); if (o) inspDraft.odo = o.value.trim();
   const n = $("insp-notes"); if (n) inspDraft.notes = n.value.trim();
   syncDraftObdBike();
 }
@@ -6761,6 +7479,15 @@ function readDiagDomIntoDraft() {
         if (found) found.verified = ta.value;
       }
     });
+
+    const descInputs = document.querySelectorAll(".dtc-row-desc-input");
+    descInputs.forEach((inp) => {
+      const code = inp.dataset.code;
+      if (code && inspDraft.inspection && inspDraft.inspection.obd && Array.isArray(inspDraft.inspection.obd.codes)) {
+        const found = inspDraft.inspection.obd.codes.find((c) => c.code === code);
+        if (found) found.desc = inp.value;
+      }
+    });
   }
 }
 
@@ -6779,7 +7506,6 @@ function readConfirmDomIntoDraft() {
  */
 function getInspStep1Html() {
   const comp = Array.isArray(inspDraft.complaints) ? inspDraft.complaints : [];
-  const isReturning = Boolean(inspDraft.selectedBikeId);
 
   return `
     <div class="insp-stage-body">
@@ -6797,88 +7523,107 @@ function getInspStep1Html() {
         </div>
       </div>
 
-      ${isReturning ? `
-        <!-- Returning Vehicle Summary Badge Card -->
-        <div class="row" style="margin-bottom:16px">
-          <div class="vehicle-summary-badge" style="flex:1">
-            <div style="display:flex;align-items:center;margin-right:12px;line-height:1;color:var(--accent)">${ICONS.bike}</div>
-            <div style="flex:1;min-width:0">
-              <div style="font-size:15px;font-weight:700;color:var(--text-primary);line-height:1.3">
-                ${escHtml([inspDraft.make, inspDraft.model].filter(Boolean).join(" "))}${inspDraft.plate ? ` • ${escHtml(inspDraft.plate)}` : ""}
-              </div>
-              <div style="font-size:13px;color:var(--text-muted);margin-top:2px">
-                ${escHtml([inspDraft.custName, inspDraft.custPhone].filter(Boolean).join(" • ") || "Walk-in Customer")}
-              </div>
-            </div>
-            <button type="button" class="btn-change-vehicle" onclick="clearSelectedIntakeBike()">Change vehicle</button>
-          </div>
+      <!-- Vehicle Inputs Grid: Row 1 = Plate (left) & Make/Brand (right); Row 2 = Odometer (left) & Model (right) -->
+      <div class="row">
+        <div class="insp-field-group">
+          <label for="insp-plate">Plate Number</label>
+          <input
+            id="insp-plate"
+            type="text"
+            placeholder="e.g. ABC-1234"
+            value="${escHtml(inspDraft.plate)}"
+            oninput="inspDraft.plate=this.value; syncDraftObdBike()"
+          />
         </div>
-      ` : `
-        <!-- Manual Vehicle Inputs -->
-        <div class="row">
-          <div class="insp-field-group">
-            <label for="insp-plate">Plate Number</label>
+        <div class="insp-field-group" id="insp-brand-wrap" style="position:relative">
+          <label for="insp-make">MAKE / BRAND</label>
+          <div class="brand-combobox-wrap">
             <input
-              id="insp-plate"
+              id="insp-make"
               type="text"
-              placeholder="e.g. ABC-1234"
-              value="${escHtml(inspDraft.plate)}"
-              oninput="inspDraft.plate=this.value; syncDraftObdBike()"
+              role="combobox"
+              aria-expanded="false"
+              aria-controls="insp-brand-listbox"
+              aria-autocomplete="list"
+              autocomplete="off"
+              placeholder="Type a brand or tap to choose (e.g. Honda, Yamaha, Suzuki)"
+              value="${escHtml(inspDraft.make)}"
+              oninput="onBrandInput(this.value)"
+              onfocus="openBrandDropdown()"
+              onclick="openBrandDropdown()"
+              onkeydown="handleBrandKeydown(event)"
             />
+            <button
+              type="button"
+              id="insp-brand-clear"
+              class="brand-clear-btn ${inspDraft.make ? "visible" : ""}"
+              onclick="clearBrandInput()"
+              aria-label="Clear brand"
+              tabindex="-1"
+            >✕</button>
+            <div
+              id="insp-brand-listbox"
+              class="brand-dropdown-list"
+              role="listbox"
+              style="display:none"
+            ></div>
           </div>
-          <div class="insp-field-group" style="position:relative">
-            <label for="insp-make">MAKE / BRAND</label>
-            <div class="brand-combobox-wrap">
-              <input
-                id="insp-make"
-                type="text"
-                role="combobox"
-                aria-expanded="false"
-                aria-controls="insp-brand-listbox"
-                aria-autocomplete="list"
-                autocomplete="off"
-                placeholder="Type a brand or tap to choose (e.g. Honda, Yamaha, Suzuki)"
-                value="${escHtml(inspDraft.make)}"
-                oninput="onBrandInput(this.value)"
-                onfocus="openBrandDropdown()"
-                onclick="openBrandDropdown()"
-                onkeydown="handleBrandKeydown(event)"
-              />
-              <button
-                type="button"
-                id="insp-brand-clear"
-                class="brand-clear-btn ${inspDraft.make ? "visible" : ""}"
-                onclick="clearBrandInput()"
-                aria-label="Clear brand"
-                tabindex="-1"
-              >✕</button>
-              <div
-                id="insp-brand-listbox"
-                class="brand-dropdown-list"
-                role="listbox"
-                style="display:none"
-              ></div>
-            </div>
-            <div class="brand-field-helper" style="font-size:12px;color:var(--text-muted);margin-top:4px">
-              Pick a brand or type your own.
-            </div>
+          <div class="brand-field-helper" style="font-size:12px;color:var(--text-muted);margin-top:4px">
+            Pick a brand or type your own.
           </div>
         </div>
+      </div>
 
-        <div class="row">
-          <div class="insp-field-group">
-            <label for="insp-model">Model</label>
+      <div class="row">
+        <div class="insp-field-group">
+          <label for="insp-odo">ODOMETER (KM)</label>
+          <input
+            id="insp-odo"
+            type="text"
+            inputmode="numeric"
+            placeholder="e.g. 12500"
+            value="${escHtml(inspDraft.odo !== undefined && inspDraft.odo !== null ? String(inspDraft.odo) : '')}"
+            oninput="this.value = this.value.replace(/[^0-9]/g, ''); inspDraft.odo = this.value"
+          />
+        </div>
+        <div class="insp-field-group" id="insp-model-wrap" style="position:relative">
+          <label for="insp-model">Model</label>
+          <div class="brand-combobox-wrap">
             <input
               id="insp-model"
               type="text"
-              placeholder="e.g. Click 125, Mio i125"
+              role="combobox"
+              aria-expanded="false"
+              aria-controls="insp-model-listbox"
+              aria-autocomplete="list"
+              autocomplete="off"
+              placeholder="Choose a model or type your own"
               value="${escHtml(inspDraft.model)}"
-              oninput="inspDraft.model=this.value; syncDraftObdBike()"
+              oninput="onModelInput(this.value)"
+              onfocus="openModelDropdown()"
+              onclick="openModelDropdown()"
+              onkeydown="handleModelKeydown(event)"
             />
+            <button
+              type="button"
+              id="insp-model-clear"
+              class="brand-clear-btn ${inspDraft.model ? "visible" : ""}"
+              onclick="clearModelInput()"
+              aria-label="Clear model"
+              tabindex="-1"
+            >✕</button>
+            <div
+              id="insp-model-listbox"
+              class="brand-dropdown-list"
+              role="listbox"
+              style="display:none"
+            ></div>
           </div>
-          <div></div>
+          <div class="brand-field-helper" style="font-size:12px;color:var(--text-muted);margin-top:4px">
+            Pick a model or type your own.
+          </div>
         </div>
-      `}
+      </div>
 
       <!-- 3x3 Symptom Grid -->
       <div class="insp-field-group">
@@ -6909,6 +7654,7 @@ function getInspStep1Html() {
 
 /**
  * Searches motorcycles and customers for auto-fill in Step 1 Intake.
+ * Only searches properly registered motorcycles (plate + make + model + customer).
  * @param {string} val - Query text.
  */
 function onIntakeSearch(val) {
@@ -6922,22 +7668,22 @@ function onIntakeSearch(val) {
     return;
   }
 
+  const regBikes = getRegisteredBikes();
   const matches = [];
-  (Array.isArray(D.bk) ? D.bk : []).forEach((b) => {
-    if (b.archived) return;
+  regBikes.forEach((b) => {
     const c = own(b);
-    if (c && c.archived) return;
     const plate = (b.plate || "").toLowerCase();
     const phone = c && c.phone ? c.phone.toLowerCase() : "";
     const name = c && c.name ? c.name.toLowerCase() : "";
-    if (plate.includes(q) || phone.includes(q) || name.includes(q)) {
+    const vehicle = ((b.make || "") + " " + (b.model || "")).toLowerCase();
+    if (plate.includes(q) || phone.includes(q) || name.includes(q) || vehicle.includes(q)) {
       matches.push({ b, c });
     }
   });
 
   if (!matches.length) {
     box.style.display = "block";
-    box.innerHTML = `<div class="insp-suggest-item" style="color:var(--text-muted);cursor:default">No existing vehicle or customer found. Fill fields below to create.</div>`;
+    box.innerHTML = `<div class="insp-suggest-item" style="color:var(--text-muted);cursor:default">No registered motorcycles found.</div>`;
     return;
   }
 
@@ -6946,8 +7692,8 @@ function onIntakeSearch(val) {
     .map(
       (m) => `
       <div class="insp-suggest-item" onmousedown="selectIntakeSuggestion('${m.b.id}')">
-        <b>${escHtml(m.b.plate)} · ${escHtml(m.b.make + " " + m.b.model)}</b>
-        <small>${escHtml(m.c ? m.c.name : "—")} · ${escHtml(m.c ? m.c.phone : "—")}</small>
+        <b>${escHtml(m.b.plate)} · ${escHtml((m.b.make || "") + " " + (m.b.model || ""))}</b>
+        <small>${escHtml(m.c ? m.c.name : "—")}${m.c && m.c.phone ? ` · ${escHtml(m.c.phone)}` : ""}</small>
       </div>
     `
     )
@@ -6955,41 +7701,59 @@ function onIntakeSearch(val) {
 }
 
 /**
- * Auto-fills Step 1 Intake inputs and stores owner details in draft for Step 3.
+ * Auto-fills Step 1 Intake editable inputs and stores owner details in draft.
+ * Does not collapse into summary card; fields remain fully editable.
  * @param {string} bikeId - Motorcycle ID.
  */
 function selectIntakeSuggestion(bikeId) {
+  readIntakeDomIntoDraft();
   const b = bike(bikeId);
   if (!b) return;
   const c = own(b);
 
   inspDraft.selectedBikeId = bikeId;
-  inspDraft.plate = b.plate || "";
-  inspDraft.make = b.make || "";
-  inspDraft.model = b.model || "";
+  inspDraft.plate = (b.plate || "").trim();
+  inspDraft.make = (b.make || "").trim();
+  inspDraft.model = (b.model || "").trim();
+  inspDraft.odo = (b.odo !== undefined && b.odo !== null && b.odo !== 0) ? String(b.odo) : (b.odo === 0 ? "0" : "");
   if (c) {
-    inspDraft.custName = c.name || "";
-    inspDraft.custPhone = c.phone || "";
+    inspDraft.custName = (c.name || "").trim();
+    inspDraft.custPhone = (c.phone || "").trim();
   }
   syncDraftObdBike();
 
-  if (view === "insp" && inspDraftStep === 1) {
-    const mainEl = $("main");
-    if (mainEl) mainEl.innerHTML = R.insp();
+  // Clear search input and hide suggestions
+  const searchInp = $("insp-intake-search");
+  if (searchInp) searchInp.value = "";
+  const box = $("insp-suggest-box");
+  if (box) {
+    box.style.display = "none";
+    box.innerHTML = "";
   }
+
+  // Populate editable DOM inputs immediately
+  const plateInp = $("insp-plate");
+  if (plateInp) plateInp.value = inspDraft.plate;
+  const makeInp = $("insp-make");
+  if (makeInp) makeInp.value = inspDraft.make;
+  const modelInp = $("insp-model");
+  if (modelInp) modelInp.value = inspDraft.model;
+  const odoInp = $("insp-odo");
+  if (odoInp) odoInp.value = inspDraft.odo;
+
+  const brandClear = $("insp-brand-clear");
+  if (brandClear) brandClear.classList.toggle("visible", Boolean(inspDraft.make));
+  const modelClear = $("insp-model-clear");
+  if (modelClear) modelClear.classList.toggle("visible", Boolean(inspDraft.model));
 }
 
 /**
- * Clears the selected returning vehicle and restores manual vehicle inputs.
+ * Legacy stub for clearing returning vehicle; no-op now that fields remain editable.
  */
 function clearSelectedIntakeBike() {
   readIntakeDomIntoDraft();
   inspDraft.selectedBikeId = null;
   syncDraftObdBike();
-  if (view === "insp" && inspDraftStep === 1) {
-    const mainEl = $("main");
-    if (mainEl) mainEl.innerHTML = R.insp();
-  }
 }
 
 /**
@@ -7510,10 +8274,115 @@ function sanitizeInspDraftInspectionItems() {
 }
 
 /**
+ * Switches the active sub-view in Step 2 Diagnosis without destroying DOM elements.
+ * @param {"inspection"|"findings"} viewName - Target sub-view.
+ */
+function setInspDiagView(viewName) {
+  inspDiagView = viewName === "findings" ? "findings" : "inspection";
+  readDiagDomIntoDraft();
+
+  const isA = inspDiagView !== "findings";
+  const panelA = $("insp-diag-panel-a");
+  const panelB = $("insp-diag-panel-b");
+  const tabA = $("insp-diag-tab-a");
+  const tabB = $("insp-diag-tab-b");
+
+  if (panelA) {
+    panelA.hidden = !isA;
+    panelA.style.display = isA ? "block" : "none";
+  }
+  if (panelB) {
+    panelB.hidden = isA;
+    panelB.style.display = isA ? "none" : "block";
+  }
+  if (tabA) {
+    if (isA) {
+      tabA.classList.add("active");
+      tabA.setAttribute("aria-selected", "true");
+      tabA.setAttribute("tabindex", "0");
+    } else {
+      tabA.classList.remove("active");
+      tabA.setAttribute("aria-selected", "false");
+      tabA.setAttribute("tabindex", "-1");
+    }
+  }
+  if (tabB) {
+    if (!isA) {
+      tabB.classList.add("active");
+      tabB.setAttribute("aria-selected", "true");
+      tabB.setAttribute("tabindex", "0");
+    } else {
+      tabB.classList.remove("active");
+      tabB.setAttribute("aria-selected", "false");
+      tabB.setAttribute("tabindex", "-1");
+    }
+  }
+
+  if (!isA) {
+    const findingsTa = $("insp-diag-findings");
+    if (findingsTa) autoGrowTextarea(findingsTa);
+  }
+
+  scrollIntoViewIfAbove("insp-diag-toggle");
+}
+
+/**
+ * Handles keyboard navigation (ArrowLeft/ArrowRight, Home/End, Enter/Space) for Diagnosis switch tabs.
+ * @param {KeyboardEvent} e
+ */
+function handleInspDiagTabKeydown(e) {
+  const tabA = $("insp-diag-tab-a");
+  const tabB = $("insp-diag-tab-b");
+  if (!tabA || !tabB) return;
+
+  const key = e.key;
+  if (key === "ArrowRight" || key === "ArrowLeft") {
+    e.preventDefault();
+    if (document.activeElement === tabA) {
+      tabB.focus();
+    } else {
+      tabA.focus();
+    }
+  } else if (key === "Home") {
+    e.preventDefault();
+    tabA.focus();
+  } else if (key === "End") {
+    e.preventDefault();
+    tabB.focus();
+  } else if (key === "Enter" || key === " " || key === "Spacebar") {
+    e.preventDefault();
+    if (document.activeElement === tabB) {
+      setInspDiagView("findings");
+    } else if (document.activeElement === tabA) {
+      setInspDiagView("inspection");
+    }
+  }
+}
+
+/**
+ * Scrolls the page to the top of the given element if it starts above the current scroll position.
+ * @param {string} id - Element ID.
+ */
+function scrollIntoViewIfAbove(id) {
+  const el = $(id);
+  if (!el) return;
+  if (typeof el.getBoundingClientRect === "function") {
+    const rect = el.getBoundingClientRect();
+    if (rect.top < 0) {
+      if (typeof el.scrollIntoView === "function") {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else if (typeof window !== "undefined" && typeof window.scrollTo === "function") {
+        window.scrollTo(0, 0);
+      }
+    }
+  }
+}
+
+/**
  * Generates HTML for Step 2 Diagnosis form.
- * Order: 1. Setup toggles, 2. ECU / OBD Diagnostic Codes (if enabled),
- * 3. Physical Inspection Log (if enabled), Shared "Add to findings" bar,
- * 4. Final Findings & Diagnosis Verification, 5. Recommended Services & Items.
+ * Split into two views toggled by segmented switch buttons directly below stepper:
+ * View A: "Inspection (1-3)" -> Sections 1, 2 (when enabled), 3 (when enabled), and shared add bar.
+ * View B: "Findings & Services (4-5)" -> Sections 4 and 5.
  * @returns {string} HTML string.
  */
 function getInspStep2Html() {
@@ -7521,70 +8390,124 @@ function getInspStep2Html() {
   const insp = inspDraft.inspection;
   syncDraftObdBike();
 
+  const isA = inspDiagView !== "findings";
+
   return `
     <div class="insp-stage-body">
-      <!-- Card 1. INSPECTION SETUP -->
-      <div class="insp-card" style="margin-bottom:16px">
-        <div class="insp-diag-card-title">1. INSPECTION SETUP</div>
-        <div style="display:flex;gap:20px;flex-wrap:wrap">
-          <label class="insp-chk-item" style="border:none;padding:0;background:none">
-            <input
-              type="checkbox"
-              ${insp.enablePhysical ? "checked" : ""}
-              onchange="toggleInspectionType('physical', this.checked)"
-            />
-            <span style="font-weight:600;font-size:14px">Physical Inspection</span>
-          </label>
-          <label class="insp-chk-item" style="border:none;padding:0;background:none">
-            <input
-              type="checkbox"
-              ${insp.enableObd ? "checked" : ""}
-              onchange="toggleInspectionType('obd', this.checked)"
-            />
-            <span style="font-weight:600;font-size:14px">ECU/OBD Diagnostic</span>
-          </label>
-        </div>
-        ${!insp.enablePhysical && !insp.enableObd ? `
-          <div style="font-size:13px;color:var(--text-muted);margin-top:10px">
-            Select at least one inspection type to record faults.
+      <!-- Segmented switch for Step 2 views -->
+      <div
+        class="item-cat-toggle-wrap insp-diag-toggle-wrap"
+        id="insp-diag-toggle"
+        role="tablist"
+        aria-label="Diagnosis sections"
+        onkeydown="handleInspDiagTabKeydown(event)"
+      >
+        <button
+          type="button"
+          id="insp-diag-tab-a"
+          class="item-cat-btn insp-diag-tab-btn ${isA ? "active" : ""}"
+          role="tab"
+          aria-selected="${isA ? "true" : "false"}"
+          aria-controls="insp-diag-panel-a"
+          tabindex="${isA ? "0" : "-1"}"
+          onclick="setInspDiagView('inspection')"
+        >
+          Inspection (1-3)
+        </button>
+        <button
+          type="button"
+          id="insp-diag-tab-b"
+          class="item-cat-btn insp-diag-tab-btn ${!isA ? "active" : ""}"
+          role="tab"
+          aria-selected="${!isA ? "true" : "false"}"
+          aria-controls="insp-diag-panel-b"
+          tabindex="${!isA ? "0" : "-1"}"
+          onclick="setInspDiagView('findings')"
+        >
+          Findings &amp; Services (4-5)
+        </button>
+      </div>
+
+      <!-- View A Panel: Sections 1-3 -->
+      <div
+        id="insp-diag-panel-a"
+        role="tabpanel"
+        aria-labelledby="insp-diag-tab-a"
+        ${isA ? "" : "hidden"}
+        style="${isA ? "display:block" : "display:none"}"
+      >
+        <!-- Card 1. INSPECTION SETUP -->
+        <div class="insp-card" style="margin-bottom:16px">
+          <div class="insp-diag-card-title">1. INSPECTION SETUP</div>
+          <div style="display:flex;gap:20px;flex-wrap:wrap">
+            <label class="insp-chk-item" style="border:none;padding:0;background:none">
+              <input
+                type="checkbox"
+                ${insp.enablePhysical ? "checked" : ""}
+                onchange="toggleInspectionType('physical', this.checked)"
+              />
+              <span style="font-weight:600;font-size:14px">Physical Inspection</span>
+            </label>
+            <label class="insp-chk-item" style="border:none;padding:0;background:none">
+              <input
+                type="checkbox"
+                ${insp.enableObd ? "checked" : ""}
+                onchange="toggleInspectionType('obd', this.checked)"
+              />
+              <span style="font-weight:600;font-size:14px">ECU/OBD Diagnostic</span>
+            </label>
           </div>
-        ` : ""}
-      </div>
-
-      <!-- Card 2: 2. ECU / OBD DIAGNOSTIC CODES (placed between Card 1 and Card 3) -->
-      ${insp.enableObd ? getEcuObdCardHtml() : ""}
-
-      <!-- Card 3: 3. PHYSICAL INSPECTION LOG -->
-      ${insp.enablePhysical ? getPhysicalInspectionLogCardHtml() : ""}
-
-      <!-- Shared Add to Findings Bar -->
-      ${getSharedAddToFindingsBarHtml()}
-
-      <!-- Card 4. FINAL FINDINGS & DIAGNOSIS VERIFICATION -->
-      <div class="insp-card" style="margin-bottom:16px">
-        <div class="insp-diag-card-title">4. FINAL FINDINGS &amp; DIAGNOSIS VERIFICATION</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:-8px 0 12px">
-          Codes you record appear here. Review, edit, and add anything else to finalize the diagnosis.
-        </p>
-        <div class="insp-field-group" style="margin-bottom:0">
-          <label for="insp-diag-findings">Findings / Mechanic Notes (optional)</label>
-          <textarea
-            id="insp-diag-findings"
-            rows="3"
-            placeholder="Describe technician findings, parts to replace, or issues identified..."
-            oninput="inspDraft.findings=this.value; autoGrowTextarea(this); updateSharedAddToFindingsBar();"
-          >${escHtml(inspDraft.findings)}</textarea>
+          ${!insp.enablePhysical && !insp.enableObd ? `
+            <div style="font-size:13px;color:var(--text-muted);margin-top:10px">
+              Select at least one inspection type to record faults.
+            </div>
+          ` : ""}
         </div>
+
+        <!-- Card 2: 2. ECU / OBD DIAGNOSTIC CODES (placed between Card 1 and Card 3) -->
+        ${insp.enableObd ? getEcuObdCardHtml() : ""}
+
+        <!-- Card 3: 3. PHYSICAL INSPECTION LOG -->
+        ${insp.enablePhysical ? getPhysicalInspectionLogCardHtml() : ""}
+
+        <!-- Shared Add to Findings Bar -->
+        ${getSharedAddToFindingsBarHtml()}
       </div>
 
-      <!-- Card 5. RECOMMENDED SERVICES & ITEMS TO ALLOCATE -->
-      <div class="insp-card" id="insp-services-card" style="margin-bottom:16px">
-        <div class="insp-diag-card-title">5. RECOMMENDED SERVICES &amp; ITEMS TO ALLOCATE</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:-8px 0 12px">
-          List the labor and items for this job. This is a price list, not inventory.
-        </p>
-        <div id="draft-items-container">
-          ${getItemsBuilderHtml("draft", { readOnly: false, showLaborDone: false })}
+      <!-- View B Panel: Sections 4-5 -->
+      <div
+        id="insp-diag-panel-b"
+        role="tabpanel"
+        aria-labelledby="insp-diag-tab-b"
+        ${!isA ? "" : "hidden"}
+        style="${!isA ? "display:block" : "display:none"}"
+      >
+        <!-- Card 4. FINAL FINDINGS & DIAGNOSIS VERIFICATION -->
+        <div class="insp-card" style="margin-bottom:16px">
+          <div class="insp-diag-card-title">4. FINAL FINDINGS &amp; DIAGNOSIS VERIFICATION</div>
+          <p style="font-size:12px;color:var(--text-muted);margin:-8px 0 12px">
+            Codes you record appear here. Review, edit, and add anything else to finalize the diagnosis.
+          </p>
+          <div class="insp-field-group" style="margin-bottom:0">
+            <label for="insp-diag-findings">Findings / Mechanic Notes (optional)</label>
+            <textarea
+              id="insp-diag-findings"
+              rows="3"
+              placeholder="Describe technician findings, parts to replace, or issues identified..."
+              oninput="inspDraft.findings=this.value; autoGrowTextarea(this); updateSharedAddToFindingsBar();"
+            >${escHtml(inspDraft.findings)}</textarea>
+          </div>
+        </div>
+
+        <!-- Card 5. RECOMMENDED SERVICES & ITEMS TO ALLOCATE -->
+        <div class="insp-card" id="insp-services-card" style="margin-bottom:16px">
+          <div class="insp-diag-card-title">5. RECOMMENDED SERVICES &amp; ITEMS TO ALLOCATE</div>
+          <p style="font-size:12px;color:var(--text-muted);margin:-8px 0 12px">
+            List the labor and items for this job. This is a price list, not inventory.
+          </p>
+          <div id="draft-items-container">
+            ${getItemsBuilderHtml("draft", { readOnly: false, showLaborDone: false })}
+          </div>
         </div>
       </div>
 
@@ -7911,6 +8834,7 @@ function clearDtcSearchInput() {
 
 /**
  * Selects a library entry from the DTC dropdown.
+ * Auto-fills code and description inputs so user can edit both before adding.
  * @param {number} idx
  * @param {string} matchedCode
  */
@@ -7927,7 +8851,10 @@ function selectDtcOption(idx, matchedCode) {
     dtcSelectedLibraryEntry = match.entry;
     dtcSelectedVariantCode = matchedCode || match.matchedCode;
     if (input) input.value = dtcSelectedVariantCode;
-    if (descInput) descInput.value = match.entry.desc || "";
+    if (descInput) {
+      descInput.value = match.entry.desc || "";
+      descInput.focus();
+    }
   }
   if (clearBtn) clearBtn.style.display = "block";
   closeDtcDropdown();
@@ -7935,16 +8862,36 @@ function selectDtcOption(idx, matchedCode) {
 
 /**
  * Selects custom code from the DTC dropdown.
+ * Auto-fills code input and focuses description input for editing before adding.
  * @param {string} code
  */
 function selectCustomDtcOption(code) {
   const input = $("dtc-search-input");
+  const descInput = $("dtc-desc-input");
   const clearBtn = $("dtc-clear-btn");
   dtcSelectedLibraryEntry = null;
   dtcSelectedVariantCode = null;
   if (input) input.value = (code || "").trim().toUpperCase();
   if (clearBtn) clearBtn.style.display = "block";
   closeDtcDropdown();
+  if (descInput) descInput.focus();
+}
+
+/**
+ * Highlights an existing DTC code row when a duplicate is attempted.
+ * @param {string} code
+ */
+function highlightExistingDtcRow(code) {
+  const row = $("dtc-row-" + code) || $("dtc-card-" + code);
+  if (row) {
+    row.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    row.classList.remove("dtc-row-pulse");
+    void row.offsetWidth;
+    row.classList.add("dtc-row-pulse");
+    setTimeout(() => {
+      row.classList.remove("dtc-row-pulse");
+    }, 1800);
+  }
 }
 
 /**
@@ -7984,9 +8931,10 @@ function addDtcCodeFromInputs() {
   );
   if (isDuplicate) {
     if (msgEl) {
-      msgEl.textContent = "Already added.";
+      msgEl.textContent = `${normCode} is already in the list.`;
       msgEl.className = "dtc-add-msg muted";
     }
+    highlightExistingDtcRow(normCode);
     return;
   }
 
@@ -8023,7 +8971,8 @@ function addDtcCodeFromInputs() {
       at: nowAt,
       model: entry.model || "Yamaha Sniper 150 V2",
       caution: entry.caution || "Verify first. Do not replace the part until the checks below are done.",
-      variants: otherVariants
+      variants: otherVariants,
+      expanded: false
     };
     inspDraft.inspection.obd.codes.push(newRecord);
   } else {
@@ -8037,13 +8986,17 @@ function addDtcCodeFromInputs() {
       done: [],
       verified: "",
       custom: true,
-      at: nowAt
+      at: nowAt,
+      expanded: false
     };
     inspDraft.inspection.obd.codes.push(newRecord);
   }
 
-  // Clear inputs
-  if (input) input.value = "";
+  // Clear inputs and dropdown for the next entry
+  if (input) {
+    input.value = "";
+    input.focus();
+  }
   if (descInput) descInput.value = "";
   if (clearBtn) clearBtn.style.display = "none";
   if (msgEl) {
@@ -8060,7 +9013,29 @@ function addDtcCodeFromInputs() {
 }
 
 /**
- * Builds HTML for 3b: Recorded codes list (one card per code).
+ * Toggles expand/collapse of an individual DTC code card details.
+ * @param {string} code
+ */
+function toggleDtcExpand(code) {
+  const codes = (inspDraft.inspection && inspDraft.inspection.obd && Array.isArray(inspDraft.inspection.obd.codes))
+    ? inspDraft.inspection.obd.codes
+    : [];
+  const c = codes.find((x) => x.code === code);
+  const detailsEl = $("dtc-details-" + code);
+  const btn = $("dtc-toggle-btn-" + code);
+  if (!detailsEl) return;
+  const isHidden = detailsEl.style.display === "none";
+  detailsEl.style.display = isHidden ? "block" : "none";
+  if (c) c.expanded = isHidden;
+  if (btn) {
+    btn.innerHTML = isHidden ? "▲ Hide Details" : "▼ Details";
+    btn.setAttribute("aria-expanded", isHidden ? "true" : "false");
+    btn.title = isHidden ? "Hide details" : "View details";
+  }
+}
+
+/**
+ * Builds HTML for 3b: Recorded codes list (compact rows with collapsed details by default).
  * @returns {string}
  */
 function getDtcRecordedCodesHtml() {
@@ -8069,7 +9044,7 @@ function getDtcRecordedCodesHtml() {
     : [];
 
   if (codes.length === 0) {
-    return `<div class="dtc-empty-placeholder" style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;border:1px dashed var(--border);border-radius:12px;background:var(--bg-surface-alt,#F8FAFC)">No codes recorded yet. Type a code from your scanner above.</div>`;
+    return `<div class="dtc-empty-placeholder" style="padding:16px;text-align:center;color:var(--text-muted);font-size:13px;border:1px dashed var(--border);border-radius:10px;background:var(--bg-surface-alt,#F8FAFC)">No codes recorded yet. Type or search a code from your scanner above.</div>`;
   }
 
   return codes.map((c) => {
@@ -8083,20 +9058,39 @@ function getDtcRecordedCodesHtml() {
     const checks = Array.isArray(c.checks) ? c.checks : [];
     const parts = Array.isArray(c.parts) ? c.parts : [];
     const doneList = Array.isArray(c.done) ? c.done : [];
+    const isExpanded = Boolean(c.expanded);
 
     return `
-      <div class="dtc-code-card" id="dtc-card-${code}" data-code="${code}">
-        <!-- Top row -->
+      <div class="dtc-code-card" id="dtc-row-${code}" data-code="${code}">
+        <!-- Top compact row -->
         <div class="dtc-card-top-row">
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:240px;flex-wrap:wrap">
             <span class="dtc-code-pill">${code}</span>
             ${errPill}
-            ${otherVariants}
+            <input
+              type="text"
+              class="dtc-row-desc-input"
+              data-code="${code}"
+              value="${escHtml(c.desc || "")}"
+              placeholder="Code description..."
+              oninput="updateDtcDesc('${code}', this.value)"
+              title="Edit code description"
+            />
           </div>
-          <div style="display:flex;align-items:center;gap:8px">
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
             <span id="dtc-btn-wrap-${code}">
               ${actionBtnHtml}
             </span>
+            <button
+              type="button"
+              class="btn g sm dtc-toggle-btn"
+              id="dtc-toggle-btn-${code}"
+              onclick="toggleDtcExpand('${code}')"
+              aria-expanded="${isExpanded ? 'true' : 'false'}"
+              title="${isExpanded ? 'Hide details' : 'View details'}"
+            >
+              ${isExpanded ? '▲ Hide Details' : '▼ Details'}
+            </button>
             <button
               type="button"
               class="btn g sm dtc-remove-btn"
@@ -8108,122 +9102,103 @@ function getDtcRecordedCodesHtml() {
           </div>
         </div>
 
-        <!-- Component & Stored Description -->
-        <div class="dtc-card-component-desc">
-          ${c.part ? `<b class="dtc-card-part-name" style="font-size:13px;color:var(--text-primary)">${escHtml(c.part)}:</b> ` : ""}
-          ${!c.custom ? `
-            <span id="dtc-desc-view-${code}" class="dtc-desc-view-text" style="font-size:13px;color:var(--text-secondary)">
-              ${escHtml(c.desc || "")}
-              <a href="javascript:void(0)" class="dtc-edit-desc-link" onclick="toggleEditDtcDesc('${code}')" style="font-size:12px;color:var(--primary);margin-left:4px">Edit</a>
-            </span>
-            <div id="dtc-desc-edit-wrap-${code}" class="dtc-desc-edit-wrap" style="display:none;margin-top:6px">
-              <textarea
-                id="dtc-desc-edit-input-${code}"
-                class="dtc-desc-edit-input"
-                rows="2"
-                oninput="updateDtcDesc('${code}', this.value)"
-              >${escHtml(c.desc || "")}</textarea>
-              <div style="margin-top:4px">
-                <button type="button" class="btn sm" onclick="toggleEditDtcDesc('${code}')">Done</button>
+        <!-- Collapsible details section (troubleshooting, suggested parts, verified findings) -->
+        <div
+          id="dtc-details-${code}"
+          class="dtc-details-collapse"
+          style="display:${isExpanded ? 'block' : 'none'};margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"
+        >
+          ${otherVariants ? `
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">
+              ${otherVariants}
+            </div>
+          ` : ""}
+
+          ${c.caution ? `
+            <div class="dtc-caution-line" style="margin-bottom:10px">
+              ${escHtml(c.caution)}
+            </div>
+          ` : ""}
+
+          <!-- Troubleshooting Steps -->
+          <div class="dtc-card-section" style="margin-bottom:12px">
+            <div class="dtc-section-title" style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">
+              TROUBLESHOOTING STEPS
+            </div>
+            ${checks.length > 0 ? `
+              <div class="dtc-steps-list" style="display:flex;flex-direction:column;gap:6px">
+                ${checks.map((chk, sIdx) => {
+                  const isDone = Boolean(doneList[sIdx]);
+                  return `
+                    <label class="dtc-step-item">
+                      <input
+                        type="checkbox"
+                        class="dtc-step-checkbox"
+                        ${isDone ? "checked" : ""}
+                        onchange="toggleDtcStepDone('${code}', ${sIdx}, this.checked)"
+                      />
+                      <span class="dtc-step-num">${sIdx + 1}.</span>
+                      <span class="dtc-step-text">${escHtml(chk)}</span>
+                    </label>
+                  `;
+                }).join("")}
               </div>
-            </div>
-          ` : `
-            <div style="margin-top:4px">
-              <textarea
-                class="dtc-desc-edit-input"
-                rows="2"
-                placeholder="Type description..."
-                oninput="updateDtcDesc('${code}', this.value)"
-              >${escHtml(c.desc || "")}</textarea>
-            </div>
-          `}
-        </div>
-
-        <!-- Caution Line -->
-        ${c.caution ? `
-          <div class="dtc-caution-line">
-            ${escHtml(c.caution)}
+            ` : `
+              <div style="font-size:12px;color:var(--text-muted);font-style:italic">
+                No steps in the library. Add your own checks in the notes below.
+              </div>
+            `}
           </div>
-        ` : ""}
 
-        <!-- Troubleshooting Steps -->
-        <div class="dtc-card-section">
-          <div class="dtc-section-title" style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">
-            TROUBLESHOOTING STEPS
+          <!-- Suggested Parts -->
+          <div class="dtc-card-section" style="margin-bottom:12px">
+            <div class="dtc-section-title" style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">
+              SUGGESTED PARTS
+            </div>
+            ${parts.length > 0 ? `
+              <div class="dtc-parts-chips-wrap" style="display:flex;flex-wrap:wrap;gap:6px">
+                ${parts.map((pt) => {
+                  const fromId = `dtc.${c.code}|${pt}`;
+                  const isAdded = Array.isArray(inspDraft.items) && inspDraft.items.some((it) => it.from === fromId);
+                  return `
+                    <button
+                      type="button"
+                      class="dtc-part-chip ${isAdded ? 'added' : ''}"
+                      aria-pressed="${isAdded ? 'true' : 'false'}"
+                      onclick="toggleDtcPartChip('${code}', '${escHtml(pt)}')"
+                    >
+                      ${isAdded ? '✓ Added: ' + escHtml(pt) : '+ ' + escHtml(pt)}
+                    </button>
+                  `;
+                }).join("")}
+              </div>
+            ` : `
+              <div style="font-size:12px;color:var(--text-muted);font-style:italic">
+                No suggested parts listed.
+              </div>
+            `}
           </div>
-          ${checks.length > 0 ? `
-            <div class="dtc-steps-list" style="display:flex;flex-direction:column;gap:6px">
-              ${checks.map((chk, sIdx) => {
-                const isDone = Boolean(doneList[sIdx]);
-                return `
-                  <label class="dtc-step-item">
-                    <input
-                      type="checkbox"
-                      class="dtc-step-checkbox"
-                      ${isDone ? "checked" : ""}
-                      onchange="toggleDtcStepDone('${code}', ${sIdx}, this.checked)"
-                    />
-                    <span class="dtc-step-num">${sIdx + 1}.</span>
-                    <span class="dtc-step-text">${escHtml(chk)}</span>
-                  </label>
-                `;
-              }).join("")}
-            </div>
-          ` : `
-            <div style="font-size:12px;color:var(--text-muted);font-style:italic">
-              No steps in the library. Add your own checks in the notes below.
-            </div>
-          `}
-        </div>
 
-        <!-- Suggested Parts -->
-        <div class="dtc-card-section">
-          <div class="dtc-section-title" style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">
-            SUGGESTED PARTS
-          </div>
-          ${parts.length > 0 ? `
-            <div class="dtc-parts-chips-wrap" style="display:flex;flex-wrap:wrap;gap:6px">
-              ${parts.map((pt) => {
-                const fromId = `dtc.${c.code}|${pt}`;
-                const isAdded = Array.isArray(inspDraft.items) && inspDraft.items.some((it) => it.from === fromId);
-                return `
-                  <button
-                    type="button"
-                    class="dtc-part-chip ${isAdded ? 'added' : ''}"
-                    aria-pressed="${isAdded ? 'true' : 'false'}"
-                    onclick="toggleDtcPartChip('${code}', '${escHtml(pt)}')"
-                  >
-                    ${isAdded ? '✓ Added: ' + escHtml(pt) : '+ ' + escHtml(pt)}
-                  </button>
-                `;
-              }).join("")}
+          <!-- Mechanic's verified findings * -->
+          <div class="dtc-verified-section">
+            <label class="dtc-verified-label" for="dtc-verified-${code}" style="display:block;font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:4px">
+              Mechanic's verified findings <span style="color:var(--text-muted)">*</span>
+            </label>
+            <textarea
+              id="dtc-verified-${code}"
+              class="dtc-verified-input"
+              data-code="${code}"
+              rows="2"
+              placeholder="What did you actually confirm? e.g. Checked sensor wiring; found loose connector pin, sensor itself is good."
+              oninput="updateDtcVerified('${code}', this.value)"
+            >${escHtml(c.verified || "")}</textarea>
+            <div
+              id="dtc-verified-reminder-${code}"
+              class="dtc-soft-reminder"
+              style="font-size:12px;color:var(--text-muted);margin-top:4px;${(c.verified || '').trim() ? 'display:none;' : ''}"
+            >
+              Add what you verified before finalizing.
             </div>
-          ` : `
-            <div style="font-size:12px;color:var(--text-muted);font-style:italic">
-              No suggested parts listed.
-            </div>
-          `}
-        </div>
-
-        <!-- Mechanic's verified findings * -->
-        <div class="dtc-verified-section" style="margin-top:4px">
-          <label class="dtc-verified-label" for="dtc-verified-${code}" style="display:block;font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:4px">
-            Mechanic's verified findings <span style="color:var(--text-muted)">*</span>
-          </label>
-          <textarea
-            id="dtc-verified-${code}"
-            class="dtc-verified-input"
-            data-code="${code}"
-            rows="2"
-            placeholder="What did you actually confirm? e.g. Checked sensor wiring; found loose connector pin, sensor itself is good."
-            oninput="updateDtcVerified('${code}', this.value)"
-          >${escHtml(c.verified || "")}</textarea>
-          <div
-            id="dtc-verified-reminder-${code}"
-            class="dtc-soft-reminder"
-            style="font-size:12px;color:var(--text-muted);margin-top:4px;${(c.verified || '').trim() ? 'display:none;' : ''}"
-          >
-            Add what you verified before finalizing.
           </div>
         </div>
       </div>
@@ -8340,10 +9315,6 @@ function updateDtcDesc(code, val) {
   const c = codes.find((x) => x.code === code);
   if (c) {
     c.desc = val;
-  }
-  const viewEl = $("dtc-desc-view-" + code);
-  if (viewEl) {
-    viewEl.innerHTML = `${escHtml(val || "")} <a href="javascript:void(0)" class="dtc-edit-desc-link" onclick="toggleEditDtcDesc('${escHtml(code)}')" style="font-size:12px;color:var(--primary);margin-left:4px">Edit</a>`;
   }
 }
 
@@ -8975,28 +9946,8 @@ function setItemFormKind(context, kind) {
   if (kind === "labor") {
     st.src = "shop";
   }
-
-  const wrap = $(`${context}-item-form-wrap`);
-  if (wrap) {
-    const btns = wrap.querySelectorAll(".item-cat-btn");
-    btns.forEach((btn, idx) => {
-      btn.classList.toggle("active", (idx === 0 && kind === "labor") || (idx === 1 && kind === "part"));
-    });
-  }
-
-  const srcGrp = $(`${context}-src-group`);
-  if (srcGrp) {
-    srcGrp.style.display = kind === "part" ? "flex" : "none";
-  }
-
-  const nameInp = $(`${context}-item-name`);
-  if (nameInp) {
-    nameInp.placeholder = kind === "labor"
-      ? "e.g. Change oil, CVT cleaning"
-      : "e.g. Engine oil 10W-40, Drive Belt";
-  }
-
   closeItemSuggestions(context);
+  renderItemsManager(context);
 }
 
 /**
@@ -9012,9 +9963,11 @@ function onItemSourceChange(context, srcVal) {
   if (priceInp) {
     if (srcVal === "own") {
       priceInp.value = "0";
+      priceInp.disabled = true;
       priceInp.readOnly = true;
       priceInp.classList.add("locked");
     } else {
+      priceInp.disabled = false;
       priceInp.readOnly = false;
       priceInp.classList.remove("locked");
       if (priceInp.value === "0") priceInp.value = "";
@@ -9137,7 +10090,7 @@ function submitItemAddForm(context, targetKey = "items") {
   const name = rawName || "Unnamed item";
   const kind = st.kind || "labor";
   const src = kind === "labor" ? "shop" : (srcSel ? srcSel.value : "shop");
-  const qty = qtyInp ? Math.max(1, parseInt(qtyInp.value, 10) || 1) : 1;
+  const qty = kind === "labor" ? 1 : (qtyInp ? Math.max(1, parseInt(qtyInp.value, 10) || 1) : 1);
   const price = src === "own" ? 0 : (priceInp ? Math.max(0, Number(priceInp.value) || 0) : 0);
 
   const newItem = {
@@ -9191,7 +10144,7 @@ function updateItemRow(context, itemId, field, val) {
     item.src = val;
     if (val === "own") item.price = 0;
   } else if (field === "qty") {
-    item.qty = Math.max(1, parseInt(val, 10) || 1);
+    item.qty = item.kind === "labor" ? 1 : Math.max(1, parseInt(val, 10) || 1);
   } else if (field === "price") {
     item.price = item.src === "own" ? 0 : Math.max(0, Number(val) || 0);
   }
@@ -9281,6 +10234,9 @@ function renderItemsManager(context) {
   }
 
   container.innerHTML = getItemsBuilderHtml(context, options);
+  if (context !== "draft") {
+    syncJobCardTotals(context);
+  }
 }
 
 /**
@@ -9295,6 +10251,7 @@ function renderItemsManager(context) {
 function getItemsBuilderHtml(context, options = {}) {
   const { readOnly = false, showLaborDone = false, showExtraToggle = false } = options;
   const formState = getItemAddFormState(context);
+  const isLaborTab = formState.kind === "labor";
   const items = getContextItems(context, "items");
   const extraItems = context !== "draft" ? getContextItems(context, "extra") : [];
   const allItems = [...items, ...extraItems.map((x) => ({ ...x, _isExtra: true }))];
@@ -9305,13 +10262,14 @@ function getItemsBuilderHtml(context, options = {}) {
   let hasWaiting = false;
 
   allItems.forEach((it) => {
-    const qty = Math.max(1, Number(it.qty) || 1);
+    const isLabor = it.kind === "labor";
+    const qty = isLabor ? 1 : Math.max(1, Number(it.qty) || 1);
     if (it.src === "own") {
       ownCount++;
     } else {
       const price = Math.max(0, Number(it.price) || 0);
       const lineTot = qty * price;
-      if (it.kind === "labor") laborSub += lineTot;
+      if (isLabor) laborSub += lineTot;
       else partsSub += lineTot;
     }
     if (it.src === "waiting") hasWaiting = true;
@@ -9342,14 +10300,14 @@ function getItemsBuilderHtml(context, options = {}) {
           <div class="item-cat-toggle-wrap">
             <button
               type="button"
-              class="item-cat-btn ${formState.kind === 'labor' ? 'active' : ''}"
+              class="item-cat-btn ${isLaborTab ? 'active' : ''}"
               onclick="setItemFormKind('${context}', 'labor')"
             >
               Labor / Service
             </button>
             <button
               type="button"
-              class="item-cat-btn ${formState.kind === 'part' ? 'active' : ''}"
+              class="item-cat-btn ${!isLaborTab ? 'active' : ''}"
               onclick="setItemFormKind('${context}', 'part')"
             >
               Part / Fluid Used
@@ -9359,12 +10317,12 @@ function getItemsBuilderHtml(context, options = {}) {
           <div class="item-add-inputs-row">
             <!-- Name with Custom Suggestion Dropdown -->
             <div class="item-input-group name-group" style="position:relative;flex:2;min-width:200px">
-              <label class="item-field-label">Item / Service Name</label>
+              <label class="item-field-label">${isLaborTab ? "SERVICE NAME" : "ITEM NAME"}</label>
               <input
                 type="text"
                 id="${context}-item-name"
                 class="item-field-input"
-                placeholder="${formState.kind === 'labor' ? 'e.g. Change oil, CVT cleaning' : 'e.g. Engine oil 10W-40, Drive Belt'}"
+                placeholder="${isLaborTab ? 'e.g. Change oil, CVT cleaning' : 'e.g. Engine oil 10W-40, Drive Belt'}"
                 autocomplete="off"
                 oninput="onItemNameInput('${context}', this.value)"
                 onfocus="onItemNameFocus('${context}')"
@@ -9376,27 +10334,29 @@ function getItemsBuilderHtml(context, options = {}) {
             <div
               class="item-input-group src-group"
               id="${context}-src-group"
-              style="flex:1.5;min-width:180px;display:${formState.kind === 'part' ? 'flex' : 'none'}"
+              style="flex:2;min-width:220px;display:${isLaborTab ? 'none' : 'flex'}"
             >
               <label class="item-field-label">Part Availability / Source</label>
-              <select id="${context}-item-src" class="item-field-input" onchange="onItemSourceChange('${context}', this.value)">
-                <option value="shop" ${formState.src === 'shop' ? 'selected' : ''}>Ready / Shop Provided</option>
+              <select id="${context}-item-src" class="item-field-input" style="width:100%;min-width:200px" onchange="onItemSourceChange('${context}', this.value)">
+                <option value="shop" ${formState.src === 'shop' || !formState.src ? 'selected' : ''}>Ready / Shop Provided</option>
                 <option value="waiting" ${formState.src === 'waiting' ? 'selected' : ''}>Waiting for Part (Buy Outside / Order)</option>
                 <option value="own" ${formState.src === 'own' ? 'selected' : ''}>Customer Brought Own Part</option>
               </select>
             </div>
 
-            <!-- Qty -->
-            <div class="item-input-group qty-group" style="width:75px;flex:0 0 75px">
-              <label class="item-field-label">Qty</label>
-              <input
-                type="number"
-                id="${context}-item-qty"
-                class="item-field-input"
-                min="1"
-                value="1"
-              />
-            </div>
+            <!-- Qty (visible only when Part) -->
+            ${!isLaborTab ? `
+              <div class="item-input-group qty-group" id="${context}-qty-group" style="width:75px;flex:0 0 75px">
+                <label class="item-field-label">Qty</label>
+                <input
+                  type="number"
+                  id="${context}-item-qty"
+                  class="item-field-input"
+                  min="1"
+                  value="1"
+                />
+              </div>
+            ` : ""}
 
             <!-- Price (₱) -->
             <div class="item-input-group price-group" style="width:120px;flex:0 0 120px">
@@ -9404,11 +10364,11 @@ function getItemsBuilderHtml(context, options = {}) {
               <input
                 type="number"
                 id="${context}-item-price"
-                class="item-field-input ${formState.src === 'own' ? 'locked' : ''}"
+                class="item-field-input ${(!isLaborTab && formState.src === 'own') ? 'locked' : ''}"
                 min="0"
                 step="any"
                 placeholder="0.00"
-                ${formState.src === 'own' ? 'readonly value="0"' : ''}
+                ${(!isLaborTab && formState.src === 'own') ? 'disabled readonly value="0"' : ''}
               />
             </div>
 
@@ -9425,6 +10385,9 @@ function getItemsBuilderHtml(context, options = {}) {
   }
 
   // 2. Items Table
+  const itemColLabel = readOnly ? "ITEM / SERVICE" : (isLaborTab ? "SERVICE" : "ITEM");
+  const showTableQty = readOnly ? true : !isLaborTab;
+
   html += `
     <div class="items-table-wrap">
       <table class="items-table">
@@ -9432,9 +10395,9 @@ function getItemsBuilderHtml(context, options = {}) {
           <tr>
             ${showLaborDone ? `<th class="c" style="width:50px">DONE</th>` : ""}
             <th style="width:110px">CATEGORY</th>
-            <th>ITEM / SERVICE</th>
-            <th style="width:160px">SOURCE</th>
-            <th class="r" style="width:75px">QTY</th>
+            <th>${itemColLabel}</th>
+            <th style="width:200px">SOURCE</th>
+            ${showTableQty ? `<th class="r" style="width:75px">QTY</th>` : ""}
             <th class="r" style="width:100px">PRICE</th>
             <th class="r" style="width:110px">LINE TOTAL</th>
             ${!readOnly ? `<th class="c" style="width:45px"></th>` : ""}
@@ -9444,14 +10407,14 @@ function getItemsBuilderHtml(context, options = {}) {
   `;
 
   if (!allItems.length) {
-    const colCount = (showLaborDone ? 1 : 0) + 6 + (!readOnly ? 1 : 0);
+    const colCount = (showLaborDone ? 1 : 0) + (showTableQty ? 1 : 0) + 5 + (!readOnly ? 1 : 0);
     html += `<tr><td colspan="${colCount}" style="text-align:center;color:var(--text-muted);padding:24px">No items added yet.</td></tr>`;
   } else {
     allItems.forEach((it) => {
       const isOwn = it.src === "own";
       const isWaiting = it.src === "waiting";
       const isLabor = it.kind === "labor";
-      const qty = Math.max(1, Number(it.qty) || 1);
+      const qty = isLabor ? 1 : Math.max(1, Number(it.qty) || 1);
       const price = isOwn ? 0 : Math.max(0, Number(it.price) || 0);
       const lineTot = qty * price;
 
@@ -9505,39 +10468,46 @@ function getItemsBuilderHtml(context, options = {}) {
       if (readOnly || isLabor) {
         let srcBadgeHtml = `<span class="src-badge shop">Shop Provided</span>`;
         if (isWaiting) srcBadgeHtml = `<span class="src-badge waiting">⏳ Waiting for Part</span>`;
-        else if (isOwn) srcBadgeHtml = `<span class="src-badge own">Customer's Own Part</span>`;
+        else if (isOwn) srcBadgeHtml = `<span class="src-badge own">Customer Brought Own Part</span>`;
         html += `<td>${srcBadgeHtml}</td>`;
       } else {
         html += `
           <td>
             <select
               class="item-inline-select"
+              style="width:100%;min-width:180px;box-sizing:border-box"
               onchange="updateItemRow('${context}', '${it.id}', 'src', this.value)"
             >
-              <option value="shop" ${it.src === 'shop' || !it.src ? 'selected' : ''}>Shop Provided</option>
+              <option value="shop" ${it.src === 'shop' || !it.src ? 'selected' : ''}>Ready / Shop Provided</option>
               <option value="waiting" ${it.src === 'waiting' ? 'selected' : ''}>Waiting for Part</option>
-              <option value="own" ${it.src === 'own' ? 'selected' : ''}>Customer's Own Part</option>
+              <option value="own" ${it.src === 'own' ? 'selected' : ''}>Customer Brought Own Part</option>
             </select>
           </td>
         `;
       }
 
       // Qty
-      if (readOnly) {
-        html += `<td class="r">${qty}</td>`;
-      } else {
-        html += `
-          <td class="r">
-            <input
-              type="number"
-              min="1"
-              class="item-inline-num"
-              value="${qty}"
-              style="width:55px"
-              onchange="updateItemRow('${context}', '${it.id}', 'qty', this.value)"
-            />
-          </td>
-        `;
+      if (showTableQty) {
+        if (readOnly) {
+          html += `<td class="r">${isLabor ? "—" : qty}</td>`;
+        } else {
+          if (isLabor) {
+            html += `<td class="r" style="color:var(--text-muted)">—</td>`;
+          } else {
+            html += `
+              <td class="r">
+                <input
+                  type="number"
+                  min="1"
+                  class="item-inline-num"
+                  value="${qty}"
+                  style="width:55px"
+                  onchange="updateItemRow('${context}', '${it.id}', 'qty', this.value)"
+                />
+              </td>
+            `;
+          }
+        }
       }
 
       // Price
@@ -9787,11 +10757,16 @@ function getJobCardStageControlHtml(o) {
 /**
  * Advances work order from Awaiting Parts/Approval to In Progress.
  * Sets approved = true and converts all waiting parts to shop.
+ * Closes the Job Card modal upon successful move and returns to Active Repairs.
  * @param {string} woId
  */
 function startRepairFromAwaiting(woId) {
+  if (isStageTransitioning) return;
   const o = g("wo", woId);
   if (!o) return;
+  isStageTransitioning = true;
+  disableStageActions();
+
   o.st = "In Progress";
   o.approved = true;
   if (Array.isArray(o.items)) {
@@ -9805,22 +10780,24 @@ function startRepairFromAwaiting(woId) {
     });
   }
   save();
-  renderInspModal(woId);
-  if (view === "rep") {
-    const resEl = $("rep-results");
-    if (resEl) resEl.innerHTML = getRepResultsHtml();
-    const chipsEl = $("rep-chips");
-    if (chipsEl) chipsEl.innerHTML = getRepChipsHtml();
-  }
+  closeInspModal();
+  setTimeout(() => {
+    isStageTransitioning = false;
+  }, 100);
 }
 
 /**
  * Returns work order from Checking back to In Progress with optional remark.
+ * Closes the Job Card modal upon successful move and returns to Active Repairs.
  * @param {string} woId
  */
 function returnJobToRepair(woId) {
+  if (isStageTransitioning) return;
   const o = g("wo", woId);
   if (!o) return;
+  isStageTransitioning = true;
+  disableStageActions();
+
   const reasonInp = $("qc-reason-" + woId);
   const reason = reasonInp ? reasonInp.value.trim() : "";
   if (reason) {
@@ -9828,34 +10805,31 @@ function returnJobToRepair(woId) {
   }
   o.st = "In Progress";
   save();
-  renderInspModal(woId);
-  if (view === "rep") {
-    const resEl = $("rep-results");
-    if (resEl) resEl.innerHTML = getRepResultsHtml();
-    const chipsEl = $("rep-chips");
-    if (chipsEl) chipsEl.innerHTML = getRepChipsHtml();
-  }
+  closeInspModal();
+  setTimeout(() => {
+    isStageTransitioning = false;
+  }, 100);
 }
 
 /**
  * Passes checking stage and sends work order to Ready for Pickup (Ready for Billing).
+ * Closes the Job Card modal upon successful move and returns to Active Repairs.
  * @param {string} woId
  */
 function passJobChecking(woId) {
+  if (isStageTransitioning) return;
   const o = g("wo", woId);
   if (!o) return;
+  isStageTransitioning = true;
+  disableStageActions();
+
   o.st = "Ready for Pickup";
   o.readyAt = nowLocalIso();
   save();
-  renderInspModal(woId);
-  if (view === "rep") {
-    const resEl = $("rep-results");
-    if (resEl) resEl.innerHTML = getRepResultsHtml();
-    const chipsEl = $("rep-chips");
-    if (chipsEl) chipsEl.innerHTML = getRepChipsHtml();
-  } else if (view === "dash") {
-    $("main").innerHTML = R.dash();
-  }
+  closeInspModal();
+  setTimeout(() => {
+    isStageTransitioning = false;
+  }, 100);
 }
 
 /**
@@ -10417,6 +11391,7 @@ function getInspStep3Html() {
             <div style="font-size:13px;line-height:1.6">
               <div><b>Plate:</b> ${escHtml(inspDraft.plate || "NO PLATE")}</div>
               <div><b>Make &amp; Model:</b> ${escHtml([inspDraft.make, inspDraft.model].filter(Boolean).join(" ") || "Unknown")}</div>
+              <div><b>Odometer:</b> ${inspDraft.odo ? `${Number(inspDraft.odo).toLocaleString()} km` : "—"}</div>
               <div style="margin-top:8px">
                 <b>Customer Complaints:</b>
                 ${(inspDraft.complaints && inspDraft.complaints.length > 0)
@@ -10535,6 +11510,7 @@ function getInspStep3Html() {
               <div style="font-weight:700">${escHtml([inspDraft.make, inspDraft.model].filter(Boolean).join(" ") || "Unknown")}</div>
               <div style="font-size:12px;color:var(--text-muted);display:flex;gap:8px;margin-top:2px">
                 <span>Plate: <b>${escHtml(inspDraft.plate || "NO PLATE")}</b></span>
+                ${inspDraft.odo ? `<span>·</span><span>Odo: <b>${Number(inspDraft.odo).toLocaleString()} km</b></span>` : ""}
               </div>
             </div>
 
@@ -10654,6 +11630,9 @@ function confirmInspectionJobOrder() {
   }
 
   // 2. Motorcycle matching: never match on empty or NO PLATE
+  const rawOdo = parseInt(String(inspDraft.odo || "").replace(/[^0-9]/g, ""), 10);
+  const odoVal = (!isNaN(rawOdo) && rawOdo >= 0) ? rawOdo : 0;
+
   let b = null;
   if (rawPlate && rawPlate.toUpperCase() !== "NO PLATE") {
     b = D.bk.find((x) => x.plate && x.plate.trim().toUpperCase() === rawPlate.toUpperCase());
@@ -10666,14 +11645,16 @@ function confirmInspectionJobOrder() {
       model: model || "",
       year: "",
       plate: plate,
-      odo: 0
+      odo: odoVal
     };
     D.bk.push(b);
   } else {
     b.cid = c.id;
     if (rawMake) b.make = rawMake;
     if (rawModel) b.model = rawModel;
-    // Keep b.year and b.odo untouched; do not update them from this page
+    if (odoVal > 0 || (rawPlate && rawPlate.toUpperCase() !== "NO PLATE")) {
+      b.odo = odoVal;
+    }
   }
 
   // 3. Work order object
@@ -10690,7 +11671,7 @@ function confirmInspectionJobOrder() {
     mech: isMechanic ? u.name : "", // Automatic assignment for Mechanic, unassigned for Admin
     st: "Awaiting Parts/Approval", // per Part 5
     sv: [],
-    // do not set wo.odo
+    odo: odoVal,
     complaints: complaints,
     notes: notes,
     note: combinedNotes,
@@ -10802,7 +11783,8 @@ function getFilteredBillOrders(filter = billFilter) {
     if (filter === "all") {
       if (o.st === "Completed") return false;
     } else if (filter === "adv" || filter === "advances") {
-      if (o.st === "Completed" || o.st === "Ready for Pickup") return false;
+      const advTotal = getAdvancesTotal(o);
+      if (o.st === "Completed" || o.st === "Ready for Pickup" || advTotal > 0) return false;
     } else if (filter === "final" || filter === "settlement") {
       if (o.st !== "Ready for Pickup") return false;
     } else if (filter === "done" || filter === "completed") {
@@ -10892,18 +11874,20 @@ function clearBillSearch() {
   if (resEl) resEl.innerHTML = getBillResultsHtml();
 }
 
+/** Configuration for Transactions & Billing filter chips. */
+const BILL_CHIPS = [
+  { key: "all", label: "All Active", modifier: "all" },
+  { key: "adv", label: "Pending Advances", modifier: "adv" },
+  { key: "final", label: "Pending Final Settlement", modifier: "final" },
+  { key: "done", label: "Completed Transactions", modifier: "done" }
+];
+
 /**
  * Updates class, aria-pressed, checkmark, and count on all four Transactions & Billing filter chips by filter key.
  */
 function updateBillChipsDom() {
-  const chips = [
-    { key: "all", label: "All Active", modifier: "all" },
-    { key: "adv", label: "Pending Advances", modifier: "adv" },
-    { key: "final", label: "Pending Final Settlement", modifier: "final" },
-    { key: "done", label: "Completed Transactions", modifier: "done" }
-  ];
   let allFound = true;
-  chips.forEach((c) => {
+  BILL_CHIPS.forEach((c) => {
     const el = $(`bill-chip-${c.modifier}`);
     if (!el) {
       allFound = false;
@@ -10914,10 +11898,11 @@ function updateBillChipsDom() {
       (c.key === "final" && billFilter === "settlement") ||
       (c.key === "done" && billFilter === "completed");
     const count = getFilteredBillOrders(c.key).length;
+    const checkMark = isSelected ? `<span class="bill-chip-check" aria-hidden="true">✓ </span>` : "";
 
     el.className = `bill-chip bill-chip--${c.modifier}${isSelected ? " is-selected" : ""}`;
     el.setAttribute("aria-pressed", isSelected ? "true" : "false");
-    el.innerHTML = `${isSelected ? '<span class="bill-chip-check" aria-hidden="true">✓ </span>' : ""}${c.label} <span class="bill-chip-count">(${count})</span>`;
+    el.innerHTML = `${checkMark}${c.label} <span class="bill-chip-count">(${count})</span>`;
   });
 
   if (!allFound) {
@@ -10953,29 +11938,21 @@ function refreshBillView() {
 }
 
 /**
- * Builds HTML for Transactions & Billing filter chips with dynamic counts and distinct color styling.
+ * Builds HTML for Transactions & Billing filter chips with dynamic counts.
  * @returns {string} HTML string.
  */
 function getBillChipsHtml() {
-  const chips = [
-    { key: "all", label: "All Active", modifier: "all" },
-    { key: "adv", label: "Pending Advances", modifier: "adv" },
-    { key: "final", label: "Pending Final Settlement", modifier: "final" },
-    { key: "done", label: "Completed Transactions", modifier: "done" }
-  ];
-
-  return chips
+  return BILL_CHIPS
     .map((c) => {
       const isSelected = billFilter === c.key ||
         (c.key === "adv" && billFilter === "advances") ||
         (c.key === "final" && billFilter === "settlement") ||
         (c.key === "done" && billFilter === "completed");
       const count = getFilteredBillOrders(c.key).length;
+      const checkMark = isSelected ? `<span class="bill-chip-check" aria-hidden="true">✓ </span>` : "";
       return `<button type="button" id="bill-chip-${c.modifier}" class="bill-chip bill-chip--${c.modifier}${
         isSelected ? " is-selected" : ""
-      }" aria-pressed="${isSelected ? "true" : "false"}" onclick="setBillFilter('${c.key}')">${
-        isSelected ? '<span class="bill-chip-check" aria-hidden="true">✓ </span>' : ""
-      }${c.label} <span class="bill-chip-count">(${count})</span></button>`;
+      }" aria-pressed="${isSelected ? "true" : "false"}" onclick="setBillFilter('${c.key}')">${checkMark}${c.label} <span class="bill-chip-count">(${count})</span></button>`;
     })
     .join("");
 }

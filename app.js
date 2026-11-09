@@ -2515,6 +2515,9 @@ function go(v) {
   if (v === "insp" && inspDraftStep === 2) {
     autoGrowTextarea($("insp-diag-findings"));
   }
+  if (v === "pos") {
+    posView = "parts";
+  }
   if (["pos", "ql", "bill"].includes(v)) {
     posLastTab = v;
     renderPosSwitcher(v);
@@ -5878,6 +5881,7 @@ let sharedBarFeedbackTimer = null;
 let inspDraft = createFreshInspDraft();
 let inspDraftStep = 1;
 let inspDiagView = "inspection";
+let inspConfirmView = "summary";
 let selectedPhysRailCat = null;
 
 /**
@@ -5887,6 +5891,7 @@ function resetInspDraft() {
   inspDraft = createFreshInspDraft();
   inspDraftStep = 1;
   inspDiagView = "inspection";
+  inspConfirmView = "summary";
   brandDropdownOpen = false;
   brandHighlightIndex = -1;
   modelDropdownOpen = false;
@@ -5960,6 +5965,8 @@ function setInspDraftStep(newStep) {
   inspDraftStep = Math.max(1, Math.min(3, newStep));
   if (inspDraftStep === 2) {
     inspDiagView = "inspection";
+  } else if (inspDraftStep === 3) {
+    inspConfirmView = "summary";
   }
   if (view === "insp") {
     const mainEl = $("main");
@@ -11325,10 +11332,92 @@ function getZoneNameForItem(catKey, itKey) {
 }
 
 /**
+ * Switches the active sub-view in Step 3 Confirmation without destroying DOM elements.
+ * @param {"summary"|"customer"} viewName - Target sub-view.
+ */
+function setInspConfirmView(viewName) {
+  inspConfirmView = viewName === "customer" ? "customer" : "summary";
+  readConfirmDomIntoDraft();
+
+  const isA = inspConfirmView !== "customer";
+  const panelA = $("insp-confirm-panel-a");
+  const panelB = $("insp-confirm-panel-b");
+  const tabA = $("insp-confirm-tab-a");
+  const tabB = $("insp-confirm-tab-b");
+
+  if (panelA) {
+    panelA.hidden = !isA;
+    panelA.style.display = isA ? "block" : "none";
+  }
+  if (panelB) {
+    panelB.hidden = isA;
+    panelB.style.display = isA ? "none" : "block";
+  }
+  if (tabA) {
+    if (isA) {
+      tabA.classList.add("active");
+      tabA.setAttribute("aria-selected", "true");
+      tabA.setAttribute("tabindex", "0");
+    } else {
+      tabA.classList.remove("active");
+      tabA.setAttribute("aria-selected", "false");
+      tabA.setAttribute("tabindex", "-1");
+    }
+  }
+  if (tabB) {
+    if (!isA) {
+      tabB.classList.add("active");
+      tabB.setAttribute("aria-selected", "true");
+      tabB.setAttribute("tabindex", "0");
+    } else {
+      tabB.classList.remove("active");
+      tabB.setAttribute("aria-selected", "false");
+      tabB.setAttribute("tabindex", "-1");
+    }
+  }
+
+  scrollIntoViewIfAbove("insp-confirm-toggle");
+}
+
+/**
+ * Handles keyboard navigation (ArrowLeft/ArrowRight, Home/End, Enter/Space) for Confirmation switch tabs.
+ * @param {KeyboardEvent} e
+ */
+function handleInspConfirmTabKeydown(e) {
+  const tabA = $("insp-confirm-tab-a");
+  const tabB = $("insp-confirm-tab-b");
+  if (!tabA || !tabB) return;
+
+  const key = e.key;
+  if (key === "ArrowRight" || key === "ArrowLeft") {
+    e.preventDefault();
+    if (document.activeElement === tabA) {
+      tabB.focus();
+    } else {
+      tabA.focus();
+    }
+  } else if (key === "Home") {
+    e.preventDefault();
+    tabA.focus();
+  } else if (key === "End") {
+    e.preventDefault();
+    tabB.focus();
+  } else if (key === "Enter" || key === " " || key === "Spacebar") {
+    e.preventDefault();
+    if (document.activeElement === tabB) {
+      setInspConfirmView("customer");
+    } else if (document.activeElement === tabA) {
+      setInspConfirmView("summary");
+    }
+  }
+}
+
+/**
  * Generates HTML for Step 3 Confirmation form.
- * Two-column layout: left column contains read-only summaries with Edit links;
- * right column contains a sticky Job Order Ticket with prefilled customer inputs,
- * live totals, counts, and primary Confirm button.
+ * Split into two views toggled by segmented switch buttons directly below title/subtitle:
+ * View A: "Summary" -> 4 review cards (and ECU/OBD diagnostic card if present) plus Accounting Total card.
+ * View B: "Customer" -> Customer Details panel with optional name and phone.
+ * Confirmation action buttons stay visible below both views.
  * @returns {string} HTML string.
  */
 function getInspStep3Html() {
@@ -11372,6 +11461,8 @@ function getInspStep3Html() {
   const scannedVehicle = obdBike ? [obdBike.brand, obdBike.model].filter(Boolean).join(" ") : "";
   const scannedLine = obdBike ? [scannedVehicle, obdBike.plate].filter(Boolean).join(" • ") : "";
 
+  const isA = inspConfirmView !== "customer";
+
   return `
     <div class="insp-stage-body">
       <div style="margin-bottom:16px">
@@ -11379,214 +11470,277 @@ function getInspStep3Html() {
         <p style="margin:0;color:var(--text-muted);font-size:13px">Review the details, add the customer, then send this job to Active Repairs.</p>
       </div>
 
-      <div class="confirm-two-col">
-        <!-- LEFT COLUMN: Read-only summary cards -->
-        <div class="confirm-left-col">
-          <!-- 1. Vehicle & Complaints Card -->
-          <div class="confirm-summary-card">
-            <div class="confirm-card-header">
-              <span style="font-weight:700;font-size:13px;color:var(--text-primary)">Vehicle &amp; Complaints</span>
-              <a href="javascript:void(0)" class="insp-edit-link" onclick="setInspDraftStep(1)">Edit</a>
-            </div>
-            <div style="font-size:13px;line-height:1.6">
-              <div><b>Plate:</b> ${escHtml(inspDraft.plate || "NO PLATE")}</div>
-              <div><b>Make &amp; Model:</b> ${escHtml([inspDraft.make, inspDraft.model].filter(Boolean).join(" ") || "Unknown")}</div>
-              <div><b>Odometer:</b> ${inspDraft.odo ? `${Number(inspDraft.odo).toLocaleString()} km` : "—"}</div>
-              <div style="margin-top:8px">
-                <b>Customer Complaints:</b>
-                ${(inspDraft.complaints && inspDraft.complaints.length > 0)
-                  ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
-                      ${inspDraft.complaints.map((c) => `<span class="complaint-chip-ro">${escHtml(c)}</span>`).join("")}
-                    </div>`
-                  : `<span style="color:var(--text-muted);margin-left:4px">None</span>`
-                }
-              </div>
-              <div style="margin-top:6px">
-                <b>Customer Notes:</b> ${inspDraft.notes ? escHtml(inspDraft.notes) : `<span style="color:var(--text-muted)">None</span>`}
-              </div>
-            </div>
+      <!-- Segmented switch for Step 3 views -->
+      <div
+        class="item-cat-toggle-wrap insp-diag-toggle-wrap"
+        id="insp-confirm-toggle"
+        role="tablist"
+        aria-label="Confirmation sections"
+        onkeydown="handleInspConfirmTabKeydown(event)"
+      >
+        <button
+          type="button"
+          id="insp-confirm-tab-a"
+          class="item-cat-btn insp-diag-tab-btn ${isA ? "active" : ""}"
+          role="tab"
+          aria-selected="${isA ? "true" : "false"}"
+          aria-controls="insp-confirm-panel-a"
+          tabindex="${isA ? "0" : "-1"}"
+          onclick="setInspConfirmView('summary')"
+        >
+          Summary
+        </button>
+        <button
+          type="button"
+          id="insp-confirm-tab-b"
+          class="item-cat-btn insp-diag-tab-btn ${!isA ? "active" : ""}"
+          role="tab"
+          aria-selected="${!isA ? "true" : "false"}"
+          aria-controls="insp-confirm-panel-b"
+          tabindex="${!isA ? "0" : "-1"}"
+          onclick="setInspConfirmView('customer')"
+        >
+          Customer
+        </button>
+      </div>
+
+      <!-- View A Panel: Summary Review Cards -->
+      <div
+        id="insp-confirm-panel-a"
+        role="tabpanel"
+        aria-labelledby="insp-confirm-tab-a"
+        ${isA ? "" : "hidden"}
+        style="${isA ? "display:block" : "display:none"}"
+      >
+        <!-- 1. Vehicle & Complaints Card -->
+        <div class="confirm-summary-card">
+          <div class="confirm-card-header">
+            <span style="font-weight:700;font-size:13px;color:var(--text-primary)">Vehicle &amp; Complaints</span>
+            <a href="javascript:void(0)" class="insp-edit-link" onclick="setInspDraftStep(1)">Edit</a>
           </div>
-
-          <!-- 2. Flagged Issues Card (Fix first, then Watch; omits OK) -->
-          <div class="confirm-summary-card">
-            <div class="confirm-card-header">
-              <span style="font-weight:700;font-size:13px;color:var(--text-primary)">Flagged Issues (${fixList.length + watchList.length})</span>
-              <a href="javascript:void(0)" class="insp-edit-link" onclick="setInspDraftStep(2)">Edit</a>
-            </div>
-            <div style="font-size:13px;line-height:1.6">
-              ${(fixList.length === 0 && watchList.length === 0) ? `
-                <div style="color:var(--text-muted)">All inspected items OK.</div>
-              ` : `
-                ${fixList.length > 0 ? `
-                  <div class="flagged-subheading" style="color:var(--danger)">Fix Required (${fixList.length})</div>
-                  <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:${watchList.length > 0 ? '12px' : '0'}">
-                    ${fixList.map((wf) => `
-                      <div class="flagged-issue-row">
-                        <span class="fault-badge fix">FIX</span>
-                        <div>
-                          <div style="font-weight:700;font-size:13px;color:var(--text-primary)">
-                            ${escHtml(wf.label)} <span style="font-size:11px;font-weight:400;color:var(--text-muted)">(${escHtml(wf.zoneName)})</span>
-                          </div>
-                          ${wf.note ? `<div style="font-size:12px;color:var(--text-secondary);margin-top:2px;font-style:italic">${escHtml(wf.note)}</div>` : ""}
-                        </div>
-                      </div>
-                    `).join("")}
-                  </div>
-                ` : ""}
-
-                ${watchList.length > 0 ? `
-                  <div class="flagged-subheading" style="color:var(--warning)">Watch / Wearing (${watchList.length})</div>
-                  <div style="display:flex;flex-direction:column;gap:6px">
-                    ${watchList.map((wf) => `
-                      <div class="flagged-issue-row">
-                        <span class="fault-badge watch">WATCH</span>
-                        <div>
-                          <div style="font-weight:700;font-size:13px;color:var(--text-primary)">
-                            ${escHtml(wf.label)} <span style="font-size:11px;font-weight:400;color:var(--text-muted)">(${escHtml(wf.zoneName)})</span>
-                          </div>
-                          ${wf.note ? `<div style="font-size:12px;color:var(--text-secondary);margin-top:2px;font-style:italic">${escHtml(wf.note)}</div>` : ""}
-                        </div>
-                      </div>
-                    `).join("")}
-                  </div>
-                ` : ""}
-              `}
-            </div>
-          </div>
-
-          <!-- 3. ECU / OBD Diagnostic Codes Card (Hidden when none) -->
-          ${obdCodes.length > 0 ? `
-            <div class="confirm-summary-card">
-              <div class="confirm-card-header">
-                <span style="font-weight:700;font-size:13px;color:var(--text-primary)">ECU / OBD Diagnostic Codes (${obdCodes.length})</span>
-                <a href="javascript:void(0)" class="insp-edit-link" onclick="setInspDraftStep(2)">Edit</a>
-              </div>
-              <div style="display:flex;flex-direction:column;gap:6px">
-                ${obdCodes.map((c) => getObdCodeSummaryDisplayHtml(c)).join("")}
-              </div>
-            </div>
-          ` : ""}
-
-          <!-- 4. Final Findings & Diagnosis Verification Card -->
-          <div class="confirm-summary-card">
-            <div class="confirm-card-header">
-              <span style="font-weight:700;font-size:13px;color:var(--text-primary)">Final Findings &amp; Diagnosis Verification</span>
-              <a href="javascript:void(0)" class="insp-edit-link" onclick="setInspDraftStep(2)">Edit</a>
-            </div>
-            <div>
-              ${inspDraft.findings && inspDraft.findings.trim()
-                ? `<div style="white-space:pre-wrap;background:#F8FAFC;padding:8px 12px;border-radius:6px;font-size:13px;line-height:1.5;border:1px solid var(--border)">${escHtml(inspDraft.findings)}</div>`
-                : `<div style="font-size:13px;color:var(--text-muted)">-</div>`
+          <div style="font-size:13px;line-height:1.6">
+            <div><b>Plate:</b> ${escHtml(inspDraft.plate || "NO PLATE")}</div>
+            <div><b>Make &amp; Model:</b> ${escHtml([inspDraft.make, inspDraft.model].filter(Boolean).join(" ") || "Unknown")}</div>
+            <div><b>Odometer:</b> ${inspDraft.odo ? `${Number(inspDraft.odo).toLocaleString()} km` : "—"}</div>
+            <div style="margin-top:8px">
+              <b>Customer Complaints:</b>
+              ${(inspDraft.complaints && inspDraft.complaints.length > 0)
+                ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+                    ${inspDraft.complaints.map((c) => `<span class="complaint-chip-ro">${escHtml(c)}</span>`).join("")}
+                  </div>`
+                : `<span style="color:var(--text-muted);margin-left:4px">None</span>`
               }
             </div>
+            <div style="margin-top:6px">
+              <b>Customer Notes:</b> ${inspDraft.notes ? escHtml(inspDraft.notes) : `<span style="color:var(--text-muted)">None</span>`}
+            </div>
           </div>
+        </div>
 
-          <!-- 5. Services & Parts (auto-attached) Card -->
+        <!-- 2. Flagged Issues Card (Fix first, then Watch; omits OK) -->
+        <div class="confirm-summary-card">
+          <div class="confirm-card-header">
+            <span style="font-weight:700;font-size:13px;color:var(--text-primary)">Flagged Issues (${fixList.length + watchList.length})</span>
+            <a href="javascript:void(0)" class="insp-edit-link" onclick="setInspDraftStep(2)">Edit</a>
+          </div>
+          <div style="font-size:13px;line-height:1.6">
+            ${(fixList.length === 0 && watchList.length === 0) ? `
+              <div style="color:var(--text-muted)">All inspected items OK.</div>
+            ` : `
+              ${fixList.length > 0 ? `
+                <div class="flagged-subheading" style="color:var(--danger)">Fix Required (${fixList.length})</div>
+                <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:${watchList.length > 0 ? '12px' : '0'}">
+                  ${fixList.map((wf) => `
+                    <div class="flagged-issue-row">
+                      <span class="fault-badge fix">FIX</span>
+                      <div>
+                        <div style="font-weight:700;font-size:13px;color:var(--text-primary)">
+                          ${escHtml(wf.label)} <span style="font-size:11px;font-weight:400;color:var(--text-muted)">(${escHtml(wf.zoneName)})</span>
+                        </div>
+                        ${wf.note ? `<div style="font-size:12px;color:var(--text-secondary);margin-top:2px;font-style:italic">${escHtml(wf.note)}</div>` : ""}
+                      </div>
+                    </div>
+                  `).join("")}
+                </div>
+              ` : ""}
+
+              ${watchList.length > 0 ? `
+                <div class="flagged-subheading" style="color:var(--warning)">Watch / Wearing (${watchList.length})</div>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  ${watchList.map((wf) => `
+                    <div class="flagged-issue-row">
+                      <span class="fault-badge watch">WATCH</span>
+                      <div>
+                        <div style="font-weight:700;font-size:13px;color:var(--text-primary)">
+                          ${escHtml(wf.label)} <span style="font-size:11px;font-weight:400;color:var(--text-muted)">(${escHtml(wf.zoneName)})</span>
+                        </div>
+                        ${wf.note ? `<div style="font-size:12px;color:var(--text-secondary);margin-top:2px;font-style:italic">${escHtml(wf.note)}</div>` : ""}
+                      </div>
+                    </div>
+                  `).join("")}
+                </div>
+              ` : ""}
+            `}
+          </div>
+        </div>
+
+        <!-- 3. ECU / OBD Diagnostic Codes Card (Hidden when none) -->
+        ${obdCodes.length > 0 ? `
           <div class="confirm-summary-card">
             <div class="confirm-card-header">
-              <span style="font-weight:700;font-size:13px;color:var(--text-primary)">Services &amp; Parts (auto-attached)</span>
+              <span style="font-weight:700;font-size:13px;color:var(--text-primary)">ECU / OBD Diagnostic Codes (${obdCodes.length})</span>
               <a href="javascript:void(0)" class="insp-edit-link" onclick="setInspDraftStep(2)">Edit</a>
             </div>
-            ${
-              (!inspDraft.items || !inspDraft.items.length)
-                ? `<div style="font-size:13px;color:var(--text-muted)">None</div>`
-                : getItemsBuilderHtml("draft", { readOnly: true, showLaborDone: false })
+            <div style="display:flex;flex-direction:column;gap:6px">
+              ${obdCodes.map((c) => getObdCodeSummaryDisplayHtml(c)).join("")}
+            </div>
+          </div>
+        ` : ""}
+
+        <!-- 4. Final Findings & Diagnosis Verification Card -->
+        <div class="confirm-summary-card">
+          <div class="confirm-card-header">
+            <span style="font-weight:700;font-size:13px;color:var(--text-primary)">Final Findings &amp; Diagnosis Verification</span>
+            <a href="javascript:void(0)" class="insp-edit-link" onclick="setInspDraftStep(2)">Edit</a>
+          </div>
+          <div>
+            ${inspDraft.findings && inspDraft.findings.trim()
+              ? `<div style="white-space:pre-wrap;background:#F8FAFC;padding:8px 12px;border-radius:6px;font-size:13px;line-height:1.5;border:1px solid var(--border)">${escHtml(inspDraft.findings)}</div>`
+              : `<div style="font-size:13px;color:var(--text-muted)">-</div>`
             }
           </div>
         </div>
 
-        <!-- RIGHT COLUMN: Sticky Job Order Ticket -->
-        <div class="confirm-right-col">
-          <div class="confirm-sticky-ticket">
-            <div class="ticket-header-strip">
-              <div>
-                <div class="ticket-header-title">Draft Job Order</div>
-                <div class="ticket-header-sub">${formatJobDate(today())}</div>
-              </div>
-              <span class="ticket-badge-pill">Ticket</span>
+        <!-- 5. Services & Parts (auto-attached) Card -->
+        <div class="confirm-summary-card">
+          <div class="confirm-card-header">
+            <span style="font-weight:700;font-size:13px;color:var(--text-primary)">Services &amp; Parts (auto-attached)</span>
+            <a href="javascript:void(0)" class="insp-edit-link" onclick="setInspDraftStep(2)">Edit</a>
+          </div>
+          ${
+            (!inspDraft.items || !inspDraft.items.length)
+              ? `<div style="font-size:13px;color:var(--text-muted)">None</div>`
+              : getItemsBuilderHtml("draft", { readOnly: true, showLaborDone: false })
+          }
+        </div>
+
+        <!-- 6. Accounting Total Card -->
+        <div class="confirm-summary-card">
+          <div class="confirm-card-header">
+            <span style="font-weight:700;font-size:13px;color:var(--text-primary)">Accounting Total</span>
+          </div>
+          <div class="ticket-totals-block" style="margin-bottom:0">
+            <div class="ticket-totals-row">
+              <span>Labor Subtotal</span>
+              <span style="font-weight:600">${P(draftTotals.labor || 0)}</span>
             </div>
-
-            <div class="ticket-vehicle-line">
-              <div style="font-weight:700">${escHtml([inspDraft.make, inspDraft.model].filter(Boolean).join(" ") || "Unknown")}</div>
-              <div style="font-size:12px;color:var(--text-muted);display:flex;gap:8px;margin-top:2px">
-                <span>Plate: <b>${escHtml(inspDraft.plate || "NO PLATE")}</b></span>
-                ${inspDraft.odo ? `<span>·</span><span>Odo: <b>${Number(inspDraft.odo).toLocaleString()} km</b></span>` : ""}
-              </div>
+            <div class="ticket-totals-row">
+              <span>Parts Subtotal</span>
+              <span style="font-weight:600">${P(draftTotals.parts || 0)}</span>
             </div>
-
-            <div class="ticket-cust-fields">
-              <div>
-                <label class="ticket-label" for="insp-cust-name">Customer Name</label>
-                <input
-                  id="insp-cust-name"
-                  type="text"
-                  class="ticket-input"
-                  placeholder="Full name (e.g. Juan dela Cruz)"
-                  value="${escHtml(inspDraft.custName || "")}"
-                  oninput="inspDraft.custName=this.value"
-                />
-              </div>
-              <div>
-                <label class="ticket-label" for="insp-cust-phone">Contact Number</label>
-                <input
-                  id="insp-cust-phone"
-                  type="text"
-                  class="ticket-input"
-                  placeholder="e.g. 0917 555 0101"
-                  value="${escHtml(inspDraft.custPhone || "")}"
-                  oninput="inspDraft.custPhone=this.value"
-                />
-              </div>
+            <div class="ticket-totals-divider"></div>
+            <div class="ticket-totals-row total">
+              <span>Estimated Total</span>
+              <span class="ticket-total-val">${P(draftTotals.total || 0)}</span>
             </div>
-
-            <div class="ticket-counts-line">
-              ${(() => {
-                const parts = [];
-                if (counts.fix > 0) parts.push(`${counts.fix} Fix`);
-                if (counts.watch > 0) parts.push(`${counts.watch} Watch`);
-                const physText = parts.length > 0 ? parts.join(" · ") : "All inspected items OK.";
-                return `${physText} · ${obdCodes.length} code${obdCodes.length === 1 ? "" : "s"}`;
-              })()}
-            </div>
-
-            <div class="ticket-totals-block">
-              <div class="ticket-totals-row">
-                <span>Labor Subtotal</span>
-                <span style="font-weight:600">${P(draftTotals.labor)}</span>
-              </div>
-              <div class="ticket-totals-row">
-                <span>Parts Subtotal</span>
-                <span style="font-weight:600">${P(draftTotals.parts)}</span>
-              </div>
-              <div class="ticket-totals-divider"></div>
-              <div class="ticket-totals-row total">
-                <span>Estimated Total</span>
-                <span class="ticket-total-val">${P(draftTotals.total)}</span>
-              </div>
-            </div>
-
-            <div class="ticket-send-note">
-              Confirming sends this job to Active Repairs with status Awaiting Parts/Approval.
-            </div>
-
-            <button
-              type="button"
-              class="btn-confirm-ticket"
-              onclick="confirmInspectionJobOrder()"
-            >
-              Confirm &amp; Send to Active Repairs
-            </button>
-
-            <button
-              type="button"
-              class="btn g"
-              style="width:100%;min-height:44px;margin-top:8px;justify-content:center"
-              onclick="setInspDraftStep(2)"
-            >
-              ← Back to Diagnosis
-            </button>
           </div>
         </div>
+      </div>
+
+      <!-- View B Panel: Customer -->
+      <div
+        id="insp-confirm-panel-b"
+        role="tabpanel"
+        aria-labelledby="insp-confirm-tab-b"
+        ${!isA ? "" : "hidden"}
+        style="${!isA ? "display:block" : "display:none"}"
+      >
+        <div class="confirm-sticky-ticket" style="max-width:640px;position:static">
+          <div class="confirm-card-header" style="margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #F1F5F9">
+            <span style="font-weight:700;font-size:13px;color:var(--text-primary)">Customer Details</span>
+          </div>
+
+          <div class="ticket-header-strip">
+            <div>
+              <div class="ticket-header-title">Draft Job Order</div>
+              <div class="ticket-header-sub">${formatJobDate(today())}</div>
+            </div>
+            <span class="ticket-badge-pill">Ticket</span>
+          </div>
+
+          <div class="ticket-vehicle-line">
+            <div style="font-weight:700">${escHtml([inspDraft.make, inspDraft.model].filter(Boolean).join(" ") || "Unknown")}</div>
+            <div style="font-size:12px;color:var(--text-muted);display:flex;gap:8px;margin-top:2px">
+              <span>Plate: <b>${escHtml(inspDraft.plate || "NO PLATE")}</b></span>
+              ${inspDraft.odo ? `<span>·</span><span>Odo: <b>${Number(inspDraft.odo).toLocaleString()} km</b></span>` : ""}
+            </div>
+          </div>
+
+          <div class="ticket-cust-fields">
+            <div>
+              <label class="ticket-label" for="insp-cust-name">
+                CUSTOMER NAME <span style="font-size:10px;font-weight:400;color:var(--text-muted);text-transform:none">(optional)</span>
+              </label>
+              <input
+                id="insp-cust-name"
+                type="text"
+                class="ticket-input"
+                placeholder="Full name (e.g. Juan dela Cruz)"
+                value="${escHtml(inspDraft.custName || "")}"
+                oninput="inspDraft.custName=this.value"
+              />
+            </div>
+            <div>
+              <label class="ticket-label" for="insp-cust-phone">
+                CONTACT NUMBER <span style="font-size:10px;font-weight:400;color:var(--text-muted);text-transform:none">(optional)</span>
+              </label>
+              <input
+                id="insp-cust-phone"
+                type="text"
+                class="ticket-input"
+                placeholder="e.g. 0917 555 0101"
+                value="${escHtml(inspDraft.custPhone || "")}"
+                oninput="inspDraft.custPhone=this.value"
+              />
+            </div>
+          </div>
+
+          <div class="ticket-counts-line">
+            ${(() => {
+              const parts = [];
+              if (counts.fix > 0) parts.push(`${counts.fix} Fix`);
+              if (counts.watch > 0) parts.push(`${counts.watch} Watch`);
+              const physText = parts.length > 0 ? parts.join(" · ") : "All inspected items OK.";
+              return `${physText} · ${obdCodes.length} code${obdCodes.length === 1 ? "" : "s"}`;
+            })()}
+          </div>
+
+          <div class="ticket-send-note">
+            Confirming sends this job to Active Repairs with status Awaiting Parts/Approval.
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Buttons: Visible below both views -->
+      <div class="confirm-actions-footer" style="margin-top:20px;max-width:640px">
+        <button
+          type="button"
+          class="btn-confirm-ticket"
+          id="btn-confirm-job-order"
+          onclick="confirmInspectionJobOrder()"
+        >
+          Confirm &amp; Send to Active Repairs
+        </button>
+
+        <button
+          type="button"
+          class="btn g"
+          id="btn-back-to-diagnosis"
+          style="width:100%;min-height:44px;margin-top:8px;justify-content:center"
+          onclick="setInspDraftStep(2)"
+        >
+          ← Back to Diagnosis
+        </button>
       </div>
     </div>
   `;
@@ -14215,6 +14369,9 @@ function getReportsViewHtml() {
 /** In-memory cart items for active Quick Sales sale. */
 let posCart = [];
 
+/** In-memory active sub-view for Quick Sales: "parts" or "cart". Never persisted to localStorage. */
+let posView = "parts";
+
 /** Optional customer name or phone for active sale. */
 let posCustomer = "";
 
@@ -14567,7 +14724,7 @@ function getPosGridHtml() {
   if (items.length === 0) {
     return `
       ${customFormHtml}
-      <div class="pos-tiles-grid">
+      <div class="pos-tiles-grid pos-catalog-grid">
         ${customTileHtml}
       </div>
       <div class="empty" style="padding:40px 16px;text-align:center;background:#FFFFFF;border:1px dashed var(--border);border-radius:12px;margin-top:12px">
@@ -14600,7 +14757,7 @@ function getPosGridHtml() {
 
   return `
     ${customFormHtml}
-    <div class="pos-tiles-grid">
+    <div class="pos-tiles-grid pos-catalog-grid">
       ${customTileHtml}
       ${tilesHtml}
     </div>
@@ -14765,7 +14922,7 @@ function getPosRightPanelHtml() {
       <div class="pos-cart-list" id="pos-cart-list">
         ${
           posCart.length === 0
-            ? `<div class="empty" style="padding:32px 16px;text-align:center;font-size:13px;color:var(--text-muted)">Cart is empty.<br>Tap catalog items on the left to add.</div>`
+            ? `<div class="empty" style="padding:32px 16px;text-align:center;font-size:13px;color:var(--text-muted)">Cart is empty.<br>Tap catalog items in Parts & Fluids to add.</div>`
             : posCart.map((item) => {
                 const lineTotal = (Number(item.qty) || 1) * (Number(item.price) || 0);
                 const isLabor = item.kind === "labor";
@@ -14896,6 +15053,7 @@ function renderPosRightPanel() {
  */
 function renderPosCart() {
   renderPosRightPanel();
+  updatePosCartTabCount();
 }
 
 /**
@@ -15112,6 +15270,7 @@ function chargePosSale() {
   closePosBottomSheet();
   renderPosGrid();
   renderPosCart();
+  updatePosCartTabCount();
   updatePosMobileBar();
   openPosReceipt(newSale.id);
 }
@@ -15430,12 +15589,108 @@ function updatePosMobileBar() {
 }
 
 /**
+ * Synchronizes the Cart & Payment tab button count and aria-label in the DOM.
+ */
+function updatePosCartTabCount() {
+  const tabB = $("pos-tab-cart");
+  if (!tabB) return;
+  const cnt = getPosTotalItemsCount();
+  tabB.textContent = `Cart & Payment (${cnt})`;
+  tabB.setAttribute("aria-label", `Cart and payment, ${cnt} item${cnt === 1 ? "" : "s"}`);
+}
+
+/**
+ * Switches the active sub-view in Quick Sales ("parts" or "cart") without destroying DOM elements.
+ * @param {"parts"|"cart"} viewName - Target sub-view.
+ */
+function setPosView(viewName) {
+  posView = viewName === "cart" ? "cart" : "parts";
+  const isA = posView !== "cart";
+
+  const panelA = $("pos-panel-parts");
+  const panelB = $("pos-panel-cart");
+  const tabA = $("pos-tab-parts");
+  const tabB = $("pos-tab-cart");
+
+  if (panelA) {
+    panelA.hidden = !isA;
+    panelA.style.display = isA ? "block" : "none";
+  }
+  if (panelB) {
+    panelB.hidden = isA;
+    panelB.style.display = isA ? "none" : "block";
+  }
+
+  if (tabA) {
+    if (isA) {
+      tabA.classList.add("active");
+      tabA.setAttribute("aria-selected", "true");
+      tabA.setAttribute("tabindex", "0");
+    } else {
+      tabA.classList.remove("active");
+      tabA.setAttribute("aria-selected", "false");
+      tabA.setAttribute("tabindex", "-1");
+    }
+  }
+
+  if (tabB) {
+    if (!isA) {
+      tabB.classList.add("active");
+      tabB.setAttribute("aria-selected", "true");
+      tabB.setAttribute("tabindex", "0");
+    } else {
+      tabB.classList.remove("active");
+      tabB.setAttribute("aria-selected", "false");
+      tabB.setAttribute("tabindex", "-1");
+    }
+  }
+
+  updatePosCartTabCount();
+  scrollIntoViewIfAbove("pos-view-toggle");
+}
+
+/**
+ * Handles keyboard navigation (ArrowLeft/ArrowRight, Home/End, Enter/Space) for Quick Sales switch tabs.
+ * @param {KeyboardEvent} e
+ */
+function handlePosTabKeydown(e) {
+  const tabA = $("pos-tab-parts");
+  const tabB = $("pos-tab-cart");
+  if (!tabA || !tabB) return;
+
+  const key = e.key;
+  if (key === "ArrowRight" || key === "ArrowLeft") {
+    e.preventDefault();
+    if (document.activeElement === tabA) {
+      tabB.focus();
+    } else {
+      tabA.focus();
+    }
+  } else if (key === "Home") {
+    e.preventDefault();
+    tabA.focus();
+  } else if (key === "End") {
+    e.preventDefault();
+    tabB.focus();
+  } else if (key === "Enter" || key === " " || key === "Spacebar") {
+    e.preventDefault();
+    if (document.activeElement === tabB) {
+      setPosView("cart");
+    } else if (document.activeElement === tabA) {
+      setPosView("parts");
+    }
+  }
+}
+
+/**
  * Main view renderer for the Quick Sales page.
  * @returns {string} Full HTML markup.
  */
 function getPosViewHtml() {
   const total = getPosTotal();
   const totalItems = getPosTotalItemsCount();
+  const isA = (posView !== "cart");
+  const posCartTabAriaLabel = `Cart and payment, ${totalItems} item${totalItems === 1 ? "" : "s"}`;
 
   return `
     <div class="card top">
@@ -15445,9 +15700,50 @@ function getPosViewHtml() {
       </div>
     </div>
 
-    <div class="pos-layout">
-      <!-- Left Column: Search, Item Tiles & Custom Item Form -->
-      <div class="pos-left-col">
+    <!-- Segmented switch for Quick Sales views -->
+    <div
+      class="item-cat-toggle-wrap insp-diag-toggle-wrap pos-view-toggle-wrap"
+      id="pos-view-toggle"
+      role="tablist"
+      aria-label="Quick Sales sections"
+      onkeydown="handlePosTabKeydown(event)"
+    >
+      <button
+        type="button"
+        id="pos-tab-parts"
+        class="item-cat-btn insp-diag-tab-btn ${isA ? "active" : ""}"
+        role="tab"
+        aria-selected="${isA ? "true" : "false"}"
+        aria-controls="pos-panel-parts"
+        tabindex="${isA ? "0" : "-1"}"
+        onclick="setPosView('parts')"
+      >
+        Parts &amp; Fluids
+      </button>
+      <button
+        type="button"
+        id="pos-tab-cart"
+        class="item-cat-btn insp-diag-tab-btn ${!isA ? "active" : ""}"
+        role="tab"
+        aria-selected="${!isA ? "true" : "false"}"
+        aria-controls="pos-panel-cart"
+        aria-label="${posCartTabAriaLabel}"
+        tabindex="${!isA ? "0" : "-1"}"
+        onclick="setPosView('cart')"
+      >
+        Cart &amp; Payment (${totalItems})
+      </button>
+    </div>
+
+    <div class="pos-layout pos-split-layout">
+      <!-- View A: Parts & Fluids Panel -->
+      <div
+        id="pos-panel-parts"
+        role="tabpanel"
+        aria-labelledby="pos-tab-parts"
+        style="${isA ? "display:block" : "display:none"}"
+        ${isA ? "" : "hidden"}
+      >
         <div class="pos-search-wrap">
           <span class="search-icon" onclick="$('pos-search-input').focus()" title="Search">${LINE_ICONS.insp}</span>
           <input
@@ -15474,8 +15770,14 @@ function getPosViewHtml() {
         </div>
       </div>
 
-      <!-- Right Column: Sticky Cart Panel / Today's Sales -->
-      <div class="pos-right-col" id="pos-right-col" onclick="if(event.target===this)closePosBottomSheet()">
+      <!-- View B: Cart & Payment Panel -->
+      <div
+        id="pos-panel-cart"
+        role="tabpanel"
+        aria-labelledby="pos-tab-cart"
+        style="${!isA ? "display:block" : "display:none"}"
+        ${!isA ? "" : "hidden"}
+      >
         <div class="pos-cart-panel" id="pos-cart-panel">
           ${getPosRightPanelHtml()}
         </div>
@@ -15483,7 +15785,7 @@ function getPosViewHtml() {
     </div>
 
     <!-- Mobile Floating Checkout Bar (<900px) -->
-    <div class="pos-mobile-bar" id="pos-mobile-bar" onclick="openPosBottomSheet()">
+    <div class="pos-mobile-bar" id="pos-mobile-bar" style="display:none" onclick="setPosView('cart')">
       View sale · ${totalItems} item${totalItems === 1 ? "" : "s"} · ${P(total)}
     </div>
   `;

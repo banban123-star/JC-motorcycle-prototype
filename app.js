@@ -50,6 +50,7 @@ const ICONS = {
   bill: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><rect x="2" y="4" width="18" height="14" rx="3" fill="var(--nav-bill-tint, #BBF7D0)"/><rect x="2" y="7.5" width="18" height="3" fill="var(--nav-bill, #16A34A)"/><rect x="4.5" y="12" width="4.5" height="3.5" rx="1" fill="var(--nav-bill, #16A34A)"/><rect x="11" y="13" width="6.5" height="2" rx="1" fill="var(--nav-bill, #16A34A)"/></svg>`,
   his: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><circle cx="11" cy="11.5" r="7.8" fill="var(--nav-his-tint, #C7D2FE)"/><path d="M11 4.5a7 7 0 1 1-5.8 3.1" stroke="var(--nav-his, #4F46E5)" stroke-width="2" stroke-linecap="round"/><polyline points="4 4 5.2 7.8 9 7.8" fill="none" stroke="var(--nav-his, #4F46E5)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="11" cy="11.5" r="1.5" fill="var(--nav-his, #4F46E5)"/><path d="M11 8v3.5l2.5 1.5" stroke="var(--nav-his, #4F46E5)" stroke-width="1.8" stroke-linecap="round"/></svg>`,
   reports: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><rect x="2.5" y="12" width="4.5" height="7.5" rx="1.8" fill="var(--nav-reports-tint, #FBCFE8)"/><rect x="8.8" y="7.5" width="4.5" height="12" rx="1.8" fill="var(--nav-reports, #DB2777)"/><rect x="15" y="3.5" width="4.5" height="16" rx="1.8" fill="var(--nav-reports-tint, #FBCFE8)"/><path d="M4.5 10.5L11 6L17.2 2.8" stroke="var(--nav-reports, #DB2777)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="17.2" cy="2.8" r="1.8" fill="var(--nav-reports, #DB2777)"/></svg>`,
+  audit: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><path d="M11 2.2L18.5 5.2v5.5c0 5-3.5 8.5-7.5 10-4-1.5-7.5-5-7.5-10V5.2L11 2.2z" fill="var(--nav-audit-tint, #99F6E4)" stroke="var(--nav-audit, #0F766E)" stroke-width="1.5" stroke-linejoin="round"/><polyline points="7.5 11 9.8 13.5 14.5 8.5" fill="none" stroke="var(--nav-audit, #0F766E)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   users: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><path d="M11 2.2L18.5 5.2v5.5c0 5-3.5 8.5-7.5 10-4-1.5-7.5-5-7.5-10V5.2L11 2.2z" fill="var(--nav-users-tint, #CBD5E1)" stroke="var(--nav-users, #475569)" stroke-width="1.5" stroke-linejoin="round"/><circle cx="11" cy="9.5" r="2.3" fill="var(--nav-users, #475569)"/><path d="M7.5 15.8c0-2 1.6-3.2 3.5-3.2s3.5 1.2 3.5 3.2" stroke="var(--nav-users, #475569)" stroke-width="1.8" stroke-linecap="round"/></svg>`,
   lock: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`,
   lock24: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`,
@@ -149,7 +150,6 @@ const nowLocalIso = () => {
  *   - model: string (model name, e.g., "Click 125")
  *   - year: number|string (model year, e.g., 2021)
  *   - plate: string (license plate number, e.g., "ABC-1234")
- *   - odo: number (current odometer reading in km)
  *
  * pt = Parts Catalog
  *   - id: string (unique part ID, e.g., "p1")
@@ -172,7 +172,6 @@ const nowLocalIso = () => {
  *   - note: string (complaint details or repair notes)
  *   - at: string (creation date string, YYYY-MM-DD)
  *   - done?: string (completion timestamp, ISO-like string, optional)
- *   - odo?: number (intake odometer reading in km, optional)
  */
 
 /**
@@ -231,6 +230,44 @@ function initDatabase() {
     } catch (e) {}
   }
 
+  // Cleanup any legacy stored odometer fields from existing localStorage data (NOT from audit entries)
+  try {
+    const rawSaved = typeof localStorage !== "undefined" ? localStorage.getItem("moto1") : null;
+    if (rawSaved) {
+      const parsed = JSON.parse(rawSaved);
+      if (parsed && typeof parsed === "object") {
+        let changed = false;
+        ["bk", "motorcycles", "wo", "jobOrders", "transactions", "history"].forEach((k) => {
+          if (Array.isArray(parsed[k])) {
+            parsed[k].forEach((rec) => {
+              if (rec && typeof rec === "object") {
+                if ("odo" in rec) { delete rec.odo; changed = true; }
+                if ("odometer" in rec) { delete rec.odometer; changed = true; }
+              }
+            });
+          }
+        });
+        if (changed) {
+          localStorage.setItem("moto1", JSON.stringify(parsed));
+        }
+      }
+    }
+  } catch (e) {}
+
+  // Clean in-memory records
+  try {
+    [bk, wo, transactions].forEach((arr) => {
+      if (Array.isArray(arr)) {
+        arr.forEach((rec) => {
+          if (rec && typeof rec === "object") {
+            delete rec.odo;
+            delete rec.odometer;
+          }
+        });
+      }
+    });
+  } catch (e) {}
+
   const db = {
     cu: cu,
     bk: bk,
@@ -284,8 +321,8 @@ const ROLES = {
 
 // Default Primary & Admin Navigation pages each role can open.
 const DEFAULT_ROLE_NAV = {
-  admin:      ["dash", "cust", "insp", "rep", "pos", "ql", "cat", "bill", "his", "reports"],
-  superadmin: ["dash", "cust", "insp", "rep", "pos", "ql", "cat", "bill", "his", "reports", "users"],
+  admin:      ["dash", "cust", "insp", "rep", "pos", "ql", "cat", "bill", "his", "reports", "audit"],
+  superadmin: ["dash", "cust", "insp", "rep", "pos", "ql", "cat", "bill", "his", "reports", "audit", "users"],
   mechanic:   ["dash", "insp", "rep", "pos", "ql", "bill"]
 };
 const ROLE_NAV = DEFAULT_ROLE_NAV;
@@ -297,7 +334,9 @@ const ROLE_NAV = DEFAULT_ROLE_NAV;
  *   _v: 2 grants full primary nav to Super Admin once.
  *   _q: 1 migrated mechanic to dedicated "qlabor".
  *   _p: 1 grants full POS tabs ("pos", "ql", "bill") to Mechanic and removes "qlabor" once.
- * Super Admin always has "users", and Admin and Super Admin always have "dash", regardless of stored matrix.
+ *   _a: 1 grants "audit" to admin and superadmin once and ensures mechanic does not have it.
+ * Super Admin always has "users" and "audit", Admin and Super Admin always have "dash", regardless of stored matrix.
+ * Mechanic role is hard-coded to never have access to "audit".
  * @param {string} role - System role key.
  * @returns {Array<string>} Allowed route keys.
  */
@@ -363,17 +402,59 @@ function getRoleNav(role) {
     } catch (e) {}
   }
 
+  // Migration for _a: 1 (adds "audit" to saved admin and superadmin lists once, ensures not in mechanic list)
+  if (matrix && typeof matrix === "object" && !matrix._a) {
+    try {
+      if (Array.isArray(matrix.superadmin)) {
+        if (!matrix.superadmin.includes("audit")) {
+          const uIdx = matrix.superadmin.indexOf("users");
+          if (uIdx !== -1) {
+            matrix.superadmin.splice(uIdx, 0, "audit");
+          } else {
+            matrix.superadmin.push("audit");
+          }
+        }
+      } else {
+        matrix.superadmin = [...DEFAULT_ROLE_NAV.superadmin];
+      }
+
+      if (Array.isArray(matrix.admin)) {
+        if (!matrix.admin.includes("audit")) {
+          matrix.admin.push("audit");
+        }
+      } else {
+        matrix.admin = [...DEFAULT_ROLE_NAV.admin];
+      }
+
+      if (Array.isArray(matrix.mechanic)) {
+        matrix.mechanic = matrix.mechanic.filter((k) => k !== "audit");
+      }
+
+      matrix._a = 1;
+      localStorage.setItem("moto1_nav", JSON.stringify(matrix));
+    } catch (e) {}
+  }
+
   let list = (matrix && Array.isArray(matrix[role]))
     ? [...matrix[role]]
     : [...(DEFAULT_ROLE_NAV[role] || [])];
 
-  // Super Admin ALWAYS has access to User Management
-  if (role === "superadmin" && !list.includes("users")) {
-    list.push("users");
+  // Super Admin ALWAYS has access to User Management and Audit
+  if (role === "superadmin") {
+    if (!list.includes("users")) {
+      list.push("users");
+    }
+    if (!list.includes("audit")) {
+      list.push("audit");
+    }
   }
   // Admin & Super Admin ALWAYS have access to Dashboard
   if ((role === "admin" || role === "superadmin") && !list.includes("dash")) {
     list.unshift("dash");
+  }
+  // Mechanic role is hard-coded to NEVER open or receive audit
+  if (role === "mechanic") {
+    list = list.filter((k) => k !== "audit");
   }
 
   const validKeys = V.map((x) => x[0]);
@@ -382,12 +463,14 @@ function getRoleNav(role) {
 
 /**
  * Checks whether the active role has permission to open a specific navigation page.
- * @param {string} pageKey - Route key to check (e.g. "dash", "cust", "rep", "cat", "his", "reports", "users").
+ * Hard-coded to refuse Mechanic from opening "audit".
+ * @param {string} pageKey - Route key to check (e.g. "dash", "cust", "rep", "cat", "his", "reports", "audit", "users").
  * @returns {boolean} True if the active role can open the page.
  */
 const canOpen = (pageKey) => {
   const u = getCurrentUser();
   if (!u) return false;
+  if (pageKey === "audit" && u.activeRole === "mechanic") return false;
   const allowed = getRoleNav(u.activeRole);
   return allowed.includes(pageKey);
 };
@@ -566,29 +649,148 @@ function isSuper() {
 }
 
 /**
- * Appends an audit entry to D.audit and saves to localStorage.
- * Capped at newest 500 entries.
- * @param {string} action - Action name (e.g. "Void sale", "Reverse transaction").
- * @param {string} ref - Target entity reference (ID, plate, sale no).
- * @param {string} note - Detailed reason or note.
+ * Returns a local audit timestamp "YYYY-MM-DD HH:MM:SS" built from local time parts.
+ * Never uses toISOString().
+ * @param {Date} [d=new Date()]
+ * @returns {string} e.g. "2026-11-12 14:05:08"
  */
-function logAudit(action, ref, note) {
-  if (!Array.isArray(D.audit)) D.audit = [];
-  const u = getCurrentUser();
-  const entry = {
-    id: uid(),
-    at: nowLocalTimestamp(),
-    by: u ? u.name : "System",
-    role: u ? (u.activeRole || u.role) : "system",
-    action: String(action || ""),
-    ref: String(ref || ""),
-    note: String(note || "")
-  };
-  D.audit.push(entry);
-  if (D.audit.length > 500) {
-    D.audit.splice(0, D.audit.length - 500);
-  }
-  save();
+function nowLocalAuditTimestamp(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hr = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  const sec = String(d.getSeconds()).padStart(2, "0");
+  return `${y}-${m}-${day} ${hr}:${min}:${sec}`;
+}
+
+/**
+ * Category scopes and action-to-category mapping for the audit log.
+ * Scopes: "ops" (visible to Admin and Super Admin) or "sensitive" (Super Admin only).
+ */
+const AUDIT_CATEGORIES = {
+  // Category scope definitions
+  "Jobs":              { scope: "ops" },
+  "Payments":          { scope: "ops" },
+  "Quick Sales":       { scope: "ops" },
+  "Quick Labor":       { scope: "ops" },
+  "Customers":         { scope: "ops" },
+  "Sessions":          { scope: "ops" },
+  "Voids & Reversals": { scope: "sensitive" },
+  "Overrides":         { scope: "sensitive" },
+  "Catalog":           { scope: "sensitive" },
+  "Users & Access":    { scope: "sensitive" },
+  "Deletions":         { scope: "sensitive" },
+  "Other":             { scope: "sensitive" },
+
+  // Action text -> Category mappings
+  "Job created":               "Jobs",
+  "Status moved":              "Jobs",
+  "Assign mechanic":           "Jobs",
+  "Item added":                "Jobs",
+  "Extra item added":          "Jobs",
+  "Advance payment":           "Payments",
+  "Settle balance":            "Payments",
+  "Paid and released":         "Payments",
+  "Quick sale recorded":       "Quick Sales",
+  "Quick labor recorded":      "Quick Labor",
+  "Add customer":              "Customers",
+  "Edit customer":             "Customers",
+  "Customer added":            "Customers",
+  "Customer edited":           "Customers",
+  "Motorcycle added":          "Customers",
+  "Motorcycle edited":         "Customers",
+  "Login":                     "Sessions",
+  "Logout":                    "Sessions",
+  "Switch account":            "Sessions",
+  "Export audit log":          "Sessions",
+  "Void sale":                 "Voids & Reversals",
+  "Void quick labor":          "Voids & Reversals",
+  "Reverse transaction":       "Voids & Reversals",
+  "Force-cancel repair":       "Voids & Reversals",
+  "Reopen job":                "Voids & Reversals",
+  "Price override":            "Overrides",
+  "Edit diagnosis":            "Overrides",
+  "Edit plate":                "Overrides",
+  "Plate change":              "Overrides",
+  "Add catalog item":          "Catalog",
+  "Edit catalog item":         "Catalog",
+  "Delete catalog item":       "Catalog",
+  "Catalog import":            "Catalog",
+  "Add user":                  "Users & Access",
+  "Edit user":                 "Users & Access",
+  "Deactivate user":           "Users & Access",
+  "Reactivate user":           "Users & Access",
+  "Role change":               "Users & Access",
+  "Permissions matrix change": "Users & Access",
+  "Permissions matrix reset":  "Users & Access",
+  "Archive motorcycle":        "Deletions",
+  "Restore motorcycle":        "Deletions",
+  "Delete motorcycle":         "Deletions",
+  "Hard delete":               "Deletions"
+};
+
+/**
+ * Derives category from action text using AUDIT_CATEGORIES, defaulting to "Other".
+ * @param {string} action
+ * @returns {string} Category name.
+ */
+function getAuditCategory(action) {
+  if (!action) return "Other";
+  const mapped = AUDIT_CATEGORIES[action];
+  if (typeof mapped === "string") return mapped;
+  if (mapped && typeof mapped === "object" && mapped.scope) return action;
+  return "Other";
+}
+
+/**
+ * Returns category scope: "ops" (Admin & Super Admin) or "sensitive" (Super Admin only).
+ * @param {string} cat - Category name.
+ * @returns {"ops"|"sensitive"}
+ */
+function getAuditCategoryScope(cat) {
+  const def = AUDIT_CATEGORIES[cat];
+  if (def && typeof def === "object" && def.scope) return def.scope;
+  return "sensitive";
+}
+
+/**
+ * Appends an audit entry to D.audit and saves to localStorage.
+ * Stamped with the active role and user at that moment.
+ * Capped at newest 2000 entries (drops oldest beyond that).
+ * Wrapped in try/catch to never throw or block actions.
+ * @param {string} action - Action name (e.g. "Job created", "Void sale").
+ * @param {string} ref - Target entity reference (job ID, plate, sale no, email).
+ * @param {string} note - Detailed reason, amount, or notes.
+ * @param {string} [customCat] - Explicit category override (optional).
+ */
+function logAudit(action, ref, note, customCat) {
+  try {
+    const u = getCurrentUser();
+    const role = u ? (u.activeRole || u.role) : "";
+    if (role === "superadmin" || isSuper()) {
+      return;
+    }
+    if (!Array.isArray(D.audit)) D.audit = [];
+    const actionStr = String(action || "");
+    const cat = customCat || getAuditCategory(actionStr);
+    const entry = {
+      id: uid(),
+      at: nowLocalAuditTimestamp(),
+      by: u ? u.name : "System",
+      userId: u ? u.id : "system",
+      role: role || "system",
+      cat: cat,
+      action: actionStr,
+      ref: String(ref || ""),
+      note: String(note || "")
+    };
+    D.audit.push(entry);
+    if (D.audit.length > 2000) {
+      D.audit.splice(0, D.audit.length - 2000);
+    }
+    save();
+  } catch (e) {}
 }
 
 /**
@@ -1236,6 +1438,8 @@ function switchAccount(userId) {
   const target = users.find((u) => u.id === userId);
   if (!target || target.active === false) return;
 
+  const prevUser = getCurrentUser();
+
   target.lastLogin = nowLocalTimestamp();
   saveUsers(users);
 
@@ -1248,6 +1452,8 @@ function switchAccount(userId) {
     view: targetView,
     at: Date.now()
   });
+
+  logAudit("Switch account", target.email, `Switched from ${prevUser ? prevUser.name : "unknown"} to ${target.name}`);
 
   closeAccountSwitcher();
   syncViewForRole();
@@ -1480,6 +1686,8 @@ function selectLoginUser(userId) {
     at: Date.now()
   });
 
+  logAudit("Login", matched.email, "Signed in");
+
   if (document.documentElement) document.documentElement.classList.add("has-session");
   document.body.classList.remove("logged-out");
   document.body.classList.add("logged-in");
@@ -1553,6 +1761,8 @@ function login() {
     at: Date.now()
   });
 
+  logAudit("Login", matched.email, "Signed in");
+
   if (document.documentElement) document.documentElement.classList.add("has-session");
   document.body.classList.remove("logged-out");
   document.body.classList.add("logged-in");
@@ -1572,6 +1782,10 @@ function login() {
  * Logs out the current user, clears the active session, clears hash, and shows the login screen.
  */
 function logout() {
+  const u = getCurrentUser();
+  if (u) {
+    logAudit("Logout", u.email, "Signed out");
+  }
   clearSession();
   view = "dash";
 
@@ -2159,6 +2373,7 @@ function takeJob(woId) {
   if (!o) return;
 
   o.mech = u.name;
+  logAudit("Assign mechanic", o.id, `Unassigned -> ${u.name}`);
   save();
 
   if (inspActiveWoId === woId) {
@@ -2233,11 +2448,12 @@ const V = [
   ["bill", "💳", "Transactions & Billing"],
   ["his", "🕘", "Service History"],
   ["reports", "📊", "Reports"],
+  ["audit", "📋", "Audit"],
   ["users", "🛡️", "User Management"]
 ];
 
 /** Route keys placed under the ADMINISTRATION & SUPPORT section. */
-const ADMIN_NAV_KEYS = ["reports", "users"];
+const ADMIN_NAV_KEYS = ["reports", "audit", "users"];
 
 /** Currently active view key. */
 let view = "dash";
@@ -2342,18 +2558,39 @@ function renderPosSwitcher(activeId) {
   if (existing) {
     existing.remove();
   }
+  const existingTitle = $("pos-title");
+  if (existingTitle) {
+    existingTitle.remove();
+  }
 
   if (view === "qlabor") {
     return;
   }
 
   const tabs = getPosTabsForRole();
-  if (tabs.length < 2) {
-    return;
-  }
-
   const mainEl = $("main-content-area") || $("main");
   if (!mainEl) return;
+
+  if (tabs.length < 2) {
+    const tabDef = POS_TABS.find((t) => t.id === activeId);
+    const titleText = tabDef
+      ? tabDef.label
+      : activeId === "pos"
+      ? "Quick Sales"
+      : activeId === "ql"
+      ? "Quick Labor"
+      : activeId === "bill"
+      ? "Transactions & Billing"
+      : "";
+    if (titleText) {
+      const titleEl = document.createElement("div");
+      titleEl.id = "pos-title";
+      titleEl.className = "card top pos-fallback-title";
+      titleEl.innerHTML = `<div><h1>${escHtml(titleText)}</h1></div>`;
+      mainEl.insertBefore(titleEl, mainEl.firstChild);
+    }
+    return;
+  }
 
   const switcher = document.createElement("div");
   switcher.id = "pos-switcher";
@@ -2479,6 +2716,10 @@ function go(v) {
     closeSidebarDrawer();
   }
   if (!canOpen(v)) return;
+  if (v === "audit") {
+    const u = getCurrentUser();
+    if (!u || u.activeRole === "mechanic" || !canOpen("audit") || (!isSuper() && u.activeRole !== "admin")) return;
+  }
   if (view !== v || v === "bill") {
     userMgmtTab = "directory";
     userSearch = "";
@@ -2490,6 +2731,13 @@ function go(v) {
     billSearch = "";
     billFilter = "all";
     catFilter = "all";
+    if (v === "audit") {
+      auditSearch = "";
+      auditPeriod = "7days";
+      auditCategory = "all";
+      auditUser = "all";
+      auditPageLimit = 50;
+    }
     if (v === "his" && hisBike) {
       const b = bike(hisBike);
       hisSearch = b ? b.plate : "";
@@ -2529,6 +2777,10 @@ function go(v) {
     const existingSwitcher = $("pos-switcher");
     if (existingSwitcher) {
       existingSwitcher.remove();
+    }
+    const existingTitle = $("pos-title");
+    if (existingTitle) {
+      existingTitle.remove();
     }
   }
 
@@ -3534,13 +3786,12 @@ const R = {
             <th>PLATE NO.</th>
             <th>MOTORCYCLE</th>
             <th>YEAR</th>
-            <th>ODOMETER</th>
             <th>OWNER</th>
             <th class="r">ACTIONS</th>
           </tr>
         </thead>
         <tbody>
-          ${!list.length ? `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">No motorcycles registered.</td></tr>` : list.map((b) => {
+          ${!list.length ? `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">No motorcycles registered.</td></tr>` : list.map((b) => {
             const c = own(b);
             const isArch = Boolean(b.archived);
             return `
@@ -3551,7 +3802,6 @@ const R = {
                 </td>
                 <td>${escHtml(b.make + " " + b.model)}</td>
                 <td>${b.year || "-"}</td>
-                <td>${(b.odo || 0).toLocaleString()} km</td>
                 <td>${escHtml(c ? c.name : "-")}<br><small style="color:var(--text-muted)">${escHtml(c ? c.phone : "")}</small></td>
                 <td class="r" style="white-space:nowrap">
                   <button type="button" class="btn g sm" onclick="hisBike='${b.id}';go('his')">History</button>
@@ -3784,6 +4034,16 @@ ${isMech ? `
    */
   reports() {
     return getReportsViewHtml();
+  },
+
+  /**
+   * Audit view: activity log and trail.
+   * Accessible to Admin (operational activity only) and Super Admin (full log).
+   * Refused to Mechanic role.
+   * @returns {string} HTML string.
+   */
+  audit() {
+    return getAuditViewHtml();
   },
 
   /**
@@ -4178,10 +4438,6 @@ function openRecord(id) {
         <div class="rec-field-label">Contact Phone</div>
         <div class="rec-field-val">${c ? c.phone : "—"}</div>
       </div>
-      <div>
-        <div class="rec-field-label">Current Odometer</div>
-        <div class="rec-field-val">${(b.odo || 0).toLocaleString()} km</div>
-      </div>
     </div>
 
     <div class="rec-section-title">
@@ -4205,10 +4461,6 @@ function openRecord(id) {
       <div>
         <div class="rec-field-label">Lead Mechanic</div>
         <div class="rec-field-val">${o.mech || "Unassigned"}</div>
-      </div>
-      <div>
-        <div class="rec-field-label">Intake Odometer</div>
-        <div class="rec-field-val">${((o.odo !== undefined ? o.odo : b.odo) || 0).toLocaleString()} km</div>
       </div>
     </div>
 
@@ -4290,7 +4542,7 @@ function openRecord(id) {
             </div>
             <div class="rec-tl-body">
               <div><b>Services:</b> ${wSvcs || "—"}</div>
-              <div><b>Mechanic:</b> ${w.mech || "Unassigned"}${w.odo ? ` · <b>Odometer:</b> ${w.odo.toLocaleString()} km` : ""}</div>
+              <div><b>Mechanic:</b> ${w.mech || "Unassigned"}</div>
               ${w.note ? `<div><b>Notes:</b> ${w.note}</div>` : ""}
             </div>
           </div>
@@ -4422,8 +4674,7 @@ function mCust() {
   const activeCustomers = (Array.isArray(D.cu) ? D.cu : []).filter((c) => !c.archived);
   M(`<h2>Add customer / motorcycle</h2><label>Owner</label><select id="fc" onchange="$('nw').style.display=this.value?'none':'block'"><option value="">New customer…</option>${activeCustomers.map((c) => `<option value="${c.id}">${escHtml(c.name)}</option>`).join("")}</select>
  <div id="nw"><label>Full name</label><input id="fn"><label>Phone</label><input id="fp"></div>
- <div class="row"><div><label>Make</label><input id="fm"></div><div><label>Model</label><input id="fo"></div><div><label>Year</label><input id="fy" type="number"></div><div><label>Plate number</label><input id="fl"></div></div>
- <label>Current odometer (km)</label><input id="fk" type="number">${acts("addC()")}`);
+ <div class="row"><div><label>Make</label><input id="fm"></div><div><label>Model</label><input id="fo"></div><div><label>Year</label><input id="fy" type="number"></div><div><label>Plate number</label><input id="fl"></div></div>${acts("addC()")}`);
 }
 
 /**
@@ -4449,9 +4700,10 @@ function addC() {
     make: v("fm"),
     model: v("fo"),
     year: +v("fy") || "",
-    plate: v("fl").toUpperCase(),
-    odo: +v("fk") || 0
+    plate: v("fl").toUpperCase()
   });
+
+  logAudit("Add customer", v("fl").toUpperCase(), `${v("fn") || "Customer"} · ${v("fm")} ${v("fo")}`);
 
   fin();
 }
@@ -4499,10 +4751,6 @@ function openEditBikeModal(bid) {
       />
       ${!canEditPlate ? `<small style="display:block;color:var(--text-muted);margin-top:4px;font-style:italic">Plate is locked after the first job.</small>` : ""}
     </div>
-    <div style="margin-bottom:16px">
-      <label>Current Odometer (km)</label>
-      <input id="edit-b-odo" type="number" value="${b.odo || 0}" style="width:100%;height:38px;padding:0 8px;border-radius:6px;border:1px solid var(--border)" />
-    </div>
     <div style="display:flex;justify-content:flex-end;gap:8px">
       <button type="button" class="btn g" onclick="cm()">Cancel</button>
       <button type="button" class="btn" onclick="saveEditBike('${b.id}')">Save Changes</button>
@@ -4530,7 +4778,6 @@ function saveEditBike(bid) {
   b.make = v("edit-b-make") || b.make;
   b.model = v("edit-b-model") || b.model;
   b.year = +v("edit-b-year") || b.year;
-  b.odo = +v("edit-b-odo") || b.odo;
 
   if (newPlate && newPlate !== oldPlate) {
     if (hasJobs) {
@@ -4553,6 +4800,7 @@ function saveEditBike(bid) {
   }
 
   save();
+  logAudit("Edit customer", b.plate, `${c ? c.name : ""} · ${b.make} ${b.model}`);
   cm();
   go("cust");
 }
@@ -4985,6 +5233,12 @@ function saveCatalogModalItem(mode, type, id) {
       if (!Array.isArray(D.sv)) D.sv = [];
       D.sv.push({ id: uid(), name, labor: price, parts: [], costPrice: cp });
     }
+  }
+
+  if (mode === "add") {
+    logAudit("Add catalog item", name, `${targetKind} · Price: ${P(price)}${costPrice !== null ? ` · Cost: ${P(costPrice)}` : ""}`);
+  } else if (mode === "edit") {
+    logAudit("Edit catalog item", name, `${targetKind} · Price: ${P(price)}${costPrice !== null ? ` · Cost: ${P(costPrice)}` : ""}`);
   }
 
   save();
@@ -5609,7 +5863,6 @@ const INSPECTION_CHECKLIST = [
 function createFreshInspDraft() {
   return {
     plate: "",
-    odo: "",
     make: "",
     model: "",
     year: "",
@@ -6322,16 +6575,14 @@ function setJobCardStatus(woId, newStatus) {
   isStageTransitioning = true;
   disableStageActions();
 
+  const oldStatus = o.st;
   o.st = newStatus;
+  logAudit("Status moved", o.id, `${oldStatus} -> ${newStatus}`);
   if (newStatus === "Ready for Pickup") {
     o.readyAt = nowLocalIso();
   }
   if (newStatus === "Completed" && !o.done) {
     o.done = nowLocalIso();
-    const b = bike(o.bid);
-    if (b && o.odo > (b.odo || 0)) {
-      b.odo = o.odo;
-    }
   }
   save();
   closeInspModal();
@@ -6516,10 +6767,6 @@ function renderInspModal(id) {
           <div class="jc-info-item">
             <span class="jc-info-label">Customer</span>
             <span class="jc-info-val">${c ? escHtml(c.name + (c.phone ? " (" + c.phone + ")" : "")) : "Walk-in Customer"}</span>
-          </div>
-          <div class="jc-info-item">
-            <span class="jc-info-label">Odometer</span>
-            <span class="jc-info-val">${o.odo ? `${Number(o.odo).toLocaleString()} km` : (b && b.odo ? `${Number(b.odo).toLocaleString()} km` : "—")}</span>
           </div>
           <div class="jc-info-item">
             <span class="jc-info-label">Date In</span>
@@ -7522,7 +7769,6 @@ function readIntakeDomIntoDraft() {
   const p = $("insp-plate"); if (p) inspDraft.plate = p.value.trim();
   const m = $("insp-make"); if (m) inspDraft.make = m.value.trim();
   const mo = $("insp-model"); if (mo) inspDraft.model = mo.value.trim();
-  const o = $("insp-odo"); if (o) inspDraft.odo = o.value.trim();
   const n = $("insp-notes"); if (n) inspDraft.notes = n.value.trim();
   syncDraftObdBike();
 }
@@ -7599,7 +7845,7 @@ function getInspStep1Html() {
         </div>
       </div>
 
-      <!-- Vehicle Inputs Grid: Row 1 = Plate (left) & Make/Brand (right); Row 2 = Odometer (left) & Model (right) -->
+      <!-- Vehicle Inputs Grid: Row 1 = Plate (left) & Make/Brand (right); Row 2 = Model (full width) -->
       <div class="row">
         <div class="insp-field-group">
           <label for="insp-plate">Plate Number</label>
@@ -7648,21 +7894,7 @@ function getInspStep1Html() {
             Pick a brand or type your own.
           </div>
         </div>
-      </div>
-
-      <div class="row">
-        <div class="insp-field-group">
-          <label for="insp-odo">ODOMETER (KM)</label>
-          <input
-            id="insp-odo"
-            type="text"
-            inputmode="numeric"
-            placeholder="e.g. 12500"
-            value="${escHtml(inspDraft.odo !== undefined && inspDraft.odo !== null ? String(inspDraft.odo) : '')}"
-            oninput="this.value = this.value.replace(/[^0-9]/g, ''); inspDraft.odo = this.value"
-          />
-        </div>
-        <div class="insp-field-group" id="insp-model-wrap" style="position:relative">
+        <div class="insp-field-group" id="insp-model-wrap" style="position:relative;grid-column:1 / -1">
           <label for="insp-model">Model</label>
           <div class="brand-combobox-wrap">
             <input
@@ -7791,7 +8023,6 @@ function selectIntakeSuggestion(bikeId) {
   inspDraft.plate = (b.plate || "").trim();
   inspDraft.make = (b.make || "").trim();
   inspDraft.model = (b.model || "").trim();
-  inspDraft.odo = (b.odo !== undefined && b.odo !== null && b.odo !== 0) ? String(b.odo) : (b.odo === 0 ? "0" : "");
   if (c) {
     inspDraft.custName = (c.name || "").trim();
     inspDraft.custPhone = (c.phone || "").trim();
@@ -7814,8 +8045,6 @@ function selectIntakeSuggestion(bikeId) {
   if (makeInp) makeInp.value = inspDraft.make;
   const modelInp = $("insp-model");
   if (modelInp) modelInp.value = inspDraft.model;
-  const odoInp = $("insp-odo");
-  if (odoInp) odoInp.value = inspDraft.odo;
 
   const brandClear = $("insp-brand-clear");
   if (brandClear) brandClear.classList.toggle("visible", Boolean(inspDraft.make));
@@ -10184,6 +10413,11 @@ function submitItemAddForm(context, targetKey = "items") {
 
   if (context !== "draft") {
     save();
+    if (targetKey === "extra") {
+      logAudit("Extra item added", context, `${newItem.name} (${newItem.kind}, ${P(newItem.price)})`);
+    } else {
+      logAudit("Item added", context, `${newItem.name} (${newItem.kind}, ${P(newItem.price)})`);
+    }
   }
 
   // Clear inputs
@@ -10843,7 +11077,9 @@ function startRepairFromAwaiting(woId) {
   isStageTransitioning = true;
   disableStageActions();
 
+  const oldSt = o.st;
   o.st = "In Progress";
+  logAudit("Status moved", o.id, `${oldSt} -> In Progress`);
   o.approved = true;
   if (Array.isArray(o.items)) {
     o.items.forEach((it) => {
@@ -10879,7 +11115,9 @@ function returnJobToRepair(woId) {
   if (reason) {
     o.remarks = (o.remarks ? o.remarks + "\n" : "") + "Returned from checking: " + reason;
   }
+  const oldSt = o.st;
   o.st = "In Progress";
+  logAudit("Status moved", o.id, `${oldSt} -> In Progress${reason ? ` (Reason: ${reason})` : ""}`);
   save();
   closeInspModal();
   setTimeout(() => {
@@ -10899,8 +11137,10 @@ function passJobChecking(woId) {
   isStageTransitioning = true;
   disableStageActions();
 
+  const oldSt = o.st;
   o.st = "Ready for Pickup";
   o.readyAt = nowLocalIso();
+  logAudit("Status moved", o.id, `${oldSt} -> Ready for Pickup`);
   save();
   closeInspModal();
   setTimeout(() => {
@@ -11590,7 +11830,6 @@ function getInspStep3Html() {
           <div style="font-size:13px;line-height:1.6">
             <div><b>Plate:</b> ${escHtml(inspDraft.plate || "NO PLATE")}</div>
             <div><b>Make &amp; Model:</b> ${escHtml([inspDraft.make, inspDraft.model].filter(Boolean).join(" ") || "Unknown")}</div>
-            <div><b>Odometer:</b> ${inspDraft.odo ? `${Number(inspDraft.odo).toLocaleString()} km` : "—"}</div>
             <div style="margin-top:8px">
               <b>Customer Complaints:</b>
               ${(inspDraft.complaints && inspDraft.complaints.length > 0)
@@ -11741,7 +11980,6 @@ function getInspStep3Html() {
             <div style="font-weight:700">${escHtml([inspDraft.make, inspDraft.model].filter(Boolean).join(" ") || "Unknown")}</div>
             <div style="font-size:12px;color:var(--text-muted);display:flex;gap:8px;margin-top:2px">
               <span>Plate: <b>${escHtml(inspDraft.plate || "NO PLATE")}</b></span>
-              ${inspDraft.odo ? `<span>·</span><span>Odo: <b>${Number(inspDraft.odo).toLocaleString()} km</b></span>` : ""}
             </div>
           </div>
 
@@ -11853,9 +12091,6 @@ function confirmInspectionJobOrder() {
   }
 
   // 2. Motorcycle matching: never match on empty or NO PLATE
-  const rawOdo = parseInt(String(inspDraft.odo || "").replace(/[^0-9]/g, ""), 10);
-  const odoVal = (!isNaN(rawOdo) && rawOdo >= 0) ? rawOdo : 0;
-
   let b = null;
   if (rawPlate && rawPlate.toUpperCase() !== "NO PLATE") {
     b = D.bk.find((x) => x.plate && x.plate.trim().toUpperCase() === rawPlate.toUpperCase());
@@ -11867,17 +12102,13 @@ function confirmInspectionJobOrder() {
       make: make || "Unknown",
       model: model || "",
       year: "",
-      plate: plate,
-      odo: odoVal
+      plate: plate
     };
     D.bk.push(b);
   } else {
     b.cid = c.id;
     if (rawMake) b.make = rawMake;
     if (rawModel) b.model = rawModel;
-    if (odoVal > 0 || (rawPlate && rawPlate.toUpperCase() !== "NO PLATE")) {
-      b.odo = odoVal;
-    }
   }
 
   // 3. Work order object
@@ -11894,7 +12125,6 @@ function confirmInspectionJobOrder() {
     mech: isMechanic ? u.name : "", // Automatic assignment for Mechanic, unassigned for Admin
     st: "Awaiting Parts/Approval", // per Part 5
     sv: [],
-    odo: odoVal,
     complaints: complaints,
     notes: notes,
     note: combinedNotes,
@@ -11912,6 +12142,7 @@ function confirmInspectionJobOrder() {
     done: null
   };
   D.wo.push(wo);
+  logAudit("Job created", wo.id, `${b.plate} · ${c.name}`);
   save();
 
   resetInspDraft();
@@ -12027,12 +12258,7 @@ function getFilteredBillOrders(filter = billFilter) {
  */
 function getBillViewHtml() {
   return `
-    <div class="card top">
-      <div>
-        <h1>Transactions &amp; Billing</h1>
-        <p>Manage job order invoices, advance payments, and payment settlements</p>
-      </div>
-    </div>
+    <h1 class="sr-only">Transactions &amp; Billing</h1>
 
     <!-- Live Search Toolbar -->
     <div class="rep-search-wrap">
@@ -12253,7 +12479,7 @@ function getBillResultsHtml() {
                     <b>${c ? escHtml(c.name) : (o.customer ? escHtml(o.customer) : "Walk-in Customer")}</b>
                     <div style="font-size:12px;color:var(--text-secondary)">${c && c.phone ? escHtml(c.phone) : "—"}</div>
                     <div style="font-size:12px;font-weight:600;margin-top:2px">${b ? escHtml(b.plate) : (o.vehicleLine ? escHtml(o.vehicleLine) : "Walk-in Motorcycle")}${b ? ` · ${escHtml(b.make + " " + b.model)}` : ""}</div>
-                    <div style="font-size:11px;color:var(--text-muted)">${o.odo !== undefined ? `${o.odo.toLocaleString()} km · ` : b && b.odo ? `${b.odo.toLocaleString()} km · ` : ""}Assigned: ${escHtml(o.mech || "Unassigned")}</div>
+                    <div style="font-size:11px;color:var(--text-muted)">Assigned: ${escHtml(o.mech || "Unassigned")}</div>
                   </td>
                   <td>
                     <div style="font-weight:700;font-size:14px">${P(brk.total)} <span style="font-size:11px;font-weight:500;color:var(--text-muted)">${totalLabel}</span></div>
@@ -12452,6 +12678,7 @@ function recordAdvancePayment(woId) {
   });
 
   save();
+  logAudit("Advance payment", o.id, `${P(amt)} · ${advPayMethod || "Cash"}${ref ? ` (Ref: ${ref})` : ""}`);
   closeAdvanceModal();
   refreshBillView();
   if (view === "rep") {
@@ -12823,15 +13050,11 @@ function confirmSettleAndRelease(woId) {
   };
   o.done = timeNow;
 
-  const b = bike(o.bid);
-  if (b && o.odo > (b.odo || 0)) {
-    b.odo = o.odo;
-  }
-
   delete o.tempPayMethod;
   delete o.tempTendered;
 
   save();
+  logAudit("Settle balance", o.id, `${P(balanceDue)} · ${method} (Tendered: ${P(tendered)}, Change: ${P(change)})`);
   closeSettleBalanceModal();
   if (view === "bill") {
     refreshBillView();
@@ -12900,7 +13123,7 @@ function openReceipt(woId) {
       <div>
         <div style="color:var(--text-muted);font-weight:600">MOTORCYCLE</div>
         <div style="font-weight:700;color:var(--text-primary)">${b ? escHtml(b.plate) : (o.vehicleLine ? escHtml(o.vehicleLine) : "Walk-in Motorcycle")}</div>
-        <div style="color:var(--text-secondary)">${b ? `${escHtml(b.make + " " + b.model)} · ${(o.odo || b.odo || 0).toLocaleString()} km` : ""}</div>
+        <div style="color:var(--text-secondary)">${b ? escHtml(b.make + " " + b.model) : ""}</div>
       </div>
       <div>
         <div style="color:var(--text-muted);font-weight:600">MECHANIC</div>
@@ -13220,6 +13443,7 @@ function toggleUserActive(userId) {
   if (u.role === "superadmin" && activeSuperAdmins <= 1 && u.active !== false) return;
 
   u.active = !u.active;
+  logAudit(u.active ? "Reactivate user" : "Deactivate user", u.email, `Account ${u.active ? "reactivated" : "deactivated"}`);
   saveUsers(users);
 
   const tbody = $("user-table-body");
@@ -13418,6 +13642,7 @@ function saveUserModal() {
     if (!target) return;
 
     const oldName = target.name;
+    const oldRole = target.role;
     target.name = name;
     target.email = email;
 
@@ -13435,6 +13660,11 @@ function saveUserModal() {
         target.active = status === "active";
       }
     }
+
+    if (oldRole !== target.role) {
+      logAudit("Role change", email, `${oldRole} -> ${target.role}`);
+    }
+    logAudit("Edit user", email, `Name: ${name}, Role: ${target.role}, Status: ${target.active !== false ? "Active" : "Inactive"}`);
 
     if (oldName && oldName !== name) {
       D.wo.forEach((wo) => {
@@ -13461,6 +13691,7 @@ function saveUserModal() {
       lastLogin: ""
     };
     users.push(newUser);
+    logAudit("Add user", email, `Name: ${name}, Role: ${role}`);
   }
 
   saveUsers(users);
@@ -13579,8 +13810,9 @@ function getPermissionsMatrixHtml() {
             const icon = route[1];
             const label = route[2];
 
-            const isSuperLocked = key === "users" || key === "dash";
+            const isSuperLocked = key === "users" || key === "dash" || key === "audit";
             const isAdminLocked = key === "dash";
+            const isMechLocked = key === "audit";
 
             const hasSuper = superNav.includes(key);
             const hasAdmin = adminNav.includes(key);
@@ -13595,7 +13827,7 @@ function getPermissionsMatrixHtml() {
                   </div>
                 </td>
                 <td>
-                  <label class="matrix-check-wrap" title="${isSuperLocked ? (key === "users" ? "Super Admin must always have access to User Management." : "Super Admin must always have access to Dashboard.") : ""}">
+                  <label class="matrix-check-wrap" title="${isSuperLocked ? (key === "users" ? "Super Admin must always have access to User Management." : key === "audit" ? "Super Admin must always have access to Audit." : "Super Admin must always have access to Dashboard.") : ""}">
                     <input
                       type="checkbox"
                       class="matrix-check"
@@ -13619,13 +13851,15 @@ function getPermissionsMatrixHtml() {
                   </label>
                 </td>
                 <td>
-                  <label class="matrix-check-wrap">
+                  <label class="matrix-check-wrap" title="${isMechLocked ? "Audit is not available to Mechanics." : ""}">
                     <input
                       type="checkbox"
                       class="matrix-check"
-                      ${hasMech ? "checked" : ""}
+                      ${hasMech && !isMechLocked ? "checked" : ""}
+                      ${isMechLocked ? "disabled" : ""}
                       onchange="toggleMatrixPermission('mechanic', '${key}', this.checked)"
                     />
+                    ${isMechLocked ? `<span style="display:inline-flex;align-items:center;color:var(--text-muted)" title="Audit is not available to Mechanics.">${ICONS.lock}</span>` : ""}
                   </label>
                 </td>
               </tr>
@@ -13664,8 +13898,9 @@ function getPermissionsMatrixHtml() {
  * @param {boolean} checked - Desired state.
  */
 function toggleMatrixPermission(role, pageKey, checked) {
-  if (role === "superadmin" && (pageKey === "users" || pageKey === "dash")) return;
+  if (role === "superadmin" && (pageKey === "users" || pageKey === "dash" || pageKey === "audit")) return;
   if (role === "admin" && pageKey === "dash") return;
+  if (role === "mechanic" && pageKey === "audit") return;
 
   const currentNav = {
     superadmin: getRoleNav("superadmin"),
@@ -13684,10 +13919,13 @@ function toggleMatrixPermission(role, pageKey, checked) {
   currentNav._v = 2;
   currentNav._q = 1;
   currentNav._p = 1;
+  currentNav._a = 1;
 
   try {
     localStorage.setItem("moto1_nav", JSON.stringify(currentNav));
   } catch (e) {}
+
+  logAudit("Permissions matrix change", role, `${checked ? "Granted" : "Revoked"} ${pageKey}`);
 
   renderNav();
   syncViewForRole();
@@ -13714,6 +13952,8 @@ function resetMatrixDefaults() {
   try {
     localStorage.removeItem("moto1_nav");
   } catch (e) {}
+
+  logAudit("Permissions matrix reset", "All roles", "Reset matrix to system defaults");
 
   renderNav();
   const main = $("main");
@@ -14428,6 +14668,564 @@ function getReportsViewHtml() {
       ${getReportResultsHtml()}
     </div>
   `;
+}
+
+
+/* ==========================================================
+   AUDIT
+   ========================================================== */
+
+/** Active search query for Audit view. */
+let auditSearch = "";
+
+/** Active period filter for Audit view (default "7days"). */
+let auditPeriod = "7days";
+
+/** Active category filter for Audit view ("all" or category name). */
+let auditCategory = "all";
+
+/** Active user filter for Audit view ("all" or user name). */
+let auditUser = "all";
+
+/** Pagination row limit for Audit view (default 50). */
+let auditPageLimit = 50;
+
+/**
+ * Evaluates whether an audit entry was performed by an auditable actor (Admin or Mechanic).
+ * Actions performed while logged in as Super Admin are strictly excluded from display and export.
+ * Supports legacy entries without explicit role via fallback user lookup.
+ * @param {Object} entry - Audit log entry.
+ * @returns {boolean} True if entry belongs to an auditable actor (not Super Admin).
+ */
+function isAuditedActor(entry) {
+  if (!entry || typeof entry !== "object") return false;
+  const role = String(entry.role || "").toLowerCase().trim();
+  if (role === "superadmin") return false;
+  if (role === "admin" || role === "mechanic") return true;
+
+  // Fallback for older entries lacking explicit role: lookup user by userId or by name
+  if (entry.userId && entry.userId !== "system") {
+    try {
+      const users = loadUsers();
+      const match = users.find((u) => u.id === entry.userId);
+      if (match) return match.role !== "superadmin";
+    } catch (e) {}
+  }
+  if (entry.by && entry.by !== "System") {
+    try {
+      const users = loadUsers();
+      const match = users.find((u) => (u.name || "").trim().toLowerCase() === String(entry.by).trim().toLowerCase());
+      if (match) return match.role !== "superadmin";
+    } catch (e) {}
+  }
+  return true;
+}
+
+/**
+ * Returns all auditable entries from D.audit (Admin and Mechanic activity only).
+ * Read-only accessor: never mutates, rewrites, or deletes entries from D.audit.
+ * @returns {Array<Object>}
+ */
+function getAuditableEntries() {
+  const raw = Array.isArray(D.audit) ? D.audit : [];
+  return raw.filter(isAuditedActor);
+}
+
+/**
+ * Returns allowed audit entries based on the active role:
+ * - Super Admin: all entries across all periods and categories.
+ * - Admin: entries with category scope "ops" within the last 90 days only.
+ * - Mechanic / unauthenticated: empty array.
+ * Never exposes counts, names, or metadata of hidden entries.
+ * @returns {Array<Object>} Entries sorted newest first.
+ */
+function getAuditEntries() {
+  const u = getCurrentUser();
+  if (!u || u.activeRole === "mechanic" || !canOpen("audit")) {
+    return [];
+  }
+  const isSuperUser = isSuper();
+  const isAdminUser = u.activeRole === "admin";
+  if (!isSuperUser && !isAdminUser) {
+    return [];
+  }
+
+  const raw = getAuditableEntries();
+  let adminCutoff = null;
+  if (!isSuperUser) {
+    const todayObj = getLocalToday();
+    adminCutoff = new Date(todayObj.getFullYear(), todayObj.getMonth(), todayObj.getDate() - 89, 0, 0, 0, 0);
+  }
+
+  const result = [];
+  for (let i = 0; i < raw.length; i++) {
+    const entry = raw[i];
+    if (!entry || typeof entry !== "object") continue;
+
+    const actionText = String(entry.action || "");
+    const cat = entry.cat || getAuditCategory(actionText);
+    const scope = getAuditCategoryScope(cat);
+
+    if (!isSuperUser) {
+      if (scope !== "ops") continue;
+      if (adminCutoff) {
+        const dateStr = entry.at ? String(entry.at).split(/[ T]/)[0] : "";
+        const d = parseLocalDate(dateStr);
+        if (!d || d.getTime() < adminCutoff.getTime()) continue;
+      }
+    }
+
+    result.push({
+      ...entry,
+      cat
+    });
+  }
+
+  return result.reverse();
+}
+
+/**
+ * Filters visible audit entries by period, category, user, and search query.
+ * @returns {Array<Object>} Filtered entries.
+ */
+function getFilteredAuditEntries() {
+  const entries = getAuditEntries();
+  return entries.filter((entry) => {
+    // 1. Period
+    const dateStr = entry.at ? String(entry.at).split(/[ T]/)[0] : "";
+    if (!inDateRange(dateStr, auditPeriod)) return false;
+
+    // 2. Category
+    if (auditCategory !== "all" && entry.cat !== auditCategory) return false;
+
+    // 3. User
+    if (auditUser !== "all" && (entry.by || "").trim() !== auditUser) return false;
+
+    // 4. Search
+    if (auditSearch) {
+      const q = auditSearch;
+      const userMatch = (entry.by || "").toLowerCase().includes(q);
+      const actionMatch = (entry.action || "").toLowerCase().includes(q);
+      const refMatch = (entry.ref || "").toLowerCase().includes(q);
+      const noteMatch = (entry.note || "").toLowerCase().includes(q);
+      if (!userMatch && !actionMatch && !refMatch && !noteMatch) return false;
+    }
+
+    return true;
+  });
+}
+
+/**
+ * Formats a timestamp into local date and time strings.
+ * e.g. "Nov 11, 2026" and "02:15:08 PM"
+ * @param {string} atStr - Stored local timestamp ("YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD HH:MM")
+ * @returns {{ date: string, time: string }} Formatted date and time.
+ */
+function formatAuditTime(atStr) {
+  if (!atStr) return { date: "—", time: "" };
+  const parts = String(atStr).split(/[ T]/);
+  const datePart = parts[0] || "";
+  const timePart = parts[1] || "";
+
+  let dateFormatted = datePart;
+  const dTokens = datePart.split("-");
+  if (dTokens.length === 3) {
+    const y = parseInt(dTokens[0], 10);
+    const m = parseInt(dTokens[1], 10) - 1;
+    const day = parseInt(dTokens[2], 10);
+    if (!isNaN(y) && !isNaN(m) && !isNaN(day)) {
+      const d = new Date(y, m, day);
+      dateFormatted = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    }
+  }
+
+  let timeFormatted = timePart;
+  if (timePart) {
+    const tTokens = timePart.split(":");
+    const hr = parseInt(tTokens[0], 10);
+    const min = parseInt(tTokens[1] || "0", 10);
+    const sec = tTokens[2] !== undefined && tTokens[2] !== "" ? parseInt(tTokens[2], 10) : null;
+    if (!isNaN(hr)) {
+      const ampm = hr >= 12 ? "PM" : "AM";
+      const hr12 = hr % 12 || 12;
+      const pad = (n) => String(n).padStart(2, "0");
+      if (sec !== null && !isNaN(sec)) {
+        timeFormatted = `${pad(hr12)}:${pad(min)}:${pad(sec)} ${ampm}`;
+      } else {
+        timeFormatted = `${pad(hr12)}:${pad(min)} ${ampm}`;
+      }
+    }
+  }
+  return { date: dateFormatted, time: timeFormatted };
+}
+
+/**
+ * Generates the full HTML markup for the Audit view.
+ * Accessible to Admin and Super Admin roles.
+ * @returns {string} HTML string.
+ */
+function getAuditViewHtml() {
+  const u = getCurrentUser();
+  if (!u || u.activeRole === "mechanic" || !canOpen("audit") || (!isSuper() && u.activeRole !== "admin")) {
+    return renderNoAccess();
+  }
+
+  const isSuperUser = isSuper();
+  const subtitle = isSuperUser
+    ? "Full activity log: who did what, and when."
+    : "Operational activity: jobs, sales, and payments.";
+
+  const categories = isSuperUser
+    ? [
+        "Jobs",
+        "Payments",
+        "Quick Sales",
+        "Quick Labor",
+        "Customers",
+        "Sessions",
+        "Voids & Reversals",
+        "Overrides",
+        "Catalog",
+        "Users & Access",
+        "Deletions"
+      ]
+    : [
+        "Jobs",
+        "Payments",
+        "Quick Sales",
+        "Quick Labor",
+        "Customers",
+        "Sessions"
+      ];
+
+  const visibleEntries = getAuditEntries();
+  const distinctUsers = Array.from(new Set(visibleEntries.map((e) => (e.by || "").trim()).filter(Boolean))).sort();
+
+  return `
+    <div class="card top">
+      <div>
+        <h1>Audit</h1>
+        <p>${subtitle}</p>
+      </div>
+    </div>
+
+    ${!isSuperUser ? `
+      <div class="audit-notice-card" role="note">
+        <span style="display:inline-flex;align-items:center;color:var(--text-muted)">${ICONS.alert || "ℹ"}</span>
+        <span>You are viewing the operational audit. User, access, override, catalog, and void records are visible to Super Admin only.</span>
+      </div>
+    ` : ""}
+
+    <!-- Toolbar card -->
+    <div class="reports-toolbar audit-toolbar">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:1 1 auto">
+        <div style="position:relative;flex:1 1 240px;min-width:200px">
+          <input
+            type="text"
+            id="audit-search"
+            class="audit-input"
+            placeholder="Search user, action, reference, or note..."
+            value="${escHtml(auditSearch)}"
+            oninput="onAuditSearchInput(this.value)"
+            aria-label="Search audit entries"
+          />
+        </div>
+
+        <div style="display:flex;align-items:center;gap:6px">
+          <label for="audit-period-select" style="font-size:13px;font-weight:700;color:var(--text-secondary)">Period:</label>
+          <select id="audit-period-select" class="audit-select" onchange="setAuditPeriod(this.value)">
+            <option value="today" ${auditPeriod === "today" ? "selected" : ""}>Today</option>
+            <option value="7days" ${auditPeriod === "7days" ? "selected" : ""}>Last 7 Days</option>
+            <option value="month" ${auditPeriod === "month" ? "selected" : ""}>This Month</option>
+            <option value="lastMonth" ${auditPeriod === "lastMonth" ? "selected" : ""}>Last Month</option>
+            <option value="year" ${auditPeriod === "year" ? "selected" : ""}>This Year</option>
+            <option value="all" ${auditPeriod === "all" ? "selected" : ""}>All Time</option>
+          </select>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:6px">
+          <label for="audit-category-select" style="font-size:13px;font-weight:700;color:var(--text-secondary)">Category:</label>
+          <select id="audit-category-select" class="audit-select" onchange="setAuditCategory(this.value)">
+            <option value="all" ${auditCategory === "all" ? "selected" : ""}>All categories</option>
+            ${categories.map((c) => `<option value="${escHtml(c)}" ${auditCategory === c ? "selected" : ""}>${escHtml(c)}</option>`).join("")}
+          </select>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:6px">
+          <label for="audit-user-select" style="font-size:13px;font-weight:700;color:var(--text-secondary)">User:</label>
+          <select id="audit-user-select" class="audit-select" onchange="setAuditUser(this.value)">
+            <option value="all" ${auditUser === "all" ? "selected" : ""}>All users</option>
+            ${distinctUsers.map((uName) => `<option value="${escHtml(uName)}" ${auditUser === uName ? "selected" : ""}>${escHtml(uName)}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px">
+        ${isSuperUser ? `
+          <button type="button" class="btn g his-btn-export" onclick="exportAuditCsv()" title="Export filtered rows to CSV">
+            <span style="display:inline-flex;align-items:center">${ICONS.download}</span> Export CSV
+          </button>
+          <span id="audit-export-feedback" style="display:none;font-size:12px;color:var(--text-muted);font-weight:600">Nothing to export.</span>
+        ` : ""}
+      </div>
+    </div>
+
+    <!-- Results wrap (re-rendered on filter changes to keep search focus) -->
+    <div id="audit-results-wrap">
+      ${getAuditResultsHtml()}
+    </div>
+  `;
+}
+
+/**
+ * Generates the HTML for summary cards, count line, table, and pagination.
+ * @returns {string} HTML string.
+ */
+function getAuditResultsHtml() {
+  const u = getCurrentUser();
+  if (!u || u.activeRole === "mechanic" || !canOpen("audit") || (!isSuper() && u.activeRole !== "admin")) {
+    return "";
+  }
+
+  const isSuperUser = isSuper();
+  const filtered = getFilteredAuditEntries();
+
+  // Summary card stats for the filtered rows in this period
+  const totalEntries = filtered.length;
+  const distinctUsersCount = new Set(filtered.map((e) => (e.by || "").trim()).filter(Boolean)).size;
+
+  let voidsCount = 0;
+  let overridesCount = 0;
+  if (isSuperUser) {
+    filtered.forEach((e) => {
+      if (e.cat === "Voids & Reversals") voidsCount++;
+      if (e.cat === "Overrides") overridesCount++;
+    });
+  }
+
+  const stat = (i, bg, l, n, t) =>
+    `<div class="card st"><div class="ic" style="background:${bg}">${i}</div><div><small>${l}</small><b>${n}</b>${t}</div></div>`;
+
+  const displayedRows = filtered.slice(0, auditPageLimit);
+  const countLineText = `Showing ${displayedRows.length} of ${totalEntries} entries`;
+
+  return `
+    <!-- Summary Cards -->
+    <div class="reports-kpi-grid audit-kpi-grid">
+      ${stat(ICONS.clipboard, "", "TOTAL ENTRIES", totalEntries, "In period")}
+      ${stat(LINE_ICONS.cust, "", "ACTIVE USERS", distinctUsersCount, "Distinct")}
+      ${isSuperUser ? stat(ICONS.alert, "", "VOIDS & REVERSALS", voidsCount, "In period") : ""}
+      ${isSuperUser ? stat(ICONS.money, "", "OVERRIDES", overridesCount, "Price & plate") : ""}
+    </div>
+
+    <!-- Count line -->
+    <div style="margin: 0 0 10px 4px;font-size:13px;color:var(--text-muted);font-weight:600">
+      ${countLineText}
+    </div>
+
+    <!-- Table -->
+    <div class="um-table-wrap audit-table-wrap">
+      ${filtered.length > 0 ? `
+        <table class="um-table audit-table">
+          <thead>
+            <tr>
+              <th style="width:160px">TIME</th>
+              <th style="width:170px">USER</th>
+              <th style="width:150px">CATEGORY</th>
+              <th style="width:170px">ACTION</th>
+              <th style="width:150px">REFERENCE</th>
+              <th>DETAILS / REASON</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${displayedRows.map((entry) => {
+              const timeObj = formatAuditTime(entry.at);
+              const isDanger = entry.cat === "Voids & Reversals" || entry.cat === "Deletions";
+              const roleLabel = getUserRoleLabel(entry.role) || entry.role || "user";
+              return `
+                <tr>
+                  <td>
+                    <div style="font-weight:700;color:var(--text)">${escHtml(timeObj.date)}</div>
+                    <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${escHtml(timeObj.time)}</div>
+                  </td>
+                  <td>
+                    <div style="font-weight:700;color:var(--text)">${escHtml(entry.by || "System")}</div>
+                    <div style="margin-top:4px">
+                      <span class="audit-role-badge">${escHtml(roleLabel)}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="audit-badge ${isDanger ? "danger" : ""}">${escHtml(entry.cat || "Other")}</span>
+                  </td>
+                  <td>
+                    <span style="font-weight:700;color:var(--text)">${escHtml(entry.action || "")}</span>
+                  </td>
+                  <td>
+                    <code class="audit-ref">${escHtml(entry.ref || "—")}</code>
+                  </td>
+                  <td>
+                    <div style="white-space:pre-wrap;word-break:break-word;font-size:13px;color:var(--text)">${escHtml(entry.note || "—")}</div>
+                  </td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      ` : `
+        <div style="padding:48px 20px;text-align:center">
+          <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px">No audit entries found.</div>
+          <div style="font-size:13px;color:var(--text-muted)">Try a different period, category, or search.</div>
+        </div>
+      `}
+    </div>
+
+    ${filtered.length > displayedRows.length ? `
+      <div style="display:flex;justify-content:center;margin-top:20px">
+        <button type="button" class="btn g" onclick="loadMoreAuditRows()" style="padding:10px 24px">
+          Show 50 more
+        </button>
+      </div>
+    ` : ""}
+  `;
+}
+
+/**
+ * Updates the user select options to reflect visible users.
+ */
+function updateAuditUserSelectOptions() {
+  const sel = $("audit-user-select");
+  if (!sel) return;
+  const currentVal = auditUser;
+  const entries = getAuditEntries();
+  const usersSet = new Set();
+  entries.forEach((e) => {
+    if (e.by && e.by.trim()) usersSet.add(e.by.trim());
+  });
+  const usersList = Array.from(usersSet).sort();
+  let html = `<option value="all">All users</option>`;
+  usersList.forEach((uName) => {
+    html += `<option value="${escHtml(uName)}" ${currentVal === uName ? "selected" : ""}>${escHtml(uName)}</option>`;
+  });
+  sel.innerHTML = html;
+  if (!usersSet.has(currentVal) && currentVal !== "all") {
+    auditUser = "all";
+  }
+}
+
+/**
+ * Live search input handler for Audit page.
+ * Keeps search input focused by re-rendering only the results container.
+ * @param {string} val
+ */
+function onAuditSearchInput(val) {
+  auditSearch = String(val || "").trim().toLowerCase();
+  auditPageLimit = 50;
+  renderAuditResults();
+}
+
+/**
+ * Period filter select handler for Audit page.
+ * @param {string} val
+ */
+function setAuditPeriod(val) {
+  auditPeriod = val;
+  auditPageLimit = 50;
+  updateAuditUserSelectOptions();
+  renderAuditResults();
+}
+
+/**
+ * Category filter select handler for Audit page.
+ * @param {string} val
+ */
+function setAuditCategory(val) {
+  auditCategory = val;
+  auditPageLimit = 50;
+  renderAuditResults();
+}
+
+/**
+ * User filter select handler for Audit page.
+ * @param {string} val
+ */
+function setAuditUser(val) {
+  auditUser = val;
+  auditPageLimit = 50;
+  renderAuditResults();
+}
+
+/**
+ * Loads 50 more rows into the Audit table.
+ */
+function loadMoreAuditRows() {
+  auditPageLimit += 50;
+  renderAuditResults();
+}
+
+/**
+ * Re-renders only the audit results container without touching the toolbar.
+ */
+function renderAuditResults() {
+  const u = getCurrentUser();
+  if (!u || u.activeRole === "mechanic" || !canOpen("audit") || (!isSuper() && u.activeRole !== "admin")) return;
+  const wrap = $("audit-results-wrap");
+  if (wrap) {
+    wrap.innerHTML = getAuditResultsHtml();
+  }
+}
+
+/**
+ * Exports currently filtered audit rows to a CSV file (Super Admin only).
+ */
+function exportAuditCsv() {
+  if (!isSuper()) return;
+  const u = getCurrentUser();
+  if (!u || u.activeRole !== "superadmin") return;
+
+  const filtered = getFilteredAuditEntries();
+  if (!filtered.length) {
+    const feedback = $("audit-export-feedback");
+    if (feedback) {
+      feedback.style.display = "inline";
+      setTimeout(() => { if (feedback) feedback.style.display = "none"; }, 3000);
+    }
+    return;
+  }
+
+  const escapeCsv = (str) => `"${String(str ?? "").replace(/"/g, '""')}"`;
+  const headers = ["Date", "Time", "User", "Role", "Category", "Action", "Reference", "Details"];
+
+  const rows = filtered.map((entry) => {
+    const timeObj = formatAuditTime(entry.at);
+    const roleLabel = getUserRoleLabel(entry.role) || entry.role || "user";
+    return [
+      timeObj.date,
+      timeObj.time,
+      entry.by || "System",
+      roleLabel,
+      entry.cat || "Other",
+      entry.action || "",
+      entry.ref || "",
+      entry.note || ""
+    ].map(escapeCsv).join(",");
+  });
+
+  const fullContent = "\uFEFF" + [
+    headers.map(escapeCsv).join(","),
+    ...rows
+  ].join("\r\n");
+
+  const todayStr = today();
+  const blob = new Blob([fullContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `moto-audit-${todayStr}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
+  logAudit("Export audit log", `${filtered.length} rows`, `Exported ${filtered.length} rows to CSV`);
 }
 
 
@@ -15320,6 +16118,7 @@ function chargePosSale() {
 
   if (!Array.isArray(D.sales)) D.sales = [];
   D.sales.push(newSale);
+  logAudit("Quick sale recorded", newSale.no, `${P(newSale.total)} · ${newSale.method} (${items.length} items)`);
   save();
 
   // Log price overrides without interrupting checkout
@@ -15762,12 +16561,7 @@ function getPosViewHtml() {
   const posCartTabAriaLabel = `Cart and payment, ${totalItems} item${totalItems === 1 ? "" : "s"}`;
 
   return `
-    <div class="card top">
-      <div>
-        <h1>Quick Sales</h1>
-        <p>Fast checkout for parts and fluids from the catalog.</p>
-      </div>
-    </div>
+    <h1 class="sr-only">Quick Sales</h1>
 
     <!-- Segmented switch for Quick Sales views -->
     <div
@@ -16082,26 +16876,24 @@ function setQuickLaborJobType(type) {
  */
 function getQuickLaborTypeBarHtml() {
   return `
-    <div class="ql-type-bar" role="group" aria-label="Job Type">
-      <button
-        type="button"
-        id="ql-type-btn-labor"
-        class="ql-type-btn ${qlJobType === 'labor' ? 'active' : ''} ${qlLaborOnlyConfirmActive ? 'confirm-remove' : ''}"
-        onclick="setQuickLaborJobType('labor')"
-        aria-pressed="${qlJobType === 'labor' ? 'true' : 'false'}"
-      >
-        ${qlLaborOnlyConfirmActive ? "Tap again to remove parts" : "Labor Only"}
-      </button>
-      <button
-        type="button"
-        id="ql-type-btn-laborparts"
-        class="ql-type-btn ${qlJobType === 'laborparts' ? 'active' : ''}"
-        onclick="setQuickLaborJobType('laborparts')"
-        aria-pressed="${qlJobType === 'laborparts' ? 'true' : 'false'}"
-      >
-        Labor + Parts
-      </button>
-    </div>
+    <button
+      type="button"
+      id="ql-type-btn-labor"
+      class="ql-type-btn ${qlJobType === 'labor' ? 'active' : ''} ${qlLaborOnlyConfirmActive ? 'confirm-remove' : ''}"
+      onclick="setQuickLaborJobType('labor')"
+      aria-pressed="${qlJobType === 'labor' ? 'true' : 'false'}"
+    >
+      ${qlLaborOnlyConfirmActive ? "Tap again to remove parts" : "Labor Only"}
+    </button>
+    <button
+      type="button"
+      id="ql-type-btn-laborparts"
+      class="ql-type-btn ${qlJobType === 'laborparts' ? 'active' : ''}"
+      onclick="setQuickLaborJobType('laborparts')"
+      aria-pressed="${qlJobType === 'laborparts' ? 'true' : 'false'}"
+    >
+      Labor + Parts
+    </button>
   `;
 }
 
@@ -17156,6 +17948,7 @@ function recordQuickFix() {
 
   if (!Array.isArray(D.wo)) D.wo = [];
   D.wo.push(newFix);
+  logAudit("Quick labor recorded", newFix.no, `${P(newFix.total)} · ${newFix.mech} (${items.length} items)`);
   save();
 
   // Log price overrides to audit trail
@@ -17200,10 +17993,6 @@ function getQuickLaborLeftColHtml() {
   const isLaborParts = qlJobType === "laborparts";
 
   return `
-    <div id="ql-type-bar-wrap">
-      ${getQuickLaborTypeBarHtml()}
-    </div>
-
     <!-- STEP 1: Who did the work -->
     <div id="ql-step-1-wrap">
       ${getQuickLaborStep1Html()}
@@ -17634,11 +18423,10 @@ function getQuickLaborViewHtml() {
   initDefaultQuickLaborMech();
 
   return `
-    <div class="card top">
-      <div>
-        <h1>Quick Labor</h1>
-        <p>Record quick fixes: labor only, or labor with the parts replaced.</p>
-      </div>
+    <h1 class="sr-only">Quick Labor</h1>
+
+    <div class="ql-mode-bar ql-type-bar" id="ql-type-bar-wrap" role="group" aria-label="Job Type">
+      ${getQuickLaborTypeBarHtml()}
     </div>
 
     <div class="pos-layout">

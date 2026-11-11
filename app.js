@@ -2489,6 +2489,7 @@ function go(v) {
     repScope = "all";
     billSearch = "";
     billFilter = "all";
+    catFilter = "all";
     if (v === "his" && hisBike) {
       const b = bike(hisBike);
       hisSearch = b ? b.plate : "";
@@ -2517,6 +2518,9 @@ function go(v) {
   }
   if (v === "pos") {
     posView = "parts";
+  }
+  if (v === "cat") {
+    catFilter = "all";
   }
   if (["pos", "ql", "bill"].includes(v)) {
     posLastTab = v;
@@ -3690,6 +3694,9 @@ ${isMech ? `
           oninput="onCatSearch(this.value)"
           style="height:42px;font-size:14px;width:100%"
         />
+        <div id="cat-chips" class="cat-chips" role="group" aria-label="Filter by category">
+          ${getCatChipsHtml()}
+        </div>
       </div>
 
       <div class="card" id="cat-table-wrap">
@@ -4644,6 +4651,58 @@ function mCard(id) {
 }
 
 let catSearch = "";
+
+/** Active category filter for Service & Parts Catalog: "all" | "labor" | "part". In-memory only. */
+let catFilter = "all";
+
+/** Category filter chip definitions for Service & Parts Catalog */
+const CAT_CHIPS = [
+  { id: "all",   label: "All" },
+  { id: "labor", label: "Labor / Service" },
+  { id: "part",  label: "Part / Fluid" }
+];
+
+/**
+ * Generates HTML string for the category filter chips in the Catalog view.
+ * @returns {string} HTML string.
+ */
+function getCatChipsHtml() {
+  return CAT_CHIPS.map((chip) => {
+    const isSelected = catFilter === chip.id;
+    return `<button
+      type="button"
+      id="cat-chip-${chip.id}"
+      class="chip ${isSelected ? "on" : ""}"
+      role="button"
+      aria-pressed="${isSelected ? "true" : "false"}"
+      onclick="setCatFilter('${chip.id}')"
+    >${chip.label}</button>`;
+  }).join("");
+}
+
+/**
+ * Filter chip selection handler for Service & Parts Catalog.
+ * Re-renders only the filter chips and the table rows, preserving search input focus.
+ * @param {"all"|"labor"|"part"} filter - Selected category filter.
+ */
+function setCatFilter(filter) {
+  catFilter = filter;
+  const hadFocus = document.activeElement && document.activeElement.closest && document.activeElement.closest("#cat-chips");
+  const chipsEl = $("cat-chips");
+  if (chipsEl) {
+    chipsEl.innerHTML = getCatChipsHtml();
+    if (hadFocus) {
+      const activeChipBtn = $(`cat-chip-${filter}`);
+      if (activeChipBtn) {
+        try { activeChipBtn.focus(); } catch (e) {}
+      }
+    }
+  }
+  const wrap = $("cat-table-wrap");
+  if (wrap) {
+    wrap.innerHTML = getCatTableHtml();
+  }
+}
 let catModalKind = "labor";
 
 /**
@@ -4685,10 +4744,8 @@ function getCatalogItems(kindFilter = "all") {
 
 /**
  * Returns HTML string for the unified catalog price menu table.
- * @returns {string}
- */
-/**
- * Returns HTML string for the unified catalog price menu table.
+ * Filters by both typed search text and selected category filter chip.
+ * Missing or unknown categories are shown under "All" only.
  * For Super Admin: adds Cost and Margin columns, and Delete action.
  * For Admin: Delete is hidden, and Cost/Margin columns are hidden.
  * @returns {string}
@@ -4696,7 +4753,19 @@ function getCatalogItems(kindFilter = "all") {
 function getCatTableHtml() {
   const q = catSearch.trim().toLowerCase();
   const all = getCatalogItems("all");
-  const filtered = q ? all.filter((it) => it.name.toLowerCase().includes(q)) : all;
+  const filtered = (Array.isArray(all) ? all : []).filter((it) => {
+    if (!it) return false;
+    if (catFilter === "labor") {
+      if (it.kind !== "labor") return false;
+    } else if (catFilter === "part") {
+      if (it.kind !== "part") return false;
+    }
+    if (q) {
+      const name = (it.name || "").toLowerCase();
+      if (!name.includes(q)) return false;
+    }
+    return true;
+  });
   const isSuperUser = isSuper();
 
   return `
@@ -4722,10 +4791,10 @@ function getCatTableHtml() {
                   const marginPct = (Number(it.price) || 0) > 0 ? ((marginVal / Number(it.price)) * 100).toFixed(1) + "%" : "-";
                   return `
                     <tr>
-                      <td><b>${escHtml(it.name)}</b></td>
+                      <td><b>${escHtml(it.name || "")}</b></td>
                       <td>
-                        <span class="cat-badge ${it.kind}">
-                          ${it.kind === "labor" ? "Labor / Service" : "Part / Fluid"}
+                        <span class="cat-badge ${it.kind || ""}">
+                          ${it.kind === "labor" ? "Labor / Service" : it.kind === "part" ? "Part / Fluid" : escHtml(it.kind || "-")}
                         </span>
                       </td>
                       <td class="r"><b>${P(it.price)}</b></td>
@@ -4736,7 +4805,7 @@ function getCatTableHtml() {
                       <td class="r" style="white-space:nowrap">
                         <button type="button" class="btn g sm" onclick="openEditCatalogModal('${it.type}', '${it.id}')">Edit</button>
                         ${isSuperUser ? `
-                          <button type="button" class="btn sm btn-destructive" style="margin-left:6px" onclick="askDeleteCatalogItem('${it.type}', '${it.id}', '${escHtml(it.name)}')">Delete</button>
+                          <button type="button" class="btn sm btn-destructive" style="margin-left:6px" onclick="askDeleteCatalogItem('${it.type}', '${it.id}', '${escHtml(it.name || "")}')">Delete</button>
                         ` : ""}
                       </td>
                     </tr>

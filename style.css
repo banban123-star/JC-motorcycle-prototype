@@ -1264,6 +1264,13 @@ tr:hover td {
   margin-bottom: 20px;
 }
 
+.cat-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
 .chip {
   all: unset;
   cursor: pointer;

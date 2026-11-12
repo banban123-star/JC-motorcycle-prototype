@@ -3626,45 +3626,6 @@ body.logged-in .login-screen {
   margin-top: 12px;
 }
 
-/* Segmented Toggle (used in Repairs scope filter) */
-.obd-seg-track {
-  display: flex;
-  background: #F1F5F9;
-  border-radius: 10px;
-  padding: 4px;
-  gap: 4px;
-}
-
-.obd-seg-btn {
-  flex: 1;
-  border: none;
-  background: transparent;
-  padding: 8px 12px;
-  min-height: 40px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  cursor: pointer;
-  text-align: center;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1.25;
-  transition: all 0.15s ease;
-}
-
-.obd-seg-btn.active {
-  background: #FFFFFF;
-  color: var(--text-primary);
-  font-weight: 700;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
-}
-
-.obd-seg-btn:focus-visible {
-  outline: 2px solid #2563EB;
-  outline-offset: 2px;
-}
 
 /* Brand Combobox in Step 1 Intake */
 .brand-combobox-wrap {
@@ -5383,37 +5344,6 @@ body.logged-in .login-screen {
   }
 }
 
-/* "Take this job" Action Button */
-.btn-take-job {
-  all: unset;
-  cursor: pointer;
-  box-sizing: border-box;
-  background: #EFF6FF;
-  border: 1px solid #BFDBFE;
-  color: #2563EB;
-  font-weight: 700;
-  font-size: 12px;
-  border-radius: 8px;
-  padding: 4px 10px;
-  min-height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1.3;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-  white-space: nowrap;
-}
-
-.btn-take-job:hover {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-  color: #1D4ED8;
-}
-
-.btn-take-job:focus-visible {
-  outline: 2px solid #2563EB;
-  outline-offset: 2px;
-}
 
 
 /* ==========================================================================
@@ -7203,7 +7133,7 @@ body.resp-scroll-locked {
 .rep-grid,
 #rep-results.rep-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 16px;
   background: transparent;
   border: none;
@@ -7215,14 +7145,14 @@ body.resp-scroll-locked {
 @media (max-width: 1024px) {
   .rep-grid,
   #rep-results.rep-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   }
 }
 
 @media (max-width: 640px) {
   .rep-grid,
   #rep-results.rep-grid {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   }
 }
 
@@ -7247,6 +7177,7 @@ body.is-mobile #rep-results.rep-grid,
   flex-direction: column;
   box-sizing: border-box;
   min-height: 250px;
+  height: 100%;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -7261,6 +7192,7 @@ body.is-mobile #rep-results.rep-grid,
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -7268,6 +7200,7 @@ body.is-mobile #rep-results.rep-grid,
   display: flex;
   flex-direction: column;
   min-width: 0;
+  flex: 1 1 0;
 }
 
 .rep-card-plate {
@@ -7275,7 +7208,10 @@ body.is-mobile #rep-results.rep-grid,
   font-weight: 700;
   color: var(--text-primary);
   line-height: 1.3;
-  word-break: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: normal;
 }
 
 .rep-card-sub {
@@ -7284,7 +7220,8 @@ body.is-mobile #rep-results.rep-grid,
   font-weight: 400;
   line-height: 1.3;
   margin-top: 2px;
-  word-break: break-word;
+  word-break: normal;
+  overflow-wrap: anywhere;
 }
 
 .rep-card-badge {

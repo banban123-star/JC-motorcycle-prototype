@@ -1805,7 +1805,6 @@ function logout() {
   hisTo = "";
   repSearch = "";
   repFilter = "all";
-  repScope = "all";
   if (typeof resetInspDraft === "function") {
     resetInspDraft();
   }
@@ -2299,7 +2298,7 @@ function tbl(L, full) {
         ${b ? `<br><small style="color:var(--mu)">${escHtml(b.make + " " + b.model)}</small>` : ""}
       </td>
       <td class="ar-col-status">${badge(o.st)}</td>
-      <td class="ar-col-mech">${escHtml(o.mech || "Unassigned")}</td>
+      <td class="ar-col-mech">${escHtml((o.mech && o.mech !== "Unassigned") ? o.mech : "-")}</td>
       <td class="ar-col-services" title="${escHtml(svc.title)}">${escHtml(svc.display)}</td>
       <td class="r ar-col-total" id="ar-row-total-${o.id}">${P(tot)}</td>
       <td class="r ar-col-action">
@@ -2324,7 +2323,7 @@ function tbl(L, full) {
           <div class="ar-card-badge">${badge(o.st)}</div>
         </div>
         <div class="ar-card-row ar-card-row-meta">
-          <span class="ar-card-mech">${escHtml(o.mech || "Unassigned")}</span>
+          <span class="ar-card-mech">${escHtml((o.mech && o.mech !== "Unassigned") ? o.mech : "-")}</span>
           <b class="ar-card-total" id="ar-card-total-${o.id}">${P(tot)}</b>
         </div>
         <div class="ar-card-row ar-card-services" title="${escHtml(svc.title)}">
@@ -2344,7 +2343,7 @@ function tbl(L, full) {
           <tr>
             <th>PLATE NO.</th>
             <th>STATUS</th>
-            <th>MECHANIC</th>
+            <th>DONE BY</th>
             <th>SERVICES</th>
             <th class="r">TOTAL</th>
             <th></th>
@@ -2359,35 +2358,6 @@ function tbl(L, full) {
       ${cards}
     </div>
   `;
-}
-
-/**
- * Assigns an unassigned work order to the currently logged-in mechanic.
- * Persists change to localStorage and updates relevant UI components without a page reload.
- * @param {string} woId - Work order ID.
- */
-function takeJob(woId) {
-  const u = getCurrentUser();
-  if (!u || u.activeRole !== "mechanic") return;
-  const o = g("wo", woId);
-  if (!o) return;
-
-  o.mech = u.name;
-  logAudit("Assign mechanic", o.id, `Unassigned -> ${u.name}`);
-  save();
-
-  if (inspActiveWoId === woId) {
-    renderInspModal(woId);
-  }
-
-  if (view === "rep") {
-    const chipsEl = $("rep-chips");
-    if (chipsEl) chipsEl.innerHTML = getRepChipsHtml();
-    const resEl = $("rep-results");
-    if (resEl) resEl.innerHTML = getRepResultsHtml();
-  } else if (view === "dash") {
-    $("main").innerHTML = R.dash();
-  }
 }
 
 /**
@@ -2466,9 +2436,6 @@ let repSearch = "";
 
 /** Active status filter for Active Repairs page ("all" or status string). */
 let repFilter = "all";
-
-/** Active scope filter on Active Repairs page for Mechanic role ("all" or "my"). */
-let repScope = "all";
 
 /** Active search query string in Transactions & Billing table. */
 let billSearch = "";
@@ -2727,7 +2694,6 @@ function go(v) {
     userStatusFilter = "all";
     repSearch = "";
     repFilter = "all";
-    repScope = "all";
     billSearch = "";
     billFilter = "all";
     catFilter = "all";
@@ -2833,19 +2799,8 @@ function getFilteredRepairs(filter = repFilter) {
     return o.st !== "Completed" && o.st !== "Cancelled" && !o.cancel;
   });
   const q = repSearch.trim().toLowerCase().replace(/\s+/g, " ");
-  const u = getCurrentUser();
-  const isMech = u && u.activeRole === "mechanic";
-  const mechName = u ? (u.name || "").trim().toLowerCase() : "";
 
   return base.filter((o) => {
-    // Mechanic scope filter ("My Jobs")
-    if (isMech && repScope === "my") {
-      const oMech = (o.mech || "").trim().toLowerCase();
-      if (!oMech || oMech !== mechName) {
-        return false;
-      }
-    }
-
     // 1. Status matching
     if (filter !== "all" && filter !== "Cancelled" && o.st !== filter) {
       return false;
@@ -2897,7 +2852,6 @@ function getRepChipsHtml() {
 function clearRepFilters() {
   repSearch = "";
   repFilter = "all";
-  repScope = "all";
   const inp = $("rep-search-input");
   if (inp) inp.value = "";
   const clr = $("rep-search-clear");
@@ -2925,7 +2879,7 @@ function renderRepCard(o) {
   const rawTot = jobTotalOf(o);
   const totVal = (typeof rawTot === "number" && !isNaN(rawTot)) ? rawTot : (Number(rawTot) || 0);
   const totFormatted = P(totVal);
-  const mechName = o.mech ? escHtml(o.mech) : "Unassigned";
+  const mechName = (o.mech && o.mech !== "Unassigned") ? escHtml(o.mech) : "-";
 
   return `
     <div class="rep-card" id="rep-card-${o.id}">
@@ -2939,7 +2893,7 @@ function renderRepCard(o) {
       <div class="rep-card-divider"></div>
       <div class="rep-card-body">
         <div class="rep-card-row">
-          <span class="rep-card-label">MECHANIC</span>
+          <span class="rep-card-label">DONE BY</span>
           <span class="rep-card-val">${mechName}</span>
         </div>
         <div class="rep-card-row">
@@ -2970,7 +2924,7 @@ function renderRepCard(o) {
 function getRepResultsHtml() {
   const list = getFilteredRepairs();
   if (!list.length) {
-    const hasFilter = Boolean(repSearch || repFilter !== "all" || repScope !== "all");
+    const hasFilter = Boolean(repSearch || repFilter !== "all");
     const title = hasFilter ? "No repair jobs found." : "No active repairs found.";
     const sub = hasFilter ? "Try a different plate number, name, or status." : "Create a work order to get started.";
     return `
@@ -2982,29 +2936,6 @@ function getRepResultsHtml() {
     `;
   }
   return list.map((o) => renderRepCard(o)).join("");
-}
-
-/**
- * Sets the active repair scope filter for the Mechanic role ("all" or "my").
- * Updates active pill styling and refreshes the chips and results table.
- * @param {"all"|"my"} scope
- */
-function setRepScope(scope) {
-  repScope = scope;
-  const segEl = $("rep-scope-seg");
-  if (segEl) {
-    const btns = segEl.querySelectorAll(".obd-seg-btn");
-    btns.forEach((btn) => {
-      const isMy = btn.getAttribute("data-scope") === "my";
-      const active = (scope === "my" && isMy) || (scope === "all" && !isMy);
-      btn.classList.toggle("active", active);
-      btn.setAttribute("aria-selected", active ? "true" : "false");
-    });
-  }
-  const chipsEl = $("rep-chips");
-  if (chipsEl) chipsEl.innerHTML = getRepChipsHtml();
-  const resEl = $("rep-results");
-  if (resEl) resEl.innerHTML = getRepResultsHtml();
 }
 
 /** Short names for calendar months (zero-indexed 0 = Jan .. 11 = Dec). */
@@ -3332,7 +3263,7 @@ function getHisResultsHtml() {
         <tr>
           <th>COMPLETION DATE &amp; TIME</th>
           <th>VEHICLE &amp; CUSTOMER INFO</th>
-          <th>LEAD MECHANIC</th>
+          <th>DONE BY</th>
           <th>PRIMARY ISSUE / DIAGNOSIS</th>
           <th class="r">TOTAL COST (₱)</th>
           <th class="r">ACTIONS</th>
@@ -3369,7 +3300,7 @@ function getHisResultsHtml() {
               <div style="font-weight:600;font-size:13px;color:var(--text-primary);margin-top:2px">${c ? c.name : "—"}</div>
             </td>
             <td>
-              <span style="font-weight:600;color:var(--text-primary)">${o.mech || "Unassigned"}</span>
+              <span style="font-weight:600;color:var(--text-primary)">${(o.mech && o.mech !== "Unassigned") ? escHtml(o.mech) : "-"}</span>
             </td>
             <td>
               <div style="font-weight:700;color:var(--text-primary)" title="${svcNames.replace(/"/g, '&quot;')}">${truncSvcNames}</div>
@@ -3395,7 +3326,7 @@ function getHisResultsHtml() {
 
 /**
  * Renders the dedicated Mechanic Dashboard view.
- * Features greeting, 4 mechanic KPI cards, My Job Queue, and Unassigned Jobs tables.
+ * Features greeting, 3 mechanic KPI cards (Active Repairs, Awaiting Parts, Done Today), and Open Jobs table.
  * Excludes revenue, pending settlement, and links to inaccessible pages.
  * @returns {string} HTML string.
  */
@@ -3405,26 +3336,21 @@ function dashMechanic() {
   const isMyJob = (o) => {
     return Boolean(o.mech && o.mech.trim().toLowerCase() === mechName.toLowerCase());
   };
-  const isUnassigned = (o) => {
-    return !o.mech || o.mech.trim() === "" || o.mech.trim().toLowerCase() === "unassigned";
-  };
 
-  // 1. MY ACTIVE JOBS: assigned to this mechanic with status "In Progress" or "Checking"
-  const myActiveJobs = D.wo.filter((o) => isMyJob(o) && (o.st === "In Progress" || o.st === "Checking"));
+  // 1. ACTIVE REPAIRS: all open jobs, not Completed, Cancelled, or Ready for Pickup
+  const openJobs = D.wo.filter((o) => o.st !== "Completed" && o.st !== "Cancelled" && !o.cancel && o.st !== "Ready for Pickup");
 
-  // 2. UNASSIGNED JOBS: empty wo.mech, not Completed, not Ready for Pickup
-  const unassignedJobs = D.wo.filter((o) => isUnassigned(o) && o.st !== "Completed" && o.st !== "Ready for Pickup");
+  // 2. AWAITING PARTS: all jobs with status "Awaiting Parts/Approval"
+  const awaitingPartsJobs = D.wo.filter((o) => o.st === "Awaiting Parts/Approval" && !o.cancel);
 
-  // 3. AWAITING PARTS: all jobs with status "Awaiting Parts/Approval"
-  const awaitingPartsJobs = D.wo.filter((o) => o.st === "Awaiting Parts/Approval");
-
-  // 4. DONE TODAY: jobs this mechanic sent to Ready for Pickup or Completed today
+  // 3. DONE TODAY: jobs where this mechanic's name is wo.mech and wo.doneAt or status change to Ready for Pickup or Completed is today
   const todayStr = today();
   const doneTodayJobs = D.wo.filter((o) => {
     if (!isMyJob(o)) return false;
     const isReadyOrDone = o.st === "Ready for Pickup" || o.st === "Completed";
     if (!isReadyOrDone) return false;
-    const dateMatch = (o.readyAt && o.readyAt.slice(0, 10) === todayStr) ||
+    const dateMatch = (o.doneAt && o.doneAt.slice(0, 10) === todayStr) ||
+                      (o.readyAt && o.readyAt.slice(0, 10) === todayStr) ||
                       (o.done && o.done.slice(0, 10) === todayStr) ||
                       (o.at && o.at === todayStr && o.st === "Ready for Pickup");
     return Boolean(dateMatch);
@@ -3440,12 +3366,6 @@ function dashMechanic() {
   const stat = (i, bg, l, n, t) =>
     `<div class="card st"><div class="ic" style="background:${bg}">${i}</div><div><small>${l}</small><b>${Number(n) || 0}</b>${t}</div></div>`;
 
-  // My Job Queue: open jobs assigned to this mechanic (not Completed, not Ready for Pickup)
-  const myQueueJobs = D.wo.filter((o) => isMyJob(o) && o.st !== "Completed" && o.st !== "Ready for Pickup");
-
-  // Up to 5 unassigned jobs, newest first
-  const unassignedRecent = [...unassignedJobs].reverse().slice(0, 5);
-
   const renderComplaintChips = (o) => {
     const list = Array.isArray(o.complaints) ? o.complaints.filter(Boolean) : [];
     if (!list.length) return "—";
@@ -3454,7 +3374,7 @@ function dashMechanic() {
     ).join("");
   };
 
-  const renderRow = (o, showTakeBtn) => {
+  const renderRow = (o) => {
     const b = bike(o.bid);
     const jo = getJobNumber(o);
     const plate = b ? b.plate : "NO PLATE";
@@ -3470,7 +3390,6 @@ function dashMechanic() {
         <td>${badge(o.st)}</td>
         <td>${renderComplaintChips(o)}</td>
         <td class="r" style="white-space:nowrap">
-          ${showTakeBtn ? `<button type="button" class="btn-take-job" style="margin-right:6px" onclick="takeJob('${o.id}')">Take this job</button>` : ""}
           <button type="button" class="btn g sm" onclick="openInspModal('${o.id}')">Job card</button>
         </td>
       </tr>
@@ -3487,20 +3406,19 @@ function dashMechanic() {
     </div>
 
     <div class="stats">
-      ${stat(LINE_ICONS.rep, "", "MY ACTIVE JOBS", myActiveJobs.length, "Assigned to you")}
-      ${stat(LINE_ICONS.his, "", "UNASSIGNED JOBS", unassignedJobs.length, "Waiting to be taken")}
+      ${stat(LINE_ICONS.rep, "", "ACTIVE REPAIRS", openJobs.length, "All open repair jobs")}
       ${stat(LINE_ICONS.cat, "", "AWAITING PARTS", awaitingPartsJobs.length, "Waiting for parts or approval")}
       ${stat(ICONS.checkCircle, "", "DONE TODAY", doneTodayJobs.length, "Finished by you")}
     </div>
 
     <div style="display:flex;flex-direction:column;gap:20px">
-      <!-- My Job Queue Card -->
+      <!-- Open Jobs Card -->
       <div class="card">
         <div class="hd" style="display:flex;justify-content:space-between;align-items:center">
-          <span style="display:inline-flex;align-items:center;gap:6px">${LINE_ICONS.rep} My Job Queue</span>
+          <span style="display:inline-flex;align-items:center;gap:6px">${LINE_ICONS.rep} Open Jobs</span>
           <button type="button" class="btn g sm" onclick="go('rep')">View all</button>
         </div>
-        ${myQueueJobs.length ? `
+        ${openJobs.length ? `
           <div class="tw">
             <table>
               <thead>
@@ -3513,37 +3431,12 @@ function dashMechanic() {
                 </tr>
               </thead>
               <tbody>
-                ${myQueueJobs.map((o) => renderRow(o, false)).join("")}
+                ${openJobs.map(renderRow).join("")}
               </tbody>
             </table>
           </div>
         ` : `
-          <div class="empty">No jobs assigned to you yet. Take one from Active Repairs.</div>
-        `}
-      </div>
-
-      <!-- Unassigned Jobs Card -->
-      <div class="card">
-        <div class="hd" style="display:flex;align-items:center;gap:8px">${ICONS.clipboard} Unassigned Jobs</div>
-        ${unassignedRecent.length ? `
-          <div class="tw">
-            <table>
-              <thead>
-                <tr>
-                  <th>JOB NO.</th>
-                  <th>PLATE / MOTORCYCLE</th>
-                  <th>STATUS</th>
-                  <th>COMPLAINT</th>
-                  <th class="r"></th>
-                </tr>
-              </thead>
-              <tbody>
-                ${unassignedRecent.map((o) => renderRow(o, true)).join("")}
-              </tbody>
-            </table>
-          </div>
-        ` : `
-          <div class="empty">No unassigned jobs.</div>
+          <div class="empty">No open repair jobs.</div>
         `}
       </div>
     </div>
@@ -3836,9 +3729,6 @@ const R = {
    * @returns {string} HTML string.
    */
   rep() {
-    const u = getCurrentUser();
-    const isMech = u && u.activeRole === "mechanic";
-
     return `<div class="card top"><div><h1>Active Repairs</h1><p>Move each job through the work order lifecycle</p></div><button class="btn" onclick="startNewInspectionWorkOrder()">+ New work order</button></div>
 <div class="rep-search-wrap">
   <span class="search-icon" onclick="$('rep-search-input').focus()" title="Search">${LINE_ICONS.insp}</span>
@@ -3858,32 +3748,6 @@ const R = {
     title="Clear search"
   >✕</button>
 </div>
-${isMech ? `
-  <div class="rep-scope-wrap" style="margin-bottom:12px">
-    <div class="obd-seg-track" id="rep-scope-seg" role="tablist" aria-label="Job Filter Scope" style="max-width:320px">
-      <button
-        type="button"
-        role="tab"
-        aria-selected="${repScope === "all" ? "true" : "false"}"
-        data-scope="all"
-        class="obd-seg-btn ${repScope === "all" ? "active" : ""}"
-        onclick="setRepScope('all')"
-      >
-        All Jobs
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected="${repScope === "my" ? "true" : "false"}"
-        data-scope="my"
-        class="obd-seg-btn ${repScope === "my" ? "active" : ""}"
-        onclick="setRepScope('my')"
-      >
-        My Jobs
-      </button>
-    </div>
-  </div>
-` : ""}
 <div id="rep-chips" class="rep-chips">${getRepChipsHtml()}</div>
 <div id="rep-results" class="rep-grid">${getRepResultsHtml()}</div>`;
   },
@@ -4009,7 +3873,7 @@ ${isMech ? `
         <option value="custom" ${hisDate === "custom" ? "selected" : ""}>Custom Range</option>
       </select>
       <select id="his-mech-select" class="his-select" onchange="onHisMechSelectChange(this.value)">
-        <option value="all" ${hisMech === "all" ? "selected" : ""}>All Mechanics</option>
+        <option value="all" ${hisMech === "all" ? "selected" : ""}>All Staff</option>
         ${getUniqueMechanics().map((m) => `<option value="${m}" ${hisMech === m ? "selected" : ""}>${m}</option>`).join("")}
       </select>
       <button type="button" class="btn g his-btn-export" onclick="exportHisCsv()" title="Export filtered list to CSV">
@@ -4296,7 +4160,7 @@ function exportHisCsv() {
     "Motorcycle",
     "Customer Name",
     "Customer Phone",
-    "Mechanic",
+    "Done By",
     "Services",
     "Notes",
     "Total Cost"
@@ -4314,7 +4178,7 @@ function exportHisCsv() {
     const moto = b ? `${b.make} ${b.model} (${b.year || ""})`.trim() : "";
     const custName = c ? c.name : "";
     const custPhone = c ? c.phone : "";
-    const mech = o.mech || "Unassigned";
+    const mech = (o.mech && o.mech !== "Unassigned") ? o.mech : "-";
     const svcsList = (o.sv && o.sv.length)
       ? o.sv.map((id) => (g("sv", id) ? g("sv", id).name : id))
       : (o.items && o.items.length)
@@ -4459,8 +4323,8 @@ function openRecord(id) {
         <div style="font-size:11px;color:var(--text-muted)">${formatJobTime(dateVal)}</div>
       </div>
       <div>
-        <div class="rec-field-label">Lead Mechanic</div>
-        <div class="rec-field-val">${o.mech || "Unassigned"}</div>
+        <div class="rec-field-label">Done by</div>
+        <div class="rec-field-val">${(o.mech && o.mech !== "Unassigned") ? escHtml(o.mech) : "-"}</div>
       </div>
     </div>
 
@@ -4542,7 +4406,7 @@ function openRecord(id) {
             </div>
             <div class="rec-tl-body">
               <div><b>Services:</b> ${wSvcs || "—"}</div>
-              <div><b>Mechanic:</b> ${w.mech || "Unassigned"}</div>
+              <div><b>Done by:</b> ${(w.mech && w.mech !== "Unassigned") ? escHtml(w.mech) : "-"}</div>
               ${w.note ? `<div><b>Notes:</b> ${w.note}</div>` : ""}
             </div>
           </div>
@@ -6577,6 +6441,13 @@ function setJobCardStatus(woId, newStatus) {
 
   const oldStatus = o.st;
   o.st = newStatus;
+  // Auto-stamp active mechanic into wo.mech on Repair Done -> Checking (overwrites earlier name); Admins do not overwrite
+  if (newStatus === "Checking" && oldStatus === "In Progress") {
+    const u = getCurrentUser();
+    if (u && u.activeRole === "mechanic") {
+      o.mech = u.name;
+    }
+  }
   logAudit("Status moved", o.id, `${oldStatus} -> ${newStatus}`);
   if (newStatus === "Ready for Pickup") {
     o.readyAt = nowLocalIso();
@@ -6630,8 +6501,6 @@ function renderInspModal(id) {
   const isDone = o.st === "Completed";
   const u = getCurrentUser();
   const isMech = u && u.activeRole === "mechanic";
-  const isUnassigned = !o.mech || o.mech.trim() === "" || o.mech.trim().toLowerCase() === "unassigned";
-  const isAssignedToOther = isMech && !isUnassigned && (o.mech || "").trim().toLowerCase() !== (u.name || "").trim().toLowerCase();
 
   // Inspection check totals
   const insp = o.inspection || {};
@@ -6773,21 +6642,8 @@ function renderInspModal(id) {
             <span class="jc-info-val">${formatJobDate(o.at)}</span>
           </div>
           <div class="jc-info-item">
-            <span class="jc-info-label">Assigned Mechanic</span>
-            <div class="jc-info-val" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-              ${!isMech ? `
-                <select class="item-inline-select" style="height:36px;font-size:13px;padding:4px 8px;border-radius:6px;border:1px solid var(--border);max-width:240px" onchange="setJobLeadMechanic('${o.id}', this.value)">
-                  <option value="" ${isUnassigned ? "selected" : ""}>Unassigned</option>
-                  ${loadUsers().filter(u => u.role === "mechanic" && u.active !== false).map(m => `
-                    <option value="${escHtml(m.name)}" ${(!isUnassigned && o.mech && o.mech.trim().toLowerCase() === m.name.toLowerCase()) ? "selected" : ""}>${escHtml(m.name)}</option>
-                  `).join("")}
-                </select>
-              ` : `
-                <span>${escHtml(o.mech || "Unassigned")}</span>
-                ${isUnassigned ? `<button type="button" class="btn-take-job" onclick="takeJob('${o.id}')">Take this job</button>` : ""}
-              `}
-              ${isAssignedToOther ? `<span style="font-size:12px;color:var(--text-muted);font-style:italic">Assigned to ${escHtml(o.mech)}</span>` : ""}
-            </div>
+            <span class="jc-info-label">Done by</span>
+            <span class="jc-info-val">${escHtml((o.mech && o.mech !== "Unassigned") ? o.mech : "-")}</span>
           </div>
           <div class="jc-info-item">
             <span class="jc-info-label">Current Status</span>
@@ -6962,23 +6818,6 @@ function renderInspModal(id) {
       </div>
     </div>
   `;
-}
-
-/**
- * Sets the lead mechanic for a work order immediately (Admin & Super Admin).
- * @param {string} woId - Work order ID.
- * @param {string} newMech - Selected mechanic name or empty for Unassigned.
- */
-function setJobLeadMechanic(woId, newMech) {
-  const o = g("wo", woId);
-  if (!o) return;
-  const oldMech = o.mech || "Unassigned";
-  o.mech = newMech || "Unassigned";
-  logAudit("Assign mechanic", o.id, `${oldMech} -> ${o.mech}`);
-  save();
-  renderInspModal(o.id);
-  if (view === "rep") renderRepResults();
-  if (view === "dash") $("main").innerHTML = R.dash();
 }
 
 /**
@@ -11079,6 +10918,11 @@ function startRepairFromAwaiting(woId) {
 
   const oldSt = o.st;
   o.st = "In Progress";
+  // Auto-stamp active mechanic into wo.mech on Start Repair only if empty; Admins do not overwrite
+  const u = getCurrentUser();
+  if (u && u.activeRole === "mechanic" && (!o.mech || o.mech === "Unassigned")) {
+    o.mech = u.name;
+  }
   logAudit("Status moved", o.id, `${oldSt} -> In Progress`);
   o.approved = true;
   if (Array.isArray(o.items)) {
@@ -12116,13 +11960,10 @@ function confirmInspectionJobOrder() {
   const notes = (inspDraft.notes || "").trim();
   const compText = complaints.join(", ");
   const combinedNotes = compText + (notes ? (compText ? " · " : "") + notes : "");
-  const u = getCurrentUser();
-  const isMechanic = u && u.activeRole === "mechanic";
-
   const wo = {
     id: uid(),
     bid: b.id,
-    mech: isMechanic ? u.name : "", // Automatic assignment for Mechanic, unassigned for Admin
+    mech: "", // New jobs start with an empty mech for every role
     st: "Awaiting Parts/Approval", // per Part 5
     sv: [],
     complaints: complaints,
@@ -12479,7 +12320,7 @@ function getBillResultsHtml() {
                     <b>${c ? escHtml(c.name) : (o.customer ? escHtml(o.customer) : "Walk-in Customer")}</b>
                     <div style="font-size:12px;color:var(--text-secondary)">${c && c.phone ? escHtml(c.phone) : "—"}</div>
                     <div style="font-size:12px;font-weight:600;margin-top:2px">${b ? escHtml(b.plate) : (o.vehicleLine ? escHtml(o.vehicleLine) : "Walk-in Motorcycle")}${b ? ` · ${escHtml(b.make + " " + b.model)}` : ""}</div>
-                    <div style="font-size:11px;color:var(--text-muted)">Assigned: ${escHtml(o.mech || "Unassigned")}</div>
+                    ${(o.mech && o.mech !== "Unassigned") ? `<div style="font-size:11px;color:var(--text-muted)">Done by: ${escHtml(o.mech)}</div>` : ""}
                   </td>
                   <td>
                     <div style="font-weight:700;font-size:14px">${P(brk.total)} <span style="font-size:11px;font-weight:500;color:var(--text-muted)">${totalLabel}</span></div>
@@ -13126,8 +12967,8 @@ function openReceipt(woId) {
         <div style="color:var(--text-secondary)">${b ? escHtml(b.make + " " + b.model) : ""}</div>
       </div>
       <div>
-        <div style="color:var(--text-muted);font-weight:600">MECHANIC</div>
-        <div style="font-weight:700;color:var(--text-primary)">${escHtml(o.mech || "Unassigned")}</div>
+        <div style="color:var(--text-muted);font-weight:600">DONE BY</div>
+        <div style="font-weight:700;color:var(--text-primary)">${escHtml((o.mech && o.mech !== "Unassigned") ? o.mech : "-")}</div>
       </div>
       <div>
         <div style="color:var(--text-muted);font-weight:600">STATUS</div>
@@ -14313,7 +14154,7 @@ function exportReportCsv() {
     "Motorcycle",
     "Customer Name",
     "Customer Phone",
-    "Lead Mechanic",
+    "Done By",
     "Services",
     "Total Cost (PHP)"
   ];
@@ -14328,7 +14169,7 @@ function exportReportCsv() {
     const moto = b ? `${b.make} ${b.model} (${b.year || ""})`.trim() : "";
     const custName = c ? c.name : "";
     const custPhone = c ? c.phone : "";
-    const mech = o.mech || "Unassigned";
+    const mech = (o.mech && o.mech !== "Unassigned") ? o.mech : "-";
     const svcsList = (o.sv && o.sv.length)
       ? o.sv.map((id) => (g("sv", id) ? g("sv", id).name : id))
       : (o.items && o.items.length)
@@ -14379,7 +14220,7 @@ function exportReportCsv() {
 function getReportResultsHtml() {
   const metrics = getReportMetrics(reportPeriod);
 
-  // 1. Mechanic Performance calculation
+  // 1. Staff Performance calculation
   const users = loadUsers();
   const activeMechs = users.filter((u) => u.role === "mechanic" && u.active !== false);
   const mechRows = activeMechs.map((m) => {
@@ -14389,11 +14230,11 @@ function getReportResultsHtml() {
     return { name: mName, completed: compJobs.length, revenue: rev };
   });
 
-  // Unassigned row
+  // Not recorded row
   const unassignedCompJobs = metrics.completedJobs.filter((o) => !o.mech || !o.mech.trim() || o.mech.trim().toLowerCase() === "unassigned");
   const unassignedRev = unassignedCompJobs.reduce((sum, o) => sum + total(o), 0);
   mechRows.push({
-    name: "Unassigned",
+    name: "Not recorded",
     completed: unassignedCompJobs.length,
     revenue: unassignedRev
   });
@@ -14547,15 +14388,15 @@ function getReportResultsHtml() {
 
     <!-- Analytics Cards Grid -->
     <div class="reports-grid">
-      <!-- Mechanic Performance (spans full width of 2-col grid) -->
+      <!-- Staff Performance (spans full width of 2-col grid) -->
       <div class="card reports-grid-wide">
-        <div class="hd" style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span>${LINE_ICONS.rep}</span><span>Mechanic Performance</span></div>
+        <div class="hd" style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span>${LINE_ICONS.rep}</span><span>Staff Performance</span></div>
         ${mechRows.some((r) => r.completed > 0 || r.revenue > 0) ? `
           <div class="tw">
             <table>
               <thead>
                 <tr>
-                  <th>MECHANIC</th>
+                  <th>DONE BY</th>
                   <th>JOBS COMPLETED</th>
                   <th class="r">REVENUE</th>
                 </tr>
@@ -14572,7 +14413,7 @@ function getReportResultsHtml() {
             </table>
           </div>
         ` : `
-          <div class="empty">No mechanic activity yet.</div>
+          <div class="empty">No staff activity yet.</div>
         `}
       </div>
 

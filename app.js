@@ -649,6 +649,16 @@ function isSuper() {
 }
 
 /**
+ * Checks whether the current active user is Admin.
+ * Follows account switching instantly without full reload.
+ * @returns {boolean}
+ */
+function isAdmin() {
+  const u = getCurrentUser();
+  return Boolean(u && (u.activeRole === "admin" || (!u.activeRole && u.role === "admin")));
+}
+
+/**
  * Returns a local audit timestamp "YYYY-MM-DD HH:MM:SS" built from local time parts.
  * Never uses toISOString().
  * @param {Date} [d=new Date()]
@@ -2495,6 +2505,9 @@ let hisDate = "all";
 /** Active mechanic filter for Service History page ("all" or mechanic name). */
 let hisMech = "all";
 
+/** Active status filter for Service History page ("all", "completed", "cancelled"). */
+let hisStatus = "all";
+
 /** Custom "From" date string for Service History page ("YYYY-MM-DD"). */
 let hisFrom = "";
 
@@ -2737,12 +2750,14 @@ function go(v) {
       hisBike = null;
       hisDate = "all";
       hisMech = "all";
+      hisStatus = "all";
       hisFrom = "";
       hisTo = "";
     } else {
       hisSearch = "";
       hisDate = "all";
       hisMech = "all";
+      hisStatus = "all";
       hisFrom = "";
       hisTo = "";
       hisBike = null;
@@ -2823,18 +2838,15 @@ const REP_CHIPS = [
  * @returns {Array<Object>} Filtered list of work orders.
  */
 function getFilteredRepairs(filter = repFilter) {
-  // Base set: all active (non-completed, non-cancelled) work orders, or cancelled jobs when filter is Cancelled
+  // Base set: all active (non-completed, non-cancelled) work orders
   const base = (Array.isArray(D.wo) ? D.wo : []).filter((o) => {
-    if (filter === "Cancelled") {
-      return o.st === "Cancelled" || Boolean(o.cancel);
-    }
     return o.st !== "Completed" && o.st !== "Cancelled" && !o.cancel;
   });
   const q = repSearch.trim().toLowerCase().replace(/\s+/g, " ");
 
   return base.filter((o) => {
     // 1. Status matching
-    if (filter !== "all" && filter !== "Cancelled" && o.st !== filter) {
+    if (filter !== "all" && o.st !== filter) {
       return false;
     }
 
@@ -2861,14 +2873,10 @@ function getFilteredRepairs(filter = repFilter) {
 
 /**
  * Builds HTML for all filter chips with dynamic counts based on the current search text.
- * Displays the Cancelled chip for Super Admin only.
  * @returns {string} HTML string of filter chip buttons.
  */
 function getRepChipsHtml() {
   const chips = [...REP_CHIPS];
-  if (isSuper()) {
-    chips.push({ id: "cancelled", label: "Cancelled", status: "Cancelled", cls: "chip-cancelled" });
-  }
   return chips.map((chip) => {
     const isSelected = repFilter === chip.status;
     const count = getFilteredRepairs(chip.status).length;
@@ -3157,13 +3165,20 @@ function getUniqueMechanics() {
 }
 
 /**
- * Returns completed work orders matching the active search query, mechanic filter, and date range.
- * Search matches against plate number, customer name, phone, make/model, job ID, mechanic, and dates.
- * Sorted by newest completion date first.
- * @returns {Array<Object>} Filtered list of completed work orders.
+ * Returns completed and cancelled work orders matching the active search query, status filter, mechanic filter, and date range.
+ * Search matches against plate number, customer name, phone, make/model, job ID, mechanic, dates, and cancel reason.
+ * Sorted by newest effective date first (completion date for completed, cancel date for cancelled).
+ * @returns {Array<Object>} Filtered list of work orders.
  */
 function getFilteredHistory() {
-  const base = D.wo.filter((o) => o.st === "Completed");
+  const base = (Array.isArray(D.wo) ? D.wo : []).filter((o) => {
+    const isCancelled = o.st === "Cancelled" || Boolean(o.cancel);
+    const isCompleted = o.st === "Completed";
+    if (!isCompleted && !isCancelled) return false;
+    if (hisStatus === "completed" && !isCompleted) return false;
+    if (hisStatus === "cancelled" && !isCancelled) return false;
+    return true;
+  });
   const q = hisSearch.trim().toLowerCase().replace(/\s+/g, " ");
 
   return base.filter((o) => {
@@ -3173,7 +3188,8 @@ function getFilteredHistory() {
     }
 
     // 2. Date range filter
-    const dateVal = o.done || o.at || "";
+    const isCancelled = o.st === "Cancelled" || Boolean(o.cancel);
+    const dateVal = isCancelled ? ((o.cancel && o.cancel.at) || o.at || "") : (o.done || o.at || "");
     if (!inDateRange(dateVal, hisDate, hisFrom, hisTo)) {
       return false;
     }
@@ -3192,6 +3208,7 @@ function getFilteredHistory() {
     const rawDate = dateVal.toLowerCase();
     const formattedDate = formatJobDate(dateVal).toLowerCase();
     const jo = getJobNumber(o).toLowerCase();
+    const cancelReason = (isCancelled && o.cancel && o.cancel.reason) ? String(o.cancel.reason).toLowerCase() : "";
 
     return (
       plate.includes(q) ||
@@ -3202,9 +3219,16 @@ function getFilteredHistory() {
       jo.includes(q) ||
       mech.includes(q) ||
       rawDate.includes(q) ||
-      formattedDate.includes(q)
+      formattedDate.includes(q) ||
+      cancelReason.includes(q)
     );
-  }).sort((a, c) => (c.done || c.at || "").localeCompare(a.done || a.at || ""));
+  }).sort((a, c) => {
+    const aCancelled = a.st === "Cancelled" || Boolean(a.cancel);
+    const cCancelled = c.st === "Cancelled" || Boolean(c.cancel);
+    const aDate = aCancelled ? ((a.cancel && a.cancel.at) || a.at || "") : (a.done || a.at || "");
+    const cDate = cCancelled ? ((c.cancel && c.cancel.at) || c.at || "") : (c.done || c.at || "");
+    return cDate.localeCompare(aDate);
+  });
 }
 
 /**
@@ -3272,20 +3296,30 @@ function getHisSummaryDescription() {
 function getHisSummaryHtml() {
   const list = getFilteredHistory();
   const count = list.length;
-  const jobWord = count === 1 ? "completed job" : "completed jobs";
+  const jobWord = count === 1 ? "job" : "jobs";
   return `Showing ${count} ${jobWord} · ${getHisSummaryDescription()}`;
 }
 
 /**
- * Builds HTML for the shop-wide completed jobs table or empty state.
+ * Renders both summary and results container in Service History.
+ */
+function renderHisResults() {
+  const sumEl = $("his-summary");
+  if (sumEl) sumEl.innerHTML = getHisSummaryHtml();
+  const resEl = $("his-results");
+  if (resEl) resEl.innerHTML = getHisResultsHtml();
+}
+
+/**
+ * Builds HTML for the shop-wide completed and cancelled jobs table or empty state.
  * @returns {string} HTML string.
  */
 function getHisResultsHtml() {
   const list = getFilteredHistory();
   if (!list.length) {
     return `<div class="empty">
-      <div style="font-weight:700;font-size:15px;color:var(--text-primary);margin-bottom:4px">No completed jobs found.</div>
-      <div>Try a different search, date range, or mechanic.</div>
+      <div style="font-weight:700;font-size:15px;color:var(--text-primary);margin-bottom:4px">No records found.</div>
+      <div>Try a different search, date range, staff, or status filter.</div>
     </div>`;
   }
 
@@ -3293,7 +3327,7 @@ function getHisResultsHtml() {
     <table>
       <thead>
         <tr>
-          <th>COMPLETION DATE &amp; TIME</th>
+          <th>DATE &amp; TIME</th>
           <th>VEHICLE &amp; CUSTOMER INFO</th>
           <th>MARKED BY</th>
           <th>PRIMARY ISSUE / DIAGNOSIS</th>
@@ -3305,7 +3339,9 @@ function getHisResultsHtml() {
         ${list.map((o) => {
           const b = bike(o.bid);
           const c = b ? own(b) : null;
-          const dateVal = o.done || o.at || "";
+          const isCancelled = o.st === "Cancelled" || Boolean(o.cancel);
+          const isRev = !isCancelled && Boolean(o.reversed);
+          const dateVal = isCancelled ? ((o.cancel && o.cancel.at) || o.at || "") : (o.done || o.at || "");
           const svcList = (o.sv && o.sv.length)
             ? o.sv.map((id) => (g("sv", id) ? g("sv", id).name : id))
             : (o.items && o.items.length)
@@ -3315,20 +3351,22 @@ function getHisResultsHtml() {
                 : [];
           const svcNames = svcList.join(", ") || (o.findings ? "Inspection Diagnosis" : "—");
           const truncSvcNames = svcNames.length > 45 ? svcNames.slice(0, 42) + "..." : svcNames;
-          const displayNote = o.note || o.notes || o.findings || "—";
+          const displayNote = isCancelled
+            ? `Cancelled: ${escHtml((o.cancel && o.cancel.reason) ? o.cancel.reason : "No reason given")}`
+            : (o.note || o.notes || o.findings || "—");
 
-          const isRev = Boolean(o.reversed);
           return `<tr>
             <td>
               <div style="font-weight:700;color:var(--text-primary)">${formatJobDate(dateVal)}</div>
               <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${formatJobTime(dateVal)}</div>
+              ${isCancelled ? `<div style="margin-top:4px"><span class="badge-cancelled">CANCELLED</span></div>` : ""}
               ${isRev ? `<div style="margin-top:4px"><span class="badge-reversed">REVERSED</span></div>` : ""}
             </td>
             <td>
-              <button type="button" class="his-plate-btn" onclick="filterByPlate('${b.plate}')" title="Filter by plate ${b.plate}">
-                <span>${b.plate}</span> <span class="his-plate-icon" style="display:inline-flex;align-items:center">${LINE_ICONS.his}</span>
+              <button type="button" class="his-plate-btn" onclick="filterByPlate('${b ? b.plate : ""}')" title="Filter by plate ${b ? b.plate : ""}">
+                <span>${b ? b.plate : "NO PLATE"}</span> <span class="his-plate-icon" style="display:inline-flex;align-items:center">${LINE_ICONS.his}</span>
               </button>
-              <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">${b.make} ${b.model}</div>
+              <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">${b ? `${b.make} ${b.model}` : "Unknown"}</div>
               <div style="font-weight:600;font-size:13px;color:var(--text-primary);margin-top:2px">${c ? c.name : "—"}</div>
             </td>
             <td>
@@ -3336,14 +3374,17 @@ function getHisResultsHtml() {
             </td>
             <td>
               <div style="font-weight:700;color:var(--text-primary)" title="${svcNames.replace(/"/g, '&quot;')}">${truncSvcNames}</div>
-              <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${escHtml(displayNote)}</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${displayNote}</div>
             </td>
             <td class="r" style="font-weight:700;color:var(--text-primary);font-size:14px">
-              ${isRev ? `<span class="text-struck">${P(total(o))}</span>` : P(total(o))}
+              ${(isRev || isCancelled) ? `<span class="text-struck">${P(total(o))}</span>` : P(total(o))}
             </td>
             <td class="r" style="white-space:nowrap">
               <button type="button" class="btn-rec" onclick="openRecord('${o.id}')">View Full Record</button>
-              ${isSuper() ? (isRev ? `
+              ${isCancelled && (isSuper() || isAdmin()) ? `
+                <button type="button" class="btn sm" style="margin-left:6px;background:#FFFFFF;color:#2563EB;border:1px solid #2563EB;font-weight:600" onclick="askRestoreJob('${o.id}')">Put back to Active Repairs</button>
+              ` : ""}
+              ${!isCancelled && isSuper() ? (isRev ? `
                 <button type="button" class="btn g sm" style="margin-left:6px" onclick="reopenJob('${o.id}')">Reopen Job</button>
               ` : `
                 <button type="button" class="btn sm btn-destructive" style="margin-left:6px" onclick="askReverseJob('${o.id}')">Void / Reverse</button>
@@ -3378,6 +3419,7 @@ function dashMechanic() {
   // 3. DONE TODAY: jobs where this mechanic's name is wo.mech and wo.doneAt or status change to Ready for Pickup or Completed is today
   const todayStr = today();
   const doneTodayJobs = D.wo.filter((o) => {
+    if (!isCountableJob(o)) return false;
     if (!isMyJob(o)) return false;
     const isReadyOrDone = o.st === "Ready for Pickup" || o.st === "Completed";
     if (!isReadyOrDone) return false;
@@ -3920,6 +3962,11 @@ const R = {
       >✕</button>
     </div>
     <div class="his-filter-group">
+      <select id="his-status-select" class="his-select" onchange="onHisStatusSelectChange(this.value)">
+        <option value="all" ${hisStatus === "all" ? "selected" : ""}>All Status</option>
+        <option value="completed" ${hisStatus === "completed" ? "selected" : ""}>Completed</option>
+        <option value="cancelled" ${hisStatus === "cancelled" ? "selected" : ""}>Cancelled</option>
+      </select>
       <select id="his-date-select" class="his-select" onchange="onHisDateSelectChange(this.value)">
         <option value="all" ${hisDate === "all" ? "selected" : ""}>All Time</option>
         <option value="today" ${hisDate === "today" ? "selected" : ""}>Today</option>
@@ -4092,6 +4139,22 @@ function clearHisSearch() {
 }
 
 /**
+ * Status dropdown change handler for Service History.
+ * @param {string} val - Selected status filter ("all", "completed", "cancelled").
+ */
+function onHisStatusSelectChange(val) {
+  hisStatus = val;
+  const sumEl = $("his-summary");
+  if (sumEl) {
+    sumEl.innerHTML = getHisSummaryHtml();
+  }
+  const resEl = $("his-results");
+  if (resEl) {
+    resEl.innerHTML = getHisResultsHtml();
+  }
+}
+
+/**
  * Date dropdown change handler for Service History.
  * @param {string} val - Selected date filter value.
  */
@@ -4230,7 +4293,8 @@ function exportHisCsv() {
   const rows = list.map((o) => {
     const b = bike(o.bid);
     const c = b ? own(b) : null;
-    const dateVal = o.done || o.at || "";
+    const isCancelled = o.st === "Cancelled" || Boolean(o.cancel);
+    const dateVal = isCancelled ? ((o.cancel && o.cancel.at) || o.at || "") : (o.done || o.at || "");
     const compDate = formatJobDate(dateVal);
     const compTime = formatJobTime(dateVal);
     const plate = b ? b.plate : "";
@@ -4246,12 +4310,15 @@ function exportHisCsv() {
           ? o.complaints
           : [];
     const svcs = svcsList.join("; ") || (o.findings ? "Inspection" : "");
-    const note = o.note || o.notes || o.findings || "";
+    const note = isCancelled
+      ? (o.cancel && o.cancel.reason ? o.cancel.reason : "No reason given")
+      : (o.note || o.notes || o.findings || "");
     const cost = total(o);
+    const statusLabel = isCancelled ? "Cancelled" : (o.reversed ? "Reversed" : "Completed");
 
     return [
       escapeCsv(o.id),
-      escapeCsv(o.reversed ? "Reversed" : "Completed"),
+      escapeCsv(statusLabel),
       escapeCsv(compDate),
       escapeCsv(compTime === " — " ? "" : compTime),
       escapeCsv(plate),
@@ -4265,7 +4332,7 @@ function exportHisCsv() {
     ].join(",");
   });
 
-  const activeSum = list.reduce((sum, o) => o.reversed ? sum : sum + total(o), 0);
+  const activeSum = list.reduce((sum, o) => (o.reversed || o.st === "Cancelled" || o.cancel) ? sum : sum + total(o), 0);
   const totalRow = [
     escapeCsv("TOTAL (active)"),
     escapeCsv(""),
@@ -4307,7 +4374,8 @@ function openRecord(id) {
   if (!o) return;
   const b = bike(o.bid);
   const c = b ? own(b) : null;
-  const dateVal = o.done || o.at || "";
+  const isCancelled = o.st === "Cancelled" || Boolean(o.cancel);
+  const dateVal = isCancelled ? ((o.cancel && o.cancel.at) || o.at || "") : (o.done || o.at || "");
 
   // All completed jobs for this motorcycle, sorted newest first
   const bikeHistory = D.wo
@@ -4346,7 +4414,7 @@ function openRecord(id) {
   const html = `
     <div class="rec-header">
       <div>
-        <div class="rec-title" id="rec-title">${b.plate} · ${b.make} ${b.model} (${b.year || "—"})</div>
+        <div class="rec-title" id="rec-title">${b ? b.plate : "NO PLATE"} · ${b ? `${b.make} ${b.model}` : "Unknown"} (${b ? (b.year || "—") : "—"})</div>
         <div class="rec-subtitle">Permanent Vehicle &amp; Service Record</div>
       </div>
       <button type="button" class="rec-close-btn" onclick="closeRecord()" title="Close record" aria-label="Close record">✕</button>
@@ -4365,8 +4433,20 @@ function openRecord(id) {
 
     <div class="rec-section-title">
       <span>This Job (#${o.id})</span>
-      ${o.reversed ? `<span class="badge-reversed">REVERSED</span>` : `<span class="bd completed">COMPLETED</span>`}
+      ${isCancelled ? `<span class="badge-cancelled">CANCELLED</span>` : (o.reversed ? `<span class="badge-reversed">REVERSED</span>` : `<span class="bd completed">COMPLETED</span>`)}
     </div>
+
+    ${isCancelled ? `
+      <div style="background:#F1F5F9;border:1px solid #CBD5E1;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#334155">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span class="badge-cancelled">CANCELLED</span>
+          <span style="font-size:12px;font-weight:600;color:var(--text-secondary)">
+            Cancelled on ${formatJobDate(dateVal)} at ${formatJobTime(dateVal)} by ${escHtml((o.cancel && o.cancel.by) || "Admin")}
+          </span>
+        </div>
+        <div><b>Reason:</b> ${escHtml((o.cancel && o.cancel.reason) ? o.cancel.reason : "No reason given")}</div>
+      </div>
+    ` : ""}
 
     ${o.reversed ? `
       <div style="background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#991B1B">
@@ -4377,7 +4457,7 @@ function openRecord(id) {
 
     <div class="rec-job-meta">
       <div>
-        <div class="rec-field-label">Completed On</div>
+        <div class="rec-field-label">${isCancelled ? "Cancelled On" : "Completed On"}</div>
         <div class="rec-field-val">${formatJobDate(dateVal)}</div>
         <div style="font-size:11px;color:var(--text-muted)">${formatJobTime(dateVal)}</div>
       </div>
@@ -4428,7 +4508,7 @@ function openRecord(id) {
 
     <div class="rec-bill-tot">
       <span>Total Cost</span>
-      <span>${o.reversed ? `<span class="text-struck">${P(total(o))}</span>` : P(total(o))}</span>
+      <span>${(o.reversed || isCancelled) ? `<span class="text-struck">${P(total(o))}</span>` : P(total(o))}</span>
     </div>
 
     <div class="rec-section-title">
@@ -4474,13 +4554,16 @@ function openRecord(id) {
     </div>
 
     <div class="rec-footer" style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">
-      ${isSuper() ? (o.reversed ? `
-        <button type="button" class="btn g" onclick="closeRecord(); reopenJob('${o.id}')">Reopen Job</button>
+      ${isCancelled && (isSuper() || isAdmin()) ? `
+        <button type="button" class="btn" style="min-height:40px;background:#FFFFFF;color:#2563EB;border:1px solid #2563EB;font-weight:600" onclick="closeRecord(); askRestoreJob('${o.id}')">Put back to Active Repairs</button>
+      ` : ""}
+      ${!isCancelled && isSuper() ? (o.reversed ? `
+        <button type="button" class="btn g" style="min-height:40px" onclick="closeRecord(); reopenJob('${o.id}')">Reopen Job</button>
       ` : `
-        <button type="button" class="btn btn-destructive" onclick="closeRecord(); askReverseJob('${o.id}')">Void / Reverse</button>
+        <button type="button" class="btn btn-destructive" style="min-height:40px" onclick="closeRecord(); askReverseJob('${o.id}')">Void / Reverse</button>
       `) : ""}
-      <button type="button" class="btn g" onclick="window.print()"><span style="display:inline-flex;align-items:center;margin-right:6px">${ICONS.print}</span>Print Record</button>
-      <button type="button" class="btn" onclick="closeRecord()">Close</button>
+      <button type="button" class="btn g" style="min-height:40px" onclick="window.print()"><span style="display:inline-flex;align-items:center;margin-right:6px">${ICONS.print}</span>Print Record</button>
+      <button type="button" class="btn" style="min-height:40px" onclick="closeRecord()">Close</button>
     </div>
   `;
 
@@ -7511,16 +7594,16 @@ function renderInspModal(id) {
         <b id="jc-footer-total-val">${P(totAmount)}</b>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        ${isSuper() && o.st !== "Completed" && o.st !== "Cancelled" ? `
-          <button type="button" class="btn sm btn-destructive" onclick="forceCancelJob('${o.id}')">Force-Cancel</button>
+        ${(isSuper() || isAdmin()) && o.st !== "Completed" && o.st !== "Cancelled" ? `
+          <button type="button" class="btn btn-destructive sm" style="min-height:40px;background:#ffffff;color:var(--danger,#dc2626);border:1px solid var(--danger-border,#fca5a5);padding:0 14px;font-weight:600" onclick="askCancelJob('${o.id}')">Cancel Job</button>
         ` : ""}
-        ${isSuper() && (o.st === "Completed" || o.st === "Cancelled" || o.reversed) ? `
-          <button type="button" class="btn g sm" onclick="reopenJob('${o.id}')">Reopen Job</button>
+        ${isSuper() && (o.st === "Completed" || o.reversed) ? `
+          <button type="button" class="btn g sm" style="min-height:40px" onclick="reopenJob('${o.id}')">Reopen Job</button>
         ` : ""}
         ${isDone ? `
-          <button type="button" class="btn sm" onclick="openReceipt('${o.id}')"><span style="display:inline-flex;align-items:center;margin-right:4px">${ICONS.print}</span>View Digital Receipt</button>
+          <button type="button" class="btn sm" style="min-height:40px" onclick="openReceipt('${o.id}')"><span style="display:inline-flex;align-items:center;margin-right:4px">${ICONS.print}</span>View Digital Receipt</button>
         ` : ""}
-        <button type="button" class="btn g jc-btn-close" onclick="closeInspModal()">Close</button>
+        <button type="button" class="btn g jc-btn-close" style="min-height:40px" onclick="closeInspModal()">Close</button>
       </div>
     </div>
   `;
@@ -7673,37 +7756,201 @@ function saveEditDiagnosis(woId) {
 }
 
 /**
- * Force-cancels an active repair work order with required reason (Super Admin only).
+ * Prompts Admin or Super Admin before cancelling an active repair job.
+ * Reuses the pos-void-ov dialog pattern.
  * @param {string} woId - Work order ID.
  */
-function forceCancelJob(woId) {
-  if (!isSuper()) return;
+function askCancelJob(woId) {
+  const u = getCurrentUser();
+  const role = (u && u.activeRole) || (u && u.role);
+  if (role !== "admin" && role !== "superadmin") return;
+
   const o = g("wo", woId);
-  if (!o) return;
-  askReason(`Force-Cancel Repair #${o.id}`, "Force-Cancel", (reason) => {
-    o.st = "Cancelled";
-    const u = getCurrentUser();
-    o.cancel = {
-      reason,
-      at: nowLocalTimestamp(),
-      by: u ? u.name : "Super Admin"
-    };
-    save();
-    closeInspModal();
-    if (view === "rep") {
-      repFilter = "Cancelled";
-      renderRepChips();
-      renderRepResults();
-    } else {
-      go(view);
-    }
-  });
+  if (!o || o.st === "Completed" || o.st === "Cancelled") return;
+
+  const md = $("pos-void-md");
+  const ov = $("pos-void-ov");
+  if (!md || !ov) return;
+
+  md.innerHTML = `
+    <div style="padding:18px 20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:10px">
+        <h3 id="pos-void-modal-title" style="margin:0;font-size:16px;color:var(--text);display:flex;align-items:center;gap:6px">
+          Cancel this job?
+        </h3>
+        <button type="button" class="search-clear visible" onclick="closePosVoidModal()" style="position:static" title="Close">✕</button>
+      </div>
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;line-height:1.4">
+        This job will be removed from Active Repairs and moved to Service History as Cancelled. You can put it back later.
+      </p>
+      <div style="margin-bottom:14px">
+        <label for="modal-cancel-reason" style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text-secondary)">Reason (optional):</label>
+        <textarea
+          id="modal-cancel-reason"
+          placeholder="Why is this job being cancelled?"
+          rows="3"
+          style="width:100%;border-radius:8px;border:1px solid var(--border);padding:8px 10px;box-sizing:border-box;font-size:13px;outline:none;resize:vertical;font-family:inherit"
+        ></textarea>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button type="button" class="btn g" id="btn-cancel-keep-job" onclick="closePosVoidModal()" style="min-height:40px;padding:0 16px">Keep Job</button>
+        <button type="button" class="btn btn-destructive" style="min-height:40px;padding:0 16px;background:#ffffff;color:var(--danger,#dc2626);border:1px solid var(--danger-border,#fca5a5);font-weight:600" onclick="confirmCancelJob('${o.id}')">Yes, Cancel Job</button>
+      </div>
+    </div>
+  `;
+
+  ov.classList.add("on");
+  ov.focus();
+  setTimeout(() => {
+    const keepBtn = $("btn-cancel-keep-job");
+    if (keepBtn) keepBtn.focus();
+  }, 50);
 }
 
 /**
- * Reopens a Completed or Cancelled repair work order with required reason (Super Admin only).
+ * Confirms cancellation of a repair job.
+ * Sets status to "Cancelled", records cancel metadata, removes card from Active Repairs grid, and updates chip counts.
+ * @param {string} woId - Work order ID.
+ */
+function confirmCancelJob(woId) {
+  const u = getCurrentUser();
+  const role = (u && u.activeRole) || (u && u.role);
+  if (role !== "admin" && role !== "superadmin") return;
+
+  const o = g("wo", woId);
+  if (!o || o.st === "Completed" || o.st === "Cancelled") return;
+
+  const reasonInp = $("modal-cancel-reason");
+  const reason = reasonInp ? reasonInp.value.trim() : "";
+  const prevStatus = o.st || "Awaiting Parts/Approval";
+
+  o.st = "Cancelled";
+  o.cancel = {
+    reason,
+    at: nowLocalTimestamp(),
+    by: u ? u.name : "Admin",
+    prevStatus
+  };
+
+  save();
+  closePosVoidModal();
+  closeInspModal();
+
+  if (view === "rep") {
+    const chipsEl = $("rep-chips");
+    if (chipsEl) chipsEl.innerHTML = getRepChipsHtml();
+    const resEl = $("rep-results");
+    if (resEl) resEl.innerHTML = getRepResultsHtml();
+  } else {
+    go(view);
+  }
+}
+
+/**
+ * Prompts Admin or Super Admin before putting a cancelled job back to Active Repairs.
+ * Reuses the pos-void-ov dialog pattern.
+ * @param {string} woId - Work order ID.
+ */
+function askRestoreJob(woId) {
+  const u = getCurrentUser();
+  const role = (u && u.activeRole) || (u && u.role);
+  if (role !== "admin" && role !== "superadmin") return;
+
+  const o = g("wo", woId);
+  if (!o) return;
+
+  const md = $("pos-void-md");
+  const ov = $("pos-void-ov");
+  if (!md || !ov) return;
+
+  md.innerHTML = `
+    <div style="padding:18px 20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:10px">
+        <h3 id="pos-void-modal-title" style="margin:0;font-size:16px;color:var(--text);display:flex;align-items:center;gap:6px">
+          Put this job back?
+        </h3>
+        <button type="button" class="search-clear visible" onclick="closePosVoidModal()" style="position:static" title="Close">✕</button>
+      </div>
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;line-height:1.4">
+        This job will return to Active Repairs.
+      </p>
+      <div style="margin-bottom:14px">
+        <label for="modal-restore-note" style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text-secondary)">Note (optional):</label>
+        <textarea
+          id="modal-restore-note"
+          placeholder="Add an optional note about putting this job back..."
+          rows="3"
+          style="width:100%;border-radius:8px;border:1px solid var(--border);padding:8px 10px;box-sizing:border-box;font-size:13px;outline:none;resize:vertical;font-family:inherit"
+        ></textarea>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button type="button" class="btn g" onclick="closePosVoidModal()" style="min-height:40px;padding:0 16px">Cancel</button>
+        <button type="button" class="btn" style="min-height:40px;padding:0 16px;background:var(--accent);color:#ffffff;font-weight:600" onclick="confirmRestoreJob('${o.id}')">Put Back</button>
+      </div>
+    </div>
+  `;
+
+  ov.classList.add("on");
+  ov.focus();
+  setTimeout(() => {
+    const noteArea = $("modal-restore-note");
+    if (noteArea) noteArea.focus();
+  }, 50);
+}
+
+/**
+ * Confirms restoration of a cancelled job back to Active Repairs.
+ * Restores status from wo.cancel.prevStatus, archives cancel history, stores wo.restored, and refreshes the table.
+ * @param {string} woId - Work order ID.
+ */
+function confirmRestoreJob(woId) {
+  const u = getCurrentUser();
+  const role = (u && u.activeRole) || (u && u.role);
+  if (role !== "admin" && role !== "superadmin") return;
+
+  const o = g("wo", woId);
+  if (!o) return;
+
+  const noteInp = $("modal-restore-note");
+  const note = noteInp ? noteInp.value.trim() : "";
+
+  // Archive cancel history
+  if (!Array.isArray(o.cancelHistory)) {
+    o.cancelHistory = [];
+  }
+  if (o.cancel) {
+    o.cancelHistory.push(o.cancel);
+  }
+
+  // Restore to prevStatus, defaulting to "Awaiting Parts/Approval"
+  const targetStatus = (o.cancel && o.cancel.prevStatus) ? o.cancel.prevStatus : "Awaiting Parts/Approval";
+  o.st = targetStatus;
+
+  o.restored = {
+    note,
+    at: nowLocalTimestamp(),
+    by: u ? u.name : "Admin"
+  };
+
+  delete o.cancel;
+
+  save();
+  closePosVoidModal();
+  closeRecord();
+
+  if (view === "his") {
+    const sumEl = $("his-summary");
+    if (sumEl) sumEl.innerHTML = getHisSummaryHtml();
+    const resEl = $("his-results");
+    if (resEl) resEl.innerHTML = getHisResultsHtml();
+  } else {
+    go(view);
+  }
+}
+
+/**
+ * Reopens a Completed repair work order with required reason (Super Admin only).
  * Completed -> "In Progress", previous payment saved to wo.prevPay, wo.pay and wo.done cleared.
- * Cancelled -> "Awaiting Parts/Approval", wo.cancel cleared.
  * @param {string} woId - Work order ID.
  */
 function reopenJob(woId) {
@@ -7720,15 +7967,24 @@ function reopenJob(woId) {
       delete o.pay;
       delete o.done;
       delete o.reversed;
-    } else if (o.st === "Cancelled" || o.cancel) {
-      o.st = "Awaiting Parts/Approval";
-      delete o.cancel;
     }
 
     save();
     closeInspModal();
     closeRecord();
-    go(view);
+    if (view === "rep") {
+      const chipsEl = $("rep-chips");
+      if (chipsEl) chipsEl.innerHTML = getRepChipsHtml();
+      const resEl = $("rep-results");
+      if (resEl) resEl.innerHTML = getRepResultsHtml();
+    } else if (view === "his") {
+      const sumEl = $("his-summary");
+      if (sumEl) sumEl.innerHTML = getHisSummaryHtml();
+      const resEl = $("his-results");
+      if (resEl) resEl.innerHTML = getHisResultsHtml();
+    } else {
+      go(view);
+    }
   }, { destructive: false });
 }
 
@@ -9218,15 +9474,12 @@ function handleInspDiagTabKeydown(e) {
 function scrollIntoViewIfAbove(id) {
   const el = $(id);
   if (!el) return;
-  if (typeof el.getBoundingClientRect === "function") {
-    const rect = el.getBoundingClientRect();
-    if (rect.top < 0) {
-      if (typeof el.scrollIntoView === "function") {
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
-      } else if (typeof window !== "undefined" && typeof window.scrollTo === "function") {
-        window.scrollTo(0, 0);
-      }
-    }
+  const prefersReduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const behavior = prefersReduced ? "auto" : "smooth";
+  if (typeof el.scrollIntoView === "function") {
+    el.scrollIntoView({ behavior, block: "start" });
+  } else if (typeof window !== "undefined" && typeof window.scrollTo === "function") {
+    window.scrollTo(0, 0);
   }
 }
 
@@ -9328,8 +9581,9 @@ function getInspStep2Html() {
         ${getSharedAddToFindingsBarHtml()}
 
         <!-- Panel A Footer Buttons -->
-        <div class="insp-footer" style="position:static;padding-top:20px;border-top:1px solid var(--border);display:flex;justify-content:flex-start">
-          <button type="button" class="btn g" onclick="setInspDraftStep(1)">← Back</button>
+        <div class="insp-footer" style="position:static;padding-top:20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+          <button type="button" class="btn g" style="min-height:44px;padding:0 20px" onclick="setInspDraftStep(1)">← Back</button>
+          <button type="button" class="btn" style="min-height:44px;padding:0 20px" onclick="setInspDiagView('findings')">Next: Findings &amp; Services →</button>
         </div>
       </div>
 
@@ -9370,9 +9624,9 @@ function getInspStep2Html() {
         </div>
 
         <!-- Panel B Footer Buttons -->
-        <div class="insp-footer" style="position:static;padding-top:20px;border-top:1px solid var(--border);display:flex;justify-content:space-between">
-          <button type="button" class="btn g" onclick="setInspDraftStep(1)">← Back</button>
-          <button type="button" class="btn" onclick="setInspDraftStep(3)">Next: Confirmation →</button>
+        <div class="insp-footer" style="position:static;padding-top:20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+          <button type="button" class="btn g" style="min-height:44px;padding:0 20px" onclick="setInspDiagView('inspection')">← Inspection</button>
+          <button type="button" class="btn" style="min-height:44px;padding:0 20px" onclick="setInspDraftStep(3)">Next: Confirmation →</button>
         </div>
       </div>
     </div>
@@ -12531,7 +12785,7 @@ function getInspStep3Html() {
         ${!isA ? "" : "hidden"}
         style="${!isA ? "display:block" : "display:none"}"
       >
-        <div class="confirm-sticky-ticket" style="max-width:640px;position:static">
+        <div class="confirm-sticky-ticket confirm-ticket-full" style="max-width:none;width:100%;position:static">
           <div class="confirm-card-header" style="margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #F1F5F9">
             <span style="font-weight:700;font-size:13px;color:var(--text-primary)">Customer Details</span>
           </div>
@@ -12551,7 +12805,7 @@ function getInspStep3Html() {
             </div>
           </div>
 
-          <div class="ticket-cust-fields">
+          <div class="ticket-cust-fields ticket-cust-fields-grid">
             <div>
               <label class="ticket-label" for="insp-cust-name">
                 CUSTOMER NAME <span style="font-size:10px;font-weight:400;color:var(--text-muted);text-transform:none">(optional)</span>
@@ -12606,24 +12860,24 @@ function getInspStep3Html() {
           </div>
 
           <!-- Actions -->
-          <div style="margin-top:16px">
-            <button
-              type="button"
-              class="btn"
-              id="btn-confirm-job-order"
-              style="width:100%;min-height:44px;justify-content:center;margin-bottom:8px;font-weight:700"
-              onclick="confirmInspectionJobOrder()"
-            >
-              Confirm &amp; Send to Active Repairs
-            </button>
+          <div class="confirm-ticket-actions">
             <button
               type="button"
               class="btn g"
               id="btn-back-to-diagnosis"
-              style="width:100%;min-height:40px;justify-content:center"
+              style="min-height:44px;padding:0 20px"
               onclick="setInspDraftStep(2)"
             >
               ← Back
+            </button>
+            <button
+              type="button"
+              class="btn"
+              id="btn-confirm-job-order"
+              style="min-height:44px;padding:0 24px;font-weight:700"
+              onclick="confirmInspectionJobOrder()"
+            >
+              Confirm &amp; Send to Active Repairs
             </button>
           </div>
         </div>
@@ -12809,6 +13063,7 @@ function matchesBillSearch(o, q) {
 function getFilteredBillOrders(filter = billFilter) {
   const q = billSearch.trim().toLowerCase().replace(/\s+/g, " ");
   return D.wo.filter((o) => {
+    if (o.st === "Cancelled" || o.cancel) return false;
     if (filter === "all") {
       if (o.st === "Completed") return false;
     } else if (filter === "adv" || filter === "advances") {
@@ -14891,7 +15146,6 @@ function getReportResultsHtml() {
   const topLabor = Object.values(laborCounts)
     .sort((a, b) => b.count - a.count || b.revenue - a.revenue)
     .slice(0, 8);
-  const maxLaborCount = Math.max(...topLabor.map((x) => x.count), 1);
 
   // 3. Top Customer Complaints
   const jobsCreatedInPeriod = D.wo.filter((o) => isCountableJob(o) && inDateRange(o.at, reportPeriod));
@@ -14907,7 +15161,6 @@ function getReportResultsHtml() {
     .map((k) => ({ label: k, count: complaintCounts[k] }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
-  const maxComplaint = Math.max(...topComplaints.map((x) => x.count), 1);
 
   // 4. Most Frequent Fault Codes
   const codeCounts = {};
@@ -14988,28 +15241,27 @@ function getReportResultsHtml() {
           <span>Most Labor Done</span>
         </div>
         ${topLabor.length ? `
-          <div style="display:flex;flex-direction:column;gap:12px">
-            ${topLabor.map((item, idx) => {
-              const pct = Math.round((item.count / maxLaborCount) * 100);
-              const countLabel = `${item.count} time${item.count === 1 ? "" : "s"}`;
-              return `
-                <div class="report-bar-row" style="margin-bottom:0">
-                  <div class="report-bar-header" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-                    <div style="display:flex;align-items:center;gap:8px;min-width:0">
-                      <span style="font-size:12px;font-weight:700;color:var(--text-muted);min-width:20px">#${idx + 1}</span>
-                      <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><b>${escHtml(item.name)}</b></span>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:12px;flex-shrink:0">
-                      <span style="font-size:13px;color:var(--text-secondary)">${countLabel}</span>
-                      <b style="font-size:13px">${P(item.revenue)}</b>
-                    </div>
-                  </div>
-                  <div class="report-bar-track" style="margin-top:6px">
-                    <div class="report-bar-fill" style="width:${pct}%;background:var(--accent)"></div>
-                  </div>
-                </div>
-              `;
-            }).join("")}
+          <div class="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:48px">#</th>
+                  <th>SERVICE</th>
+                  <th class="r" style="width:130px">TIMES DONE</th>
+                  <th class="r" style="width:140px">REVENUE</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${topLabor.map((item, idx) => `
+                  <tr>
+                    <td style="color:var(--text-muted);font-weight:700">#${idx + 1}</td>
+                    <td><b>${escHtml(item.name)}</b></td>
+                    <td class="r" style="font-weight:600">${item.count}</td>
+                    <td class="r" style="font-weight:700">${P(item.revenue)}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
           </div>
         ` : `
           <div class="empty">No labor recorded in this period.</div>
@@ -15018,23 +15270,30 @@ function getReportResultsHtml() {
 
       <!-- Top Customer Complaints -->
       <div class="card">
-        <div class="hd" style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span>${ICONS.chat}</span><span>Top Customer Complaints</span></div>
+        <div class="hd" style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+          <span>${ICONS.chat}</span>
+          <span>Top Customer Complaints</span>
+        </div>
         ${topComplaints.length ? `
-          <div>
-            ${topComplaints.map((c) => {
-              const pct = (c.count / maxComplaint) * 100;
-              return `
-                <div class="report-bar-row">
-                  <div class="report-bar-header">
-                    <span><b>${escHtml(c.label)}</b></span>
-                    <b>${c.count}</b>
-                  </div>
-                  <div class="report-bar-track">
-                    <div class="report-bar-fill" style="width:${pct}%;background:var(--accent)"></div>
-                  </div>
-                </div>
-              `;
-            }).join("")}
+          <div class="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:48px">#</th>
+                  <th>COMPLAINT</th>
+                  <th class="r" style="width:90px">COUNT</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${topComplaints.map((c, idx) => `
+                  <tr>
+                    <td style="color:var(--text-muted);font-weight:700">#${idx + 1}</td>
+                    <td><b>${escHtml(c.label)}</b></td>
+                    <td class="r" style="font-weight:700">${c.count}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
           </div>
         ` : `
           <div class="empty">No complaints recorded.</div>
@@ -15043,64 +15302,32 @@ function getReportResultsHtml() {
 
       <!-- Most Frequent Fault Codes -->
       <div class="card">
-        <div class="hd" style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span>${LINE_ICONS.pos}</span><span>Most Frequent Fault Codes</span></div>
+        <div class="hd" style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+          <span>${LINE_ICONS.pos}</span>
+          <span>Most Frequent Fault Codes</span>
+        </div>
         ${topCodes.length ? `
-          <div style="display:flex;flex-direction:column;gap:8px">
-            ${topCodes.map((c) => `
-              <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px">
-                <div style="display:flex;align-items:center;gap:8px">
-                  <span style="display:inline-block;padding:2px 6px;border-radius:4px;background:var(--danger-soft);color:var(--danger);border:1px solid var(--danger-border);font-weight:700;font-size:11px">${escHtml(c.code)}</span>
-                  <span style="font-size:13px;color:var(--text-secondary)">${escHtml(c.label || "Trouble code")}</span>
-                </div>
-                <b>${c.count}</b>
-              </div>
-            `).join("")}
-          </div>
-        ` : `
-          <div class="empty">No fault codes recorded.</div>
-        `}
-      </div>
-    </div>
-
-      <!-- Top Customer Complaints -->
-      <div class="card">
-        <div class="hd" style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span>${ICONS.chat}</span><span>Top Customer Complaints</span></div>
-        ${topComplaints.length ? `
-          <div>
-            ${topComplaints.map((c) => {
-              const pct = (c.count / maxComplaint) * 100;
-              return `
-                <div class="report-bar-row">
-                  <div class="report-bar-header">
-                    <span><b>${escHtml(c.label)}</b></span>
-                    <b>${c.count}</b>
-                  </div>
-                  <div class="report-bar-track">
-                    <div class="report-bar-fill" style="width:${pct}%;background:var(--accent)"></div>
-                  </div>
-                </div>
-              `;
-            }).join("")}
-          </div>
-        ` : `
-          <div class="empty">No complaints recorded.</div>
-        `}
-      </div>
-
-      <!-- Most Frequent Fault Codes -->
-      <div class="card">
-        <div class="hd" style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span>${LINE_ICONS.pos}</span><span>Most Frequent Fault Codes</span></div>
-        ${topCodes.length ? `
-          <div style="display:flex;flex-direction:column;gap:8px">
-            ${topCodes.map((c) => `
-              <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px">
-                <div style="display:flex;align-items:center;gap:8px">
-                  <span style="display:inline-block;padding:2px 6px;border-radius:4px;background:var(--danger-soft);color:var(--danger);border:1px solid var(--danger-border);font-weight:700;font-size:11px">${escHtml(c.code)}</span>
-                  <span style="font-size:13px;color:var(--text-secondary)">${escHtml(c.label || "Trouble code")}</span>
-                </div>
-                <b>${c.count}</b>
-              </div>
-            `).join("")}
+          <div class="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:48px">#</th>
+                  <th style="width:110px">CODE</th>
+                  <th>COMPONENT / DESCRIPTION</th>
+                  <th class="r" style="width:90px">COUNT</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${topCodes.map((c, idx) => `
+                  <tr>
+                    <td style="color:var(--text-muted);font-weight:700">#${idx + 1}</td>
+                    <td><code style="font-family:monospace;font-weight:700;font-size:12px;background:var(--danger-soft);color:var(--danger);padding:2px 6px;border-radius:4px;border:1px solid var(--danger-border)">${escHtml(c.code)}</code></td>
+                    <td>${escHtml(c.label || "Trouble code")}</td>
+                    <td class="r" style="font-weight:700">${c.count}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
           </div>
         ` : `
           <div class="empty">No fault codes recorded.</div>

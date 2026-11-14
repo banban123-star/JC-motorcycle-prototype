@@ -2673,6 +2673,10 @@ body.logged-in .login-screen {
   display: flex;
 }
 
+#pos-void-ov {
+  z-index: 500;
+}
+
 .insp-md {
   background: var(--bg-surface);
   border-radius: 16px;
@@ -4555,6 +4559,47 @@ body.logged-in .login-screen {
   box-sizing: border-box;
 }
 
+.confirm-sticky-ticket.confirm-ticket-full {
+  max-width: 100%;
+  width: 100%;
+}
+
+.ticket-cust-fields-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 600px) {
+  .ticket-cust-fields-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
+
+.confirm-ticket-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 600px) {
+  .confirm-ticket-actions {
+    flex-direction: column-reverse;
+    gap: 10px;
+  }
+  .confirm-ticket-actions .btn,
+  .confirm-ticket-actions .btn.g {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .confirm-actions-footer {
   max-width: 640px;
   width: 100%;
@@ -5765,29 +5810,6 @@ body.logged-in .login-screen {
 }
 .reports-grid-wide {
   grid-column: 1 / -1;
-}
-
-/* Horizontal Bar Chart */
-.report-bar-row {
-  margin-bottom: 12px;
-}
-.report-bar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-  font-size: 13px;
-}
-.report-bar-track {
-  height: 10px;
-  background: #F1F5F9;
-  border-radius: 6px;
-  overflow: hidden;
-}
-.report-bar-fill {
-  height: 100%;
-  border-radius: 6px;
-  transition: width 0.3s ease;
 }
 
 /* ==========================================================

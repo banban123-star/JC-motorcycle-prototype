@@ -2758,8 +2758,16 @@ function go(v) {
   const mainArea = $("main");
   if (mainArea) mainArea.scrollTop = 0;
   if (typeof window !== "undefined") window.scrollTo(0, 0);
-  if (v === "insp" && inspDraftStep === 2) {
-    autoGrowTextarea($("insp-diag-findings"));
+  if (v === "insp") {
+    if (inspDraftStep === 2) {
+      inspDiagView = "inspection";
+      autoGrowTextarea($("insp-diag-findings"));
+    } else if (inspDraftStep === 3) {
+      inspConfirmView = "summary";
+    }
+  }
+  if (v === "pos") {
+    posView = "parts";
   }
   if (v === "cat") {
     catFilter = "all";
@@ -6451,6 +6459,8 @@ let sharedBarFeedbackTimer = null;
  */
 let inspDraft = createFreshInspDraft();
 let inspDraftStep = 1;
+let inspDiagView = "inspection";
+let inspConfirmView = "summary";
 let selectedPhysRailCat = null;
 
 /**
@@ -6459,6 +6469,8 @@ let selectedPhysRailCat = null;
 function resetInspDraft() {
   inspDraft = createFreshInspDraft();
   inspDraftStep = 1;
+  inspDiagView = "inspection";
+  inspConfirmView = "summary";
   brandDropdownOpen = false;
   brandHighlightIndex = -1;
   modelDropdownOpen = false;
@@ -6530,6 +6542,12 @@ function setInspDraftStep(newStep) {
   syncDraftObdBike();
 
   inspDraftStep = Math.max(1, Math.min(3, newStep));
+  if (inspDraftStep === 2) {
+    inspDiagView = "inspection";
+  } else if (inspDraftStep === 3) {
+    inspConfirmView = "summary";
+  }
+
   if (view === "insp") {
     const mainEl = $("main");
     if (mainEl) mainEl.innerHTML = R.insp();
@@ -6589,17 +6607,10 @@ function getInspViewHtml() {
       ${inspDraftStep === 1 ? `<button type="button" class="btn-clear-draft" onclick="resetInspDraft()" title="Clear form">Clear form</button>` : ""}
     </div>
 
-    ${inspDraftStep === 1 ? `
-      <div class="card insp-card-container">
-        ${getInspStepperHtml(inspDraftStep)}
-        ${stepBodyHtml}
-      </div>
-    ` : `
-      <div class="card" style="padding:16px 20px;margin:16px 0">
-        ${getInspStepperHtml(inspDraftStep)}
-      </div>
+    <div class="card insp-card-container">
+      ${getInspStepperHtml(inspDraftStep)}
       ${stepBodyHtml}
-    `}
+    </div>
   `;
 }
 
@@ -8803,56 +8814,120 @@ function sanitizeInspDraftInspectionItems() {
 }
 
 /**
- * Opens mobile bottom sheet summary drawer for Step 2 Diagnosis.
+ * Switches the active sub-view in Step 2 Diagnosis ("inspection" or "findings") without destroying DOM elements.
+ * Updates class and aria attributes of both buttons from inspDiagView state.
+ * @param {"inspection"|"findings"} viewName - Target sub-view.
  */
-function openInspStep2BottomSheet() {
-  const col = $("insp-step2-right");
-  if (col) col.classList.add("bottom-sheet-open");
-}
+function setInspDiagView(viewName) {
+  inspDiagView = viewName === "findings" ? "findings" : "inspection";
+  readDiagDomIntoDraft();
 
-/**
- * Closes mobile bottom sheet summary drawer for Step 2 Diagnosis.
- */
-function closeInspStep2BottomSheet() {
-  const col = $("insp-step2-right");
-  if (col) col.classList.remove("bottom-sheet-open");
-}
+  const isA = inspDiagView !== "findings";
+  const panelA = $("insp-diag-panel-a");
+  const panelB = $("insp-diag-panel-b");
+  const tabA = $("insp-diag-tab-a");
+  const tabB = $("insp-diag-tab-b");
 
-/**
- * Live updates the Step 2 Diagnosis Summary panel counts and totals in place without destroying input focus.
- */
-function updateInspStep2Summary() {
-  const counts = getPhysicalInspectionCounts();
-  const draftTotals = getDraftItemsTotals();
-  const obdCodes = (inspDraft.inspection && inspDraft.inspection.obd && Array.isArray(inspDraft.inspection.obd.codes))
-    ? inspDraft.inspection.obd.codes
-    : [];
-  const itemsCount = (inspDraft.items && Array.isArray(inspDraft.items)) ? inspDraft.items.length : 0;
-
-  const countsEl = $("insp-step2-counts");
-  if (countsEl) {
-    countsEl.textContent = `${counts.fix} Fix · ${obdCodes.length} code${obdCodes.length === 1 ? "" : "s"} · ${itemsCount} item${itemsCount === 1 ? "" : "s"}`;
+  if (panelA) {
+    panelA.hidden = !isA;
+    panelA.style.display = isA ? "block" : "none";
+  }
+  if (panelB) {
+    panelB.hidden = isA;
+    panelB.style.display = isA ? "none" : "block";
+    if (!isA) {
+      autoGrowTextarea($("insp-diag-findings"));
+    }
   }
 
-  const laborEl = $("insp-step2-labor");
-  if (laborEl) laborEl.textContent = P(draftTotals.labor || 0);
+  if (tabA) {
+    if (isA) {
+      tabA.classList.add("active");
+      tabA.setAttribute("aria-selected", "true");
+      tabA.setAttribute("aria-pressed", "true");
+      tabA.setAttribute("tabindex", "0");
+    } else {
+      tabA.classList.remove("active");
+      tabA.setAttribute("aria-selected", "false");
+      tabA.setAttribute("aria-pressed", "false");
+      tabA.setAttribute("tabindex", "-1");
+    }
+  }
 
-  const partsEl = $("insp-step2-parts");
-  if (partsEl) partsEl.textContent = P(draftTotals.parts || 0);
+  if (tabB) {
+    if (!isA) {
+      tabB.classList.add("active");
+      tabB.setAttribute("aria-selected", "true");
+      tabB.setAttribute("aria-pressed", "true");
+      tabB.setAttribute("tabindex", "0");
+    } else {
+      tabB.classList.remove("active");
+      tabB.setAttribute("aria-selected", "false");
+      tabB.setAttribute("aria-pressed", "false");
+      tabB.setAttribute("tabindex", "-1");
+    }
+  }
 
-  const totalEl = $("insp-step2-total");
-  if (totalEl) totalEl.textContent = P(draftTotals.total || 0);
+  scrollIntoViewIfAbove("insp-diag-toggle");
+}
 
-  const barEl = $("insp-step2-mobile-bar");
-  if (barEl) {
-    barEl.textContent = `View summary · ${counts.fix} Fix · ${itemsCount} item${itemsCount === 1 ? "" : "s"} · ${P(draftTotals.total || 0)}`;
+/**
+ * Handles keyboard navigation (ArrowLeft/ArrowRight, Home/End, Enter/Space) for Diagnosis switch tabs.
+ * @param {KeyboardEvent} e
+ */
+function handleInspDiagTabKeydown(e) {
+  const tabA = $("insp-diag-tab-a");
+  const tabB = $("insp-diag-tab-b");
+  if (!tabA || !tabB) return;
+
+  const key = e.key;
+  if (key === "ArrowRight" || key === "ArrowLeft") {
+    e.preventDefault();
+    if (document.activeElement === tabA) {
+      tabB.focus();
+    } else {
+      tabA.focus();
+    }
+  } else if (key === "Home") {
+    e.preventDefault();
+    tabA.focus();
+  } else if (key === "End") {
+    e.preventDefault();
+    tabB.focus();
+  } else if (key === "Enter" || key === " " || key === "Spacebar") {
+    e.preventDefault();
+    if (document.activeElement === tabB) {
+      setInspDiagView("findings");
+    } else if (document.activeElement === tabA) {
+      setInspDiagView("inspection");
+    }
   }
 }
 
 /**
- * Generates HTML for Step 2 Diagnosis form using Quick Labor's 2-column layout.
- * Left column stacks cards 1 to 5.
- * Right column displays sticky Diagnosis Summary panel.
+ * Scrolls the page to the top of the given element if it starts above the current scroll position.
+ * @param {string} id - Element ID.
+ */
+function scrollIntoViewIfAbove(id) {
+  const el = $(id);
+  if (!el) return;
+  if (typeof el.getBoundingClientRect === "function") {
+    const rect = el.getBoundingClientRect();
+    if (rect.top < 0) {
+      if (typeof el.scrollIntoView === "function") {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else if (typeof window !== "undefined" && typeof window.scrollTo === "function") {
+        window.scrollTo(0, 0);
+      }
+    }
+  }
+}
+
+/**
+ * Generates HTML for Step 2 Diagnosis form.
+ * Split into two views toggled by segmented switch buttons directly below stepper:
+ * View A: "Inspection (1-3)" -> Sections 1, 2 (when enabled), 3 (when enabled), and shared add bar.
+ * View B: "Findings & Services (4-5)" -> Sections 4 and 5.
  * @returns {string} HTML string.
  */
 function getInspStep2Html() {
@@ -8860,15 +8935,54 @@ function getInspStep2Html() {
   const insp = inspDraft.inspection;
   syncDraftObdBike();
 
-  const counts = getPhysicalInspectionCounts();
-  const draftTotals = getDraftItemsTotals();
-  const obdCodes = (insp.obd && Array.isArray(insp.obd.codes)) ? insp.obd.codes : [];
-  const draftItemsCount = (inspDraft.items && Array.isArray(inspDraft.items)) ? inspDraft.items.length : 0;
+  const isA = inspDiagView !== "findings";
 
   return `
-    <div class="pos-layout">
-      <!-- Left Column: Cards 1-5 stacked -->
-      <div class="pos-left-col" id="insp-step2-left">
+    <div class="insp-stage-body">
+      <!-- Segmented switch for Step 2 views -->
+      <div
+        class="tab-switch-bar"
+        id="insp-diag-toggle"
+        role="tablist"
+        aria-label="Diagnosis sections"
+        onkeydown="handleInspDiagTabKeydown(event)"
+      >
+        <button
+          type="button"
+          id="insp-diag-tab-a"
+          class="tab-switch-btn ${isA ? "active" : ""}"
+          role="tab"
+          aria-selected="${isA ? "true" : "false"}"
+          aria-pressed="${isA ? "true" : "false"}"
+          aria-controls="insp-diag-panel-a"
+          tabindex="${isA ? "0" : "-1"}"
+          onclick="setInspDiagView('inspection')"
+        >
+          Inspection (1-3)
+        </button>
+        <button
+          type="button"
+          id="insp-diag-tab-b"
+          class="tab-switch-btn ${!isA ? "active" : ""}"
+          role="tab"
+          aria-selected="${!isA ? "true" : "false"}"
+          aria-pressed="${!isA ? "true" : "false"}"
+          aria-controls="insp-diag-panel-b"
+          tabindex="${!isA ? "0" : "-1"}"
+          onclick="setInspDiagView('findings')"
+        >
+          Findings &amp; Services (4-5)
+        </button>
+      </div>
+
+      <!-- View A Panel: Sections 1-3 -->
+      <div
+        id="insp-diag-panel-a"
+        role="tabpanel"
+        aria-labelledby="insp-diag-tab-a"
+        ${isA ? "" : "hidden"}
+        style="${isA ? "display:block" : "display:none"}"
+      >
         <!-- Card 1. INSPECTION SETUP -->
         <div class="insp-card" style="margin-bottom:16px">
           <div class="insp-diag-card-title">1. INSPECTION SETUP</div>
@@ -8905,7 +9019,16 @@ function getInspStep2Html() {
 
         <!-- Shared Add to Findings Bar -->
         ${getSharedAddToFindingsBarHtml()}
+      </div>
 
+      <!-- View B Panel: Sections 4-5 -->
+      <div
+        id="insp-diag-panel-b"
+        role="tabpanel"
+        aria-labelledby="insp-diag-tab-b"
+        ${!isA ? "" : "hidden"}
+        style="${!isA ? "display:block" : "display:none"}"
+      >
         <!-- Card 4. FINAL FINDINGS & DIAGNOSIS VERIFICATION -->
         <div class="insp-card" style="margin-bottom:16px">
           <div class="insp-diag-card-title">4. FINAL FINDINGS &amp; DIAGNOSIS VERIFICATION</div>
@@ -8935,71 +9058,11 @@ function getInspStep2Html() {
         </div>
       </div>
 
-      <!-- Right Column: Diagnosis Summary -->
-      <div class="pos-right-col" id="insp-step2-right">
-        <div class="pos-cart-panel" style="padding:16px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-            <span style="font-size:15px;font-weight:800;color:var(--text-primary)">Diagnosis Summary</span>
-            <button type="button" class="pos-sheet-close" onclick="closeInspStep2BottomSheet()" aria-label="Close summary">✕</button>
-          </div>
-
-          <!-- Vehicle line -->
-          <div style="background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px">
-            <div style="font-weight:700;color:var(--text-primary)">${escHtml([inspDraft.make, inspDraft.model].filter(Boolean).join(" ") || "Unknown Motorcycle")}</div>
-            <div style="color:var(--text-muted);margin-top:2px">Plate: <b>${escHtml(inspDraft.plate || "NO PLATE")}</b></div>
-          </div>
-
-          <!-- Live counts row -->
-          <div style="background:var(--bg-surface-alt, #F8FAFC);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:12px;font-weight:600;color:var(--text-secondary)" id="insp-step2-counts">
-            ${counts.fix} Fix · ${obdCodes.length} code${obdCodes.length === 1 ? "" : "s"} · ${draftItemsCount} item${draftItemsCount === 1 ? "" : "s"}
-          </div>
-
-          <!-- Financial Totals -->
-          <div class="ticket-totals-block" style="margin-bottom:0">
-            <div class="ticket-totals-row">
-              <span>Labor Subtotal</span>
-              <span id="insp-step2-labor" style="font-weight:600">${P(draftTotals.labor || 0)}</span>
-            </div>
-            <div class="ticket-totals-row">
-              <span>Parts Subtotal</span>
-              <span id="insp-step2-parts" style="font-weight:600">${P(draftTotals.parts || 0)}</span>
-            </div>
-            <div class="ticket-totals-divider"></div>
-            <div class="ticket-totals-row total">
-              <span>Estimated Total</span>
-              <span id="insp-step2-total" class="ticket-total-val">${P(draftTotals.total || 0)}</span>
-            </div>
-          </div>
-
-          <!-- Muted Note -->
-          <div style="font-size:11px;color:var(--text-muted);margin:12px 0 16px;line-height:1.4">
-            Nothing here is required.
-          </div>
-
-          <!-- Action Buttons -->
-          <button
-            type="button"
-            class="btn"
-            style="width:100%;min-height:44px;justify-content:center;margin-bottom:8px;font-weight:700"
-            onclick="setInspDraftStep(3)"
-          >
-            Next: Confirmation →
-          </button>
-          <button
-            type="button"
-            class="btn g"
-            style="width:100%;min-height:40px;justify-content:center"
-            onclick="setInspDraftStep(1)"
-          >
-            ← Back
-          </button>
-        </div>
+      <!-- Footer Buttons -->
+      <div class="insp-footer" style="position:static;padding-top:20px;border-top:1px solid var(--border);display:flex;justify-content:space-between">
+        <button type="button" class="btn g" onclick="setInspDraftStep(1)">← Back</button>
+        <button type="button" class="btn" onclick="setInspDraftStep(3)">Next: Confirmation →</button>
       </div>
-    </div>
-
-    <!-- Mobile Floating Checkout Bar (<900px) -->
-    <div class="pos-mobile-bar" id="insp-step2-mobile-bar" onclick="openInspStep2BottomSheet()">
-      View summary · ${counts.fix} Fix · ${draftItemsCount} item${draftItemsCount === 1 ? "" : "s"} · ${P(draftTotals.total || 0)}
     </div>
   `;
 }
@@ -9698,7 +9761,6 @@ function renderDtcRecordedCodes() {
   if (wrap) {
     wrap.innerHTML = getDtcRecordedCodesHtml();
   }
-  updateInspStep2Summary();
 }
 
 /**
@@ -10339,7 +10401,7 @@ function addSharedResultsToFindings() {
   codes.forEach((c) => renderDtcCardActionBtn(c.code));
   updateAllItemFindingsButtons();
   updateSharedAddToFindingsBar();
-  showSharedBarFeedback("Added to Final Findings below", 2500);
+  showSharedBarFeedback("Added to Final Findings (Findings & Services tab)", 2500);
 }
 
 /**
@@ -10726,8 +10788,6 @@ function renderItemsManager(context) {
   container.innerHTML = getItemsBuilderHtml(context, options);
   if (context !== "draft") {
     syncJobCardTotals(context);
-  } else {
-    updateInspStep2Summary();
   }
 }
 
@@ -11785,7 +11845,6 @@ function setItemInspectionState(catKey, itKey, state = "fix") {
   renderInspectionItemRow(catKey, itKey);
   renderPhysRailCategoryDot(catKey);
   updateSharedAddToFindingsBar();
-  updateInspStep2Summary();
 }
 
 /**
@@ -11833,25 +11892,98 @@ function getZoneNameForItem(catKey, itKey) {
 }
 
 /**
- * Opens mobile bottom sheet drawer for Step 3 Confirmation.
+ * Switches the active sub-view in Step 3 Confirmation ("summary" or "customer") without destroying DOM elements.
+ * Updates class and aria attributes of both buttons from inspConfirmView state.
+ * @param {"summary"|"customer"} viewName - Target sub-view.
  */
-function openInspStep3BottomSheet() {
-  const col = $("insp-step3-right");
-  if (col) col.classList.add("bottom-sheet-open");
+function setInspConfirmView(viewName) {
+  inspConfirmView = viewName === "customer" ? "customer" : "summary";
+  readConfirmDomIntoDraft();
+
+  const isA = inspConfirmView !== "customer";
+  const panelA = $("insp-confirm-panel-a");
+  const panelB = $("insp-confirm-panel-b");
+  const tabA = $("insp-confirm-tab-a");
+  const tabB = $("insp-confirm-tab-b");
+
+  if (panelA) {
+    panelA.hidden = !isA;
+    panelA.style.display = isA ? "block" : "none";
+  }
+  if (panelB) {
+    panelB.hidden = isA;
+    panelB.style.display = isA ? "none" : "block";
+  }
+
+  if (tabA) {
+    if (isA) {
+      tabA.classList.add("active");
+      tabA.setAttribute("aria-selected", "true");
+      tabA.setAttribute("aria-pressed", "true");
+      tabA.setAttribute("tabindex", "0");
+    } else {
+      tabA.classList.remove("active");
+      tabA.setAttribute("aria-selected", "false");
+      tabA.setAttribute("aria-pressed", "false");
+      tabA.setAttribute("tabindex", "-1");
+    }
+  }
+
+  if (tabB) {
+    if (!isA) {
+      tabB.classList.add("active");
+      tabB.setAttribute("aria-selected", "true");
+      tabB.setAttribute("aria-pressed", "true");
+      tabB.setAttribute("tabindex", "0");
+    } else {
+      tabB.classList.remove("active");
+      tabB.setAttribute("aria-selected", "false");
+      tabB.setAttribute("aria-pressed", "false");
+      tabB.setAttribute("tabindex", "-1");
+    }
+  }
+
+  scrollIntoViewIfAbove("insp-confirm-toggle");
 }
 
 /**
- * Closes mobile bottom sheet drawer for Step 3 Confirmation.
+ * Handles keyboard navigation (ArrowLeft/ArrowRight, Home/End, Enter/Space) for Confirmation switch tabs.
+ * @param {KeyboardEvent} e
  */
-function closeInspStep3BottomSheet() {
-  const col = $("insp-step3-right");
-  if (col) col.classList.remove("bottom-sheet-open");
+function handleInspConfirmTabKeydown(e) {
+  const tabA = $("insp-confirm-tab-a");
+  const tabB = $("insp-confirm-tab-b");
+  if (!tabA || !tabB) return;
+
+  const key = e.key;
+  if (key === "ArrowRight" || key === "ArrowLeft") {
+    e.preventDefault();
+    if (document.activeElement === tabA) {
+      tabB.focus();
+    } else {
+      tabA.focus();
+    }
+  } else if (key === "Home") {
+    e.preventDefault();
+    tabA.focus();
+  } else if (key === "End") {
+    e.preventDefault();
+    tabB.focus();
+  } else if (key === "Enter" || key === " " || key === "Spacebar") {
+    e.preventDefault();
+    if (document.activeElement === tabB) {
+      setInspConfirmView("customer");
+    } else if (document.activeElement === tabA) {
+      setInspConfirmView("summary");
+    }
+  }
 }
 
 /**
- * Generates HTML for Step 3 Confirmation form using Quick Labor's 2-column layout.
- * Left column stacks read-only summary cards.
- * Right column displays sticky Job Order Ticket panel with customer inputs and actions.
+ * Generates HTML for Step 3 Confirmation form.
+ * Split into two views toggled by segmented switch buttons directly below title/subtitle:
+ * View A: "Summary" -> 5 review cards (and ECU/OBD diagnostic card if present) plus Accounting Total card.
+ * View B: "Customer" -> Customer Details panel with customer inputs, totals, and confirm buttons.
  * @returns {string} HTML string.
  */
 function getInspStep3Html() {
@@ -11897,10 +12029,59 @@ function getInspStep3Html() {
   const physText = physParts.length > 0 ? physParts.join(" · ") : "All inspected items OK.";
   const countsText = `${physText} · ${obdCodes.length} code${obdCodes.length === 1 ? "" : "s"}`;
 
+  const isA = inspConfirmView !== "customer";
+
   return `
-    <div class="pos-layout">
-      <!-- Left Column: Summary Review Cards -->
-      <div class="pos-left-col" id="insp-step3-left">
+    <div class="insp-stage-body">
+      <div style="margin-bottom:16px">
+        <h3 style="margin:0 0 4px">Confirmation</h3>
+        <p style="margin:0;color:var(--text-muted);font-size:13px">Review the details, add the customer, then send this job to Active Repairs.</p>
+      </div>
+
+      <!-- Segmented switch for Step 3 views -->
+      <div
+        class="tab-switch-bar"
+        id="insp-confirm-toggle"
+        role="tablist"
+        aria-label="Confirmation sections"
+        onkeydown="handleInspConfirmTabKeydown(event)"
+      >
+        <button
+          type="button"
+          id="insp-confirm-tab-a"
+          class="tab-switch-btn ${isA ? "active" : ""}"
+          role="tab"
+          aria-selected="${isA ? "true" : "false"}"
+          aria-pressed="${isA ? "true" : "false"}"
+          aria-controls="insp-confirm-panel-a"
+          tabindex="${isA ? "0" : "-1"}"
+          onclick="setInspConfirmView('summary')"
+        >
+          Summary
+        </button>
+        <button
+          type="button"
+          id="insp-confirm-tab-b"
+          class="tab-switch-btn ${!isA ? "active" : ""}"
+          role="tab"
+          aria-selected="${!isA ? "true" : "false"}"
+          aria-pressed="${!isA ? "true" : "false"}"
+          aria-controls="insp-confirm-panel-b"
+          tabindex="${!isA ? "0" : "-1"}"
+          onclick="setInspConfirmView('customer')"
+        >
+          Customer
+        </button>
+      </div>
+
+      <!-- View A Panel: Summary Review Cards -->
+      <div
+        id="insp-confirm-panel-a"
+        role="tabpanel"
+        aria-labelledby="insp-confirm-tab-a"
+        ${isA ? "" : "hidden"}
+        style="${isA ? "display:block" : "display:none"}"
+      >
         <!-- 1. Vehicle & Complaints Card -->
         <div class="confirm-summary-card">
           <div class="confirm-card-header">
@@ -12011,29 +12192,67 @@ function getInspStep3Html() {
               : getItemsBuilderHtml("draft", { readOnly: true, showLaborDone: false })
           }
         </div>
+
+        <!-- 6. Accounting Total Card -->
+        <div class="confirm-summary-card">
+          <div class="confirm-card-header">
+            <span style="font-weight:700;font-size:13px;color:var(--text-primary)">Accounting Total</span>
+          </div>
+          <div class="ticket-totals-block" style="margin-bottom:0">
+            <div class="ticket-totals-row">
+              <span>Labor Subtotal</span>
+              <span style="font-weight:600">${P(draftTotals.labor || 0)}</span>
+            </div>
+            <div class="ticket-totals-row">
+              <span>Parts Subtotal</span>
+              <span style="font-weight:600">${P(draftTotals.parts || 0)}</span>
+            </div>
+            <div class="ticket-totals-divider"></div>
+            <div class="ticket-totals-row total">
+              <span>Estimated Total</span>
+              <span class="ticket-total-val">${P(draftTotals.total || 0)}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Summary Footer Buttons -->
+        <div class="insp-footer" style="position:static;padding-top:20px;border-top:1px solid var(--border);display:flex;justify-content:space-between">
+          <button type="button" class="btn g" onclick="setInspDraftStep(2)">← Back</button>
+          <button type="button" class="btn" onclick="setInspConfirmView('customer')">Next: Customer →</button>
+        </div>
       </div>
 
-      <!-- Right Column: Job Order Ticket Panel -->
-      <div class="pos-right-col" id="insp-step3-right">
-        <div class="pos-cart-panel" style="padding:16px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-            <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-size:15px;font-weight:800;color:var(--text-primary)">Job Order Ticket</span>
-              <span class="badge" style="font-size:11px;font-weight:700;background:var(--bg-subtle);color:var(--text-primary);padding:2px 8px;border-radius:999px;border:1px solid var(--border)">Draft</span>
-            </div>
-            <button type="button" class="pos-sheet-close" onclick="closeInspStep3BottomSheet()" aria-label="Close ticket">✕</button>
+      <!-- View B Panel: Customer -->
+      <div
+        id="insp-confirm-panel-b"
+        role="tabpanel"
+        aria-labelledby="insp-confirm-tab-b"
+        ${!isA ? "" : "hidden"}
+        style="${!isA ? "display:block" : "display:none"}"
+      >
+        <div class="confirm-sticky-ticket" style="max-width:640px;position:static">
+          <div class="confirm-card-header" style="margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #F1F5F9">
+            <span style="font-weight:700;font-size:13px;color:var(--text-primary)">Customer Details</span>
           </div>
 
-          <!-- Vehicle Line -->
-          <div style="background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px">
-            <div style="font-weight:700;color:var(--text-primary)">${escHtml([inspDraft.make, inspDraft.model].filter(Boolean).join(" ") || "Unknown Motorcycle")}</div>
-            <div style="color:var(--text-muted);margin-top:2px">Plate: <b>${escHtml(inspDraft.plate || "NO PLATE")}</b></div>
-          </div>
-
-          <!-- Customer Input Fields -->
-          <div class="ticket-cust-fields" style="margin-bottom:12px">
+          <div class="ticket-header-strip">
             <div>
-              <label class="ticket-label" for="insp-cust-name" style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">
+              <div class="ticket-header-title">Draft Job Order</div>
+              <div class="ticket-header-sub">${formatJobDate(today())}</div>
+            </div>
+            <span class="ticket-badge-pill">Ticket</span>
+          </div>
+
+          <div class="ticket-vehicle-line">
+            <div style="font-weight:700">${escHtml([inspDraft.make, inspDraft.model].filter(Boolean).join(" ") || "Unknown")}</div>
+            <div style="font-size:12px;color:var(--text-muted);display:flex;gap:8px;margin-top:2px">
+              <span>Plate: <b>${escHtml(inspDraft.plate || "NO PLATE")}</b></span>
+            </div>
+          </div>
+
+          <div class="ticket-cust-fields">
+            <div>
+              <label class="ticket-label" for="insp-cust-name">
                 CUSTOMER NAME <span style="font-size:10px;font-weight:400;color:var(--text-muted);text-transform:none">(optional)</span>
               </label>
               <input
@@ -12043,11 +12262,10 @@ function getInspStep3Html() {
                 placeholder="Full name (e.g. Juan dela Cruz)"
                 value="${escHtml(inspDraft.custName || "")}"
                 oninput="inspDraft.custName=this.value"
-                style="width:100%;height:34px;box-sizing:border-box;border-radius:6px;border:1px solid var(--border);padding:0 8px;font-size:12px;background:var(--bg-surface);color:var(--text)"
               />
             </div>
-            <div style="margin-top:8px">
-              <label class="ticket-label" for="insp-cust-phone" style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">
+            <div>
+              <label class="ticket-label" for="insp-cust-phone">
                 CONTACT NUMBER <span style="font-size:10px;font-weight:400;color:var(--text-muted);text-transform:none">(optional)</span>
               </label>
               <input
@@ -12057,13 +12275,11 @@ function getInspStep3Html() {
                 placeholder="e.g. 0917 555 0101"
                 value="${escHtml(inspDraft.custPhone || "")}"
                 oninput="inspDraft.custPhone=this.value"
-                style="width:100%;height:34px;box-sizing:border-box;border-radius:6px;border:1px solid var(--border);padding:0 8px;font-size:12px;background:var(--bg-surface);color:var(--text)"
               />
             </div>
           </div>
 
-          <!-- Counts Line -->
-          <div style="background:var(--bg-surface-alt, #F8FAFC);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:12px;font-weight:600;color:var(--text-secondary)">
+          <div class="ticket-counts-line">
             ${countsText}
           </div>
 
@@ -12084,37 +12300,33 @@ function getInspStep3Html() {
             </div>
           </div>
 
-          <!-- Muted Note -->
-          <div style="font-size:11px;color:var(--text-muted);margin:12px 0 16px;line-height:1.4">
+          <div class="ticket-send-note">
             Confirming sends this job to Active Repairs with status Awaiting Parts/Approval.
           </div>
 
           <!-- Actions -->
-          <button
-            type="button"
-            class="btn"
-            id="btn-confirm-job-order"
-            style="width:100%;min-height:44px;justify-content:center;margin-bottom:8px;font-weight:700"
-            onclick="confirmInspectionJobOrder()"
-          >
-            Confirm &amp; Send to Active Repairs
-          </button>
-          <button
-            type="button"
-            class="btn g"
-            id="btn-back-to-diagnosis"
-            style="width:100%;min-height:40px;justify-content:center"
-            onclick="setInspDraftStep(2)"
-          >
-            ← Back
-          </button>
+          <div style="margin-top:16px">
+            <button
+              type="button"
+              class="btn"
+              id="btn-confirm-job-order"
+              style="width:100%;min-height:44px;justify-content:center;margin-bottom:8px;font-weight:700"
+              onclick="confirmInspectionJobOrder()"
+            >
+              Confirm &amp; Send to Active Repairs
+            </button>
+            <button
+              type="button"
+              class="btn g"
+              id="btn-back-to-diagnosis"
+              style="width:100%;min-height:40px;justify-content:center"
+              onclick="setInspDraftStep(2)"
+            >
+              ← Back
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-
-    <!-- Mobile Floating Checkout Bar (<900px) -->
-    <div class="pos-mobile-bar" id="insp-step3-mobile-bar" onclick="openInspStep3BottomSheet()">
-      View ticket · ${counts.fix} Fix · ${P(draftTotals.total || 0)}
     </div>
   `;
 }
@@ -15375,6 +15587,9 @@ function exportAuditCsv() {
 /** In-memory cart items for active Quick Sales sale. */
 let posCart = [];
 
+/** In-memory active sub-view for Quick Sales: "parts" or "cart". Never persisted to localStorage. */
+let posView = "parts";
+
 /** Optional customer name or phone for active sale. */
 let posCustomer = "";
 
@@ -15485,6 +15700,7 @@ function generatePosNumber() {
  */
 function resetPosState() {
   posCart = [];
+  posView = "parts";
   posCustomer = "";
   posMethod = "Cash";
   posTendered = 0;
@@ -15802,7 +16018,6 @@ function addCatalogItemToPosCart(catId, kind) {
 
   renderPosGrid();
   renderPosCart();
-  updatePosMobileBar();
 }
 
 /**
@@ -15843,7 +16058,6 @@ function addCustomItemToPosCart() {
   posCustomOpen = false;
   renderPosGrid();
   renderPosCart();
-  updatePosMobileBar();
 }
 
 /**
@@ -15924,7 +16138,6 @@ function getPosRightPanelHtml() {
           >
             ${posClearConfirmActive ? "Tap again to clear" : "Clear all"}
           </button>
-          <button type="button" class="pos-sheet-close" onclick="closePosBottomSheet()" aria-label="Close summary">✕</button>
         </div>
       </div>
 
@@ -16074,7 +16287,7 @@ function renderPosRightPanel() {
  */
 function renderPosCart() {
   renderPosRightPanel();
-  updatePosMobileBar();
+  updatePosCartTabCount();
 }
 
 /**
@@ -16110,7 +16323,7 @@ function syncPosCartSummaryDom() {
     reasonEl.textContent = getPosChargeReason(total);
   }
 
-  updatePosMobileBar();
+  updatePosCartTabCount();
 }
 
 /**
@@ -16129,7 +16342,6 @@ function updatePosCartQty(lineId, delta) {
   }
   renderPosGrid();
   renderPosCart();
-  updatePosMobileBar();
 }
 
 /**
@@ -16204,7 +16416,6 @@ function handlePosClearCart() {
   posRef = "";
   renderPosGrid();
   renderPosCart();
-  updatePosMobileBar();
 }
 
 /**
@@ -16295,10 +16506,8 @@ function chargePosSale() {
   posClearConfirmActive = false;
   if (posClearConfirmTimer) clearTimeout(posClearConfirmTimer);
 
-  closePosBottomSheet();
   renderPosGrid();
   renderPosCart();
-  updatePosMobileBar();
   openPosReceipt(newSale.id);
 }
 
@@ -16588,93 +16797,201 @@ function openPosReceipt(saleId) {
 }
 
 /**
- * Opens mobile cart bottom sheet drawer.
+ * Synchronizes the Cart & Payment tab button count and aria-label in the DOM without re-rendering other buttons.
  */
-function openPosBottomSheet() {
-  const col = $("pos-right-col");
-  if (col) col.classList.add("bottom-sheet-open");
+function updatePosCartTabCount() {
+  const tabB = $("pos-tab-cart");
+  if (!tabB) return;
+  const cnt = getPosTotalItemsCount();
+  tabB.textContent = `Cart & Payment (${cnt})`;
+  tabB.setAttribute("aria-label", `Cart and payment, ${cnt} item${cnt === 1 ? "" : "s"}`);
 }
 
 /**
- * Closes mobile cart bottom sheet drawer.
+ * Switches the active sub-view in Quick Sales ("parts" or "cart") without destroying DOM elements.
+ * Updates class and aria attributes of both buttons from posView state.
+ * @param {"parts"|"cart"} viewName - Target sub-view.
  */
-function closePosBottomSheet() {
-  const col = $("pos-right-col");
-  if (col) col.classList.remove("bottom-sheet-open");
+function setPosView(viewName) {
+  posView = viewName === "cart" ? "cart" : "parts";
+  const isA = posView !== "cart";
+
+  const panelA = $("pos-panel-parts");
+  const panelB = $("pos-panel-cart");
+  const tabA = $("pos-tab-parts");
+  const tabB = $("pos-tab-cart");
+
+  if (panelA) {
+    panelA.hidden = !isA;
+    panelA.style.display = isA ? "block" : "none";
+  }
+  if (panelB) {
+    panelB.hidden = isA;
+    panelB.style.display = isA ? "none" : "block";
+  }
+
+  if (tabA) {
+    if (isA) {
+      tabA.classList.add("active");
+      tabA.setAttribute("aria-selected", "true");
+      tabA.setAttribute("aria-pressed", "true");
+      tabA.setAttribute("tabindex", "0");
+    } else {
+      tabA.classList.remove("active");
+      tabA.setAttribute("aria-selected", "false");
+      tabA.setAttribute("aria-pressed", "false");
+      tabA.setAttribute("tabindex", "-1");
+    }
+  }
+
+  if (tabB) {
+    if (!isA) {
+      tabB.classList.add("active");
+      tabB.setAttribute("aria-selected", "true");
+      tabB.setAttribute("aria-pressed", "true");
+      tabB.setAttribute("tabindex", "0");
+    } else {
+      tabB.classList.remove("active");
+      tabB.setAttribute("aria-selected", "false");
+      tabB.setAttribute("aria-pressed", "false");
+      tabB.setAttribute("tabindex", "-1");
+    }
+  }
+
+  updatePosCartTabCount();
+  scrollIntoViewIfAbove("pos-view-toggle");
 }
 
 /**
- * Updates floating mobile bar checkout summary.
+ * Handles keyboard navigation (ArrowLeft/ArrowRight, Home/End, Enter/Space) for Quick Sales switch tabs.
+ * @param {KeyboardEvent} e
  */
-function updatePosMobileBar() {
-  const barEl = $("pos-mobile-bar");
-  const total = getPosTotal();
-  const count = getPosTotalItemsCount();
-  if (barEl) {
-    barEl.textContent = `View sale · ${count} item${count === 1 ? "" : "s"} · ${P(total)}`;
+function handlePosTabKeydown(e) {
+  const tabA = $("pos-tab-parts");
+  const tabB = $("pos-tab-cart");
+  if (!tabA || !tabB) return;
+
+  const key = e.key;
+  if (key === "ArrowRight" || key === "ArrowLeft") {
+    e.preventDefault();
+    if (document.activeElement === tabA) {
+      tabB.focus();
+    } else {
+      tabA.focus();
+    }
+  } else if (key === "Home") {
+    e.preventDefault();
+    tabA.focus();
+  } else if (key === "End") {
+    e.preventDefault();
+    tabB.focus();
+  } else if (key === "Enter" || key === " " || key === "Spacebar") {
+    e.preventDefault();
+    if (document.activeElement === tabB) {
+      setPosView("cart");
+    } else if (document.activeElement === tabA) {
+      setPosView("parts");
+    }
   }
 }
 
 /**
- * Main view renderer for the Quick Sales page using Quick Labor's 2-column layout.
- * Left column displays Parts & Fluids catalog search and grid.
- * Right column displays sticky Current Sale cart and checkout panel.
+ * Main view renderer for the Quick Sales page.
  * @returns {string} Full HTML markup.
  */
 function getPosViewHtml() {
   const total = getPosTotal();
   const totalItems = getPosTotalItemsCount();
+  const isA = (posView !== "cart");
+  const posCartTabAriaLabel = `Cart and payment, ${totalItems} item${totalItems === 1 ? "" : "s"}`;
 
   return `
     <h1 class="sr-only">Quick Sales</h1>
 
-    <div class="pos-layout">
-      <!-- Left Column: Parts & Fluids Panel -->
-      <div class="pos-left-col" id="pos-panel-parts">
-        <div class="card" style="padding:16px;margin-bottom:0">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-            <h2 style="font-size:15px;font-weight:800;color:var(--text-primary);margin:0">Parts &amp; Fluids</h2>
-            <button type="button" class="btn g sm" onclick="openNewItemModal('part')">+ Custom item</button>
-          </div>
+    <!-- Segmented switch for Quick Sales views -->
+    <div
+      class="tab-switch-bar"
+      id="pos-view-toggle"
+      role="tablist"
+      aria-label="Quick Sales sections"
+      onkeydown="handlePosTabKeydown(event)"
+    >
+      <button
+        type="button"
+        id="pos-tab-parts"
+        class="tab-switch-btn ${isA ? "active" : ""}"
+        role="tab"
+        aria-selected="${isA ? "true" : "false"}"
+        aria-pressed="${isA ? "true" : "false"}"
+        aria-controls="pos-panel-parts"
+        tabindex="${isA ? "0" : "-1"}"
+        onclick="setPosView('parts')"
+      >
+        Parts &amp; Fluids
+      </button>
+      <button
+        type="button"
+        id="pos-tab-cart"
+        class="tab-switch-btn ${!isA ? "active" : ""}"
+        role="tab"
+        aria-selected="${!isA ? "true" : "false"}"
+        aria-pressed="${!isA ? "true" : "false"}"
+        aria-controls="pos-panel-cart"
+        aria-label="${posCartTabAriaLabel}"
+        tabindex="${!isA ? "0" : "-1"}"
+        onclick="setPosView('cart')"
+      >
+        Cart &amp; Payment (${totalItems})
+      </button>
+    </div>
 
-          <div class="pos-search-wrap">
-            <span class="search-icon" onclick="$('pos-search-input').focus()" title="Search">${LINE_ICONS.insp}</span>
-            <input
-              id="pos-search-input"
-              type="text"
-              class="pos-search-input"
-              placeholder="Search parts and fluids (press Enter to quick-add)..."
-              value="${escHtml(posSearch)}"
-              oninput="onPosSearchInput(this.value)"
-              onkeydown="if(event.key==='Enter'){event.preventDefault();addFirstPosMatchToCart();}"
-            />
-            <button
-              id="pos-search-clear"
-              class="search-clear ${posSearch ? "visible" : ""}"
-              onclick="clearPosSearch()"
-              type="button"
-              aria-label="Clear search"
-              title="Clear search"
-            >✕</button>
-          </div>
+    <div class="pos-layout pos-split-layout">
+      <!-- View A: Parts & Fluids Panel -->
+      <div
+        id="pos-panel-parts"
+        role="tabpanel"
+        aria-labelledby="pos-tab-parts"
+        style="${isA ? "display:block" : "display:none"}"
+        ${isA ? "" : "hidden"}
+      >
+        <div class="pos-search-wrap">
+          <span class="search-icon" onclick="$('pos-search-input').focus()" title="Search">${LINE_ICONS.insp}</span>
+          <input
+            id="pos-search-input"
+            type="text"
+            class="pos-search-input"
+            placeholder="Search parts and fluids (press Enter to quick-add)..."
+            value="${escHtml(posSearch)}"
+            oninput="onPosSearchInput(this.value)"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();addFirstPosMatchToCart();}"
+          />
+          <button
+            id="pos-search-clear"
+            class="search-clear ${posSearch ? "visible" : ""}"
+            onclick="clearPosSearch()"
+            type="button"
+            aria-label="Clear search"
+            title="Clear search"
+          >✕</button>
+        </div>
 
-          <div id="pos-grid-wrap">
-            ${getPosGridHtml()}
-          </div>
+        <div id="pos-grid-wrap">
+          ${getPosGridHtml()}
         </div>
       </div>
 
-      <!-- Right Column: Current Sale Cart Panel -->
-      <div class="pos-right-col" id="pos-right-col">
+      <!-- View B: Cart & Payment Panel -->
+      <div
+        id="pos-panel-cart"
+        role="tabpanel"
+        aria-labelledby="pos-tab-cart"
+        style="${!isA ? "display:block" : "display:none"}"
+        ${!isA ? "" : "hidden"}
+      >
         <div class="pos-cart-panel" id="pos-cart-panel">
           ${getPosRightPanelHtml()}
         </div>
       </div>
-    </div>
-
-    <!-- Mobile Floating Checkout Bar (<900px) -->
-    <div class="pos-mobile-bar" id="pos-mobile-bar" onclick="openPosBottomSheet()">
-      View sale · ${totalItems} item${totalItems === 1 ? "" : "s"} · ${P(total)}
     </div>
   `;
 }

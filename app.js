@@ -1483,8 +1483,6 @@ function switchAccount(userId) {
     at: Date.now()
   });
 
-  logAudit("Switch account", target.email, `Switched from ${prevUser ? prevUser.name : "unknown"} to ${target.name}`);
-
   closeAccountSwitcher();
   syncViewForRole();
 }
@@ -1716,7 +1714,7 @@ function selectLoginUser(userId) {
     at: Date.now()
   });
 
-  logAudit("Login", matched.email, "Signed in");
+  logAudit("Login", matched.email, matched.role, "Sessions");
 
   if (document.documentElement) document.documentElement.classList.add("has-session");
   document.body.classList.remove("logged-out");
@@ -1791,7 +1789,7 @@ function login() {
     at: Date.now()
   });
 
-  logAudit("Login", matched.email, "Signed in");
+  logAudit("Login", matched.email, matched.role, "Sessions");
 
   if (document.documentElement) document.documentElement.classList.add("has-session");
   document.body.classList.remove("logged-out");
@@ -1814,7 +1812,7 @@ function login() {
 function logout() {
   const u = getCurrentUser();
   if (u) {
-    logAudit("Logout", u.email, "Signed out");
+    logAudit("Logout", u.email, u.activeRole || u.role, "Sessions");
   }
   clearSession();
   view = "dash";
@@ -2720,8 +2718,6 @@ function go(v) {
   if (view !== v || v === "bill") {
     userMgmtTab = "directory";
     userSearch = "";
-    userRoleFilter = "all";
-    userStatusFilter = "all";
     repSearch = "";
     repFilter = "all";
     billSearch = "";
@@ -4511,7 +4507,6 @@ function askReverseJob(woId) {
       at: nowLocalTimestamp(),
       by: u ? u.name : "Super Admin"
     };
-    logAudit("Reverse transaction", o.id, reason);
     save();
     if (view === "his") renderHisResults();
     else go(view);
@@ -4594,7 +4589,14 @@ document.onkeydown = (e) => {
 /**
  * Opens the "New Customer" modal.
  */
-function openNewCustomerModal() {
+let _newCustomerOnSaved = null;
+
+/**
+ * Opens the "New Customer" modal.
+ * @param {(customer: object) => void} [onSaved] - Optional callback after successful save.
+ */
+function openNewCustomerModal(onSaved) {
+  _newCustomerOnSaved = onSaved || null;
   M(`
     <div style="padding:10px 4px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:12px">
@@ -4645,21 +4647,345 @@ function saveNewCustomer() {
     joinedAt: today()
   };
   D.cu.push(newC);
-  logAudit("Add customer", newC.name, "Customer profile created");
   save();
-  cm();
-  expandedCustIds.add(newC.id);
-  go("cust");
+
+  if (_newCustomerOnSaved) {
+    const cb = _newCustomerOnSaved;
+    _newCustomerOnSaved = null;
+    cb(newC);
+  } else {
+    cm();
+    expandedCustIds.add(newC.id);
+    go("cust");
+  }
+}
+
+/** State for Register Vehicle searchable customer picker combobox */
+let regSelectedCid = "";
+let regCustHighlightIndex = -1;
+let regCustMatches = [];
+let regCustDropdownOpen = false;
+
+/**
+ * Filters active customers matching query across name, phone, or vehicle plate numbers (max 8).
+ * @param {string} query
+ * @returns {Array<object>}
+ */
+function getRegCustomerMatches(query) {
+  const q = (query || "").trim().toLowerCase();
+  const allCustomers = (Array.isArray(D.cu) ? D.cu : []).filter((c) => !c.archived);
+  if (!q) {
+    return allCustomers.slice(0, 8);
+  }
+  const allBikes = Array.isArray(D.bk) ? D.bk : [];
+  const matches = [];
+  for (let i = 0; i < allCustomers.length; i++) {
+    const c = allCustomers[i];
+    const nameMatch = (c.name || "").toLowerCase().includes(q);
+    const phoneMatch = (c.phone || "").toLowerCase().includes(q);
+    let plateMatch = false;
+    if (!nameMatch && !phoneMatch) {
+      const bikes = allBikes.filter((b) => b.cid === c.id && !b.archived);
+      plateMatch = bikes.some((b) => (b.plate || "").toLowerCase().includes(q));
+    }
+    if (nameMatch || phoneMatch || plateMatch) {
+      matches.push(c);
+      if (matches.length >= 8) break;
+    }
+  }
+  return matches;
 }
 
 /**
- * Opens the "Register Vehicle" modal.
- * @param {string} [preselectedCid] - Optional customer ID to preselect.
+ * Builds HTML for Register Vehicle customer dropdown listbox options.
+ * @param {string} query
+ * @returns {string} HTML string
  */
-function openRegisterVehicleModal(preselectedCid) {
-  const activeCustomers = (Array.isArray(D.cu) ? D.cu : []).filter((c) => !c.archived).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-  const hasCust = activeCustomers.length > 0;
-  const initialCid = preselectedCid || (hasCust ? activeCustomers[0].id : "__new__");
+function renderRegCustListboxHtml(query) {
+  const matches = getRegCustomerMatches(query);
+  regCustMatches = matches;
+  const allBikes = Array.isArray(D.bk) ? D.bk : [];
+
+  let html = "";
+  if (matches.length === 0) {
+    html += `<div style="padding:10px 14px;font-size:13px;color:var(--text-muted)">No matching customers found.</div>`;
+  } else {
+    matches.forEach((c, idx) => {
+      const bikesCount = allBikes.filter((b) => b.cid === c.id && !b.archived).length;
+      const isHighlighted = idx === regCustHighlightIndex;
+      html += `
+        <div
+          id="reg-cust-opt-${idx}"
+          role="option"
+          aria-selected="${isHighlighted ? "true" : "false"}"
+          class="brand-dropdown-item ${isHighlighted ? "active" : ""}"
+          style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;gap:8px"
+          onmousedown="selectRegCustomer('${c.id}')"
+          onmouseenter="setRegCustHighlight(${idx})"
+        >
+          <div style="display:flex;align-items:center;min-width:0;gap:6px">
+            <b>${escHtml(c.name || "Unnamed")}</b>
+            ${c.phone ? `<span style="color:var(--text-muted);font-size:12px">(${escHtml(c.phone)})</span>` : ""}
+          </div>
+          <span style="color:var(--text-muted);font-size:12px;white-space:nowrap;flex-shrink:0">${bikesCount} vehicle${bikesCount === 1 ? "" : "s"}</span>
+        </div>
+      `;
+    });
+  }
+
+  const isNewHighlighted = regCustHighlightIndex === matches.length;
+  html += `
+    <div
+      id="reg-cust-opt-new"
+      role="option"
+      aria-selected="${isNewHighlighted ? "true" : "false"}"
+      class="brand-dropdown-item ${isNewHighlighted ? "active" : ""}"
+      style="display:flex;align-items:center;padding:10px 14px;cursor:pointer;color:var(--accent);font-weight:700;border-top:1px solid var(--border);gap:6px"
+      onmousedown="onRegCustAddNewClick()"
+      onmouseenter="setRegCustHighlight(${matches.length})"
+    >
+      <span>+ New customer</span>
+    </div>
+  `;
+
+  return html;
+}
+
+/**
+ * Opens customer picker dropdown listbox.
+ */
+function openRegCustDropdown() {
+  regCustDropdownOpen = true;
+  const inp = $("reg-cust-search");
+  const listbox = $("reg-cust-listbox");
+  if (inp) inp.setAttribute("aria-expanded", "true");
+  if (listbox) {
+    const q = inp ? inp.value : "";
+    listbox.innerHTML = renderRegCustListboxHtml(q);
+    listbox.style.display = "block";
+  }
+}
+
+/**
+ * Closes customer picker dropdown listbox.
+ */
+function closeRegCustDropdown() {
+  regCustDropdownOpen = false;
+  const inp = $("reg-cust-search");
+  const listbox = $("reg-cust-listbox");
+  if (inp) inp.setAttribute("aria-expanded", "false");
+  if (listbox) listbox.style.display = "none";
+  regCustHighlightIndex = -1;
+}
+
+/**
+ * Live search handler for customer picker. Re-renders only the dropdown list to maintain focus.
+ * @param {string} val
+ */
+function onRegCustSearchInput(val) {
+  const err = $("reg-b-cid-err");
+  if (err) err.style.display = "none";
+  const inp = $("reg-cust-search");
+  if (inp) inp.style.borderColor = "var(--border)";
+  const clearBtn = $("reg-cust-clear");
+  if (clearBtn) clearBtn.classList.toggle("visible", Boolean(val));
+
+  // If input is modified, invalidate selected customer ID if text no longer matches
+  if (regSelectedCid) {
+    const c = g("cu", regSelectedCid);
+    const expected = c ? `${c.name}${c.phone ? ` (${c.phone})` : ""}` : "";
+    if (val !== expected) {
+      regSelectedCid = "";
+    }
+  }
+
+  regCustHighlightIndex = -1;
+  regCustDropdownOpen = true;
+  if (inp) inp.setAttribute("aria-expanded", "true");
+  const listbox = $("reg-cust-listbox");
+  if (listbox) {
+    listbox.innerHTML = renderRegCustListboxHtml(val);
+    listbox.style.display = "block";
+  }
+}
+
+/**
+ * Sets highlighted row index in the customer picker listbox.
+ * @param {number} idx
+ */
+function setRegCustHighlight(idx) {
+  regCustHighlightIndex = idx;
+  updateRegCustHighlightDom();
+}
+
+/**
+ * Updates CSS active class across customer picker listbox items without re-rendering.
+ */
+function updateRegCustHighlightDom() {
+  const totalOptions = regCustMatches.length + 1;
+  for (let i = 0; i < regCustMatches.length; i++) {
+    const el = $("reg-cust-opt-" + i);
+    if (el) {
+      const active = i === regCustHighlightIndex;
+      el.classList.toggle("active", active);
+      el.setAttribute("aria-selected", active ? "true" : "false");
+      if (active) el.scrollIntoView({ block: "nearest" });
+    }
+  }
+  const newEl = $("reg-cust-opt-new");
+  if (newEl) {
+    const active = regCustHighlightIndex === regCustMatches.length;
+    newEl.classList.toggle("active", active);
+    newEl.setAttribute("aria-selected", active ? "true" : "false");
+    if (active) newEl.scrollIntoView({ block: "nearest" });
+  }
+}
+
+/**
+ * Selects a customer from the dropdown list, fills input with "Name (phone)", and moves focus to Plate Number.
+ * @param {string} cid - Customer ID.
+ */
+function selectRegCustomer(cid) {
+  regSelectedCid = cid;
+  const c = g("cu", cid);
+  const text = c ? `${c.name}${c.phone ? ` (${c.phone})` : ""}` : "";
+  const inp = $("reg-cust-search");
+  if (inp) inp.value = text;
+  const clearBtn = $("reg-cust-clear");
+  if (clearBtn) clearBtn.classList.toggle("visible", Boolean(text));
+  const err = $("reg-b-cid-err");
+  if (err) err.style.display = "none";
+  if (inp) inp.style.borderColor = "var(--border)";
+  closeRegCustDropdown();
+
+  const plateInp = $("reg-b-plate");
+  if (plateInp) plateInp.focus();
+}
+
+/**
+ * Clears selected customer and search text, then focuses the search input.
+ */
+function clearRegCustSearch() {
+  regSelectedCid = "";
+  const inp = $("reg-cust-search");
+  if (inp) {
+    inp.value = "";
+    inp.focus();
+  }
+  const clearBtn = $("reg-cust-clear");
+  if (clearBtn) clearBtn.classList.remove("visible");
+  openRegCustDropdown();
+}
+
+/**
+ * Keyboard handler for customer picker combobox (ArrowUp/Down, Enter, Escape, Tab).
+ * @param {KeyboardEvent} e
+ */
+function handleRegCustKeydown(e) {
+  const totalOptions = regCustMatches.length + 1;
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    if (!regCustDropdownOpen) {
+      openRegCustDropdown();
+      regCustHighlightIndex = 0;
+    } else {
+      regCustHighlightIndex = (regCustHighlightIndex + 1) % totalOptions;
+    }
+    updateRegCustHighlightDom();
+    return;
+  }
+  if (e.key === "ArrowUp") {
+    e.preventDefault();
+    if (!regCustDropdownOpen) {
+      openRegCustDropdown();
+      regCustHighlightIndex = totalOptions - 1;
+    } else {
+      regCustHighlightIndex = (regCustHighlightIndex - 1 + totalOptions) % totalOptions;
+    }
+    updateRegCustHighlightDom();
+    return;
+  }
+  if (e.key === "Enter") {
+    if (regCustDropdownOpen && regCustHighlightIndex >= 0) {
+      e.preventDefault();
+      if (regCustHighlightIndex < regCustMatches.length) {
+        selectRegCustomer(regCustMatches[regCustHighlightIndex].id);
+      } else {
+        onRegCustAddNewClick();
+      }
+    }
+    return;
+  }
+  if (e.key === "Escape") {
+    if (regCustDropdownOpen) {
+      e.preventDefault();
+      closeRegCustDropdown();
+    }
+    return;
+  }
+  if (e.key === "Tab") {
+    closeRegCustDropdown();
+    return;
+  }
+}
+
+/**
+ * Handles "+ New customer" selection: saves typed vehicle fields and opens the new customer modal.
+ */
+function onRegCustAddNewClick() {
+  closeRegCustDropdown();
+  const prevPlate = v("reg-b-plate") || "";
+  const prevYear = v("reg-b-year") || "";
+  const prevMake = v("reg-b-make") || "";
+  const prevModel = v("reg-b-model") || "";
+  const prevEngine = v("reg-b-engine") || "";
+
+  openNewCustomerModal((newC) => {
+    openRegisterVehicleModal(newC.id, {
+      plate: prevPlate,
+      year: prevYear,
+      make: prevMake,
+      model: prevModel,
+      engine: prevEngine
+    });
+  });
+}
+
+// Global click-outside listener for register vehicle customer picker combobox
+if (typeof document !== "undefined") {
+  document.addEventListener("click", (e) => {
+    if (!regCustDropdownOpen) return;
+    const wrap = $("reg-cust-combobox-wrap");
+    if (wrap && !wrap.contains(e.target)) {
+      closeRegCustDropdown();
+    }
+  });
+}
+
+/**
+ * Opens the "Register Vehicle" modal with searchable customer picker.
+ * @param {string} [preselectedCid] - Optional customer ID to preselect.
+ * @param {object} [initialFields] - Optional draft vehicle fields to restore.
+ */
+function openRegisterVehicleModal(preselectedCid, initialFields = {}) {
+  let initialCustText = "";
+  regSelectedCid = "";
+  regCustHighlightIndex = -1;
+  regCustDropdownOpen = false;
+
+  if (preselectedCid) {
+    const c = g("cu", preselectedCid);
+    if (c && !c.archived) {
+      regSelectedCid = c.id;
+      initialCustText = `${c.name}${c.phone ? ` (${c.phone})` : ""}`;
+    }
+  }
+
+  const plateVal = initialFields.plate || "";
+  const yearVal = initialFields.year || "";
+  const makeVal = initialFields.make || "";
+  const modelVal = initialFields.model || "";
+  const engineVal = initialFields.engine || "";
 
   M(`
     <div style="padding:10px 4px">
@@ -4668,55 +4994,100 @@ function openRegisterVehicleModal(preselectedCid) {
         <button type="button" class="search-clear visible" onclick="cm()" style="position:static" title="Close">✕</button>
       </div>
 
-      <div style="margin-bottom:14px">
-        <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Owner / Customer *</label>
-        <select id="reg-b-cid" onchange="onRegBikeCustomerChange(this.value)" style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;background:var(--bg-surface);box-sizing:border-box">
-          ${activeCustomers.map((c) => `<option value="${c.id}" ${c.id === initialCid ? "selected" : ""}>${escHtml(c.name)} ${c.phone ? `(${c.phone})` : ""}</option>`).join("")}
-          <option value="__new__" ${initialCid === "__new__" ? "selected" : ""}>+ Add new customer profile...</option>
-        </select>
-      </div>
-
-      <div id="reg-b-new-cust-fields" style="display:${initialCid === "__new__" ? "block" : "none"};background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px">
-        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px">New Customer Details</div>
-        <div style="margin-bottom:8px">
-          <label style="display:block;font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:4px">Full Name *</label>
-          <input id="reg-new-c-name" placeholder="Customer full name" style="width:100%;height:36px;padding:0 8px;border-radius:6px;border:1px solid var(--border);font-size:13px;box-sizing:border-box;background:var(--bg-surface)" />
-          <div id="reg-new-c-name-err" style="display:none;color:var(--danger,#DC2626);font-size:11px;font-weight:600;margin-top:3px">Customer name is required.</div>
+      <div style="margin-bottom:14px;position:relative" id="reg-cust-picker-wrap">
+        <label for="reg-cust-search" style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Owner / Customer *</label>
+        <div class="brand-combobox-wrap" id="reg-cust-combobox-wrap">
+          <input
+            id="reg-cust-search"
+            type="text"
+            role="combobox"
+            aria-expanded="false"
+            aria-controls="reg-cust-listbox"
+            aria-autocomplete="list"
+            placeholder="Search customer by name or phone..."
+            value="${escHtml(initialCustText)}"
+            autocomplete="off"
+            style="width:100%;height:40px;padding:0 38px 0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;background:var(--bg-surface);box-sizing:border-box"
+            onfocus="openRegCustDropdown()"
+            onclick="openRegCustDropdown()"
+            oninput="onRegCustSearchInput(this.value)"
+            onkeydown="handleRegCustKeydown(event)"
+          />
+          <button
+            type="button"
+            id="reg-cust-clear"
+            class="brand-clear-btn ${initialCustText ? "visible" : ""}"
+            onclick="clearRegCustSearch()"
+            title="Clear customer"
+            aria-label="Clear customer selection"
+          >✕</button>
+          <div
+            id="reg-cust-listbox"
+            role="listbox"
+            class="brand-dropdown-list"
+            style="display:none"
+          ></div>
         </div>
-        <div>
-          <label style="display:block;font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:4px">Phone Number</label>
-          <input id="reg-new-c-phone" placeholder="Contact number" style="width:100%;height:36px;padding:0 8px;border-radius:6px;border:1px solid var(--border);font-size:13px;box-sizing:border-box;font-family:ui-monospace,monospace;background:var(--bg-surface)" />
-        </div>
+        <div id="reg-b-cid-err" style="display:none;color:var(--danger,#DC2626);font-size:12px;font-weight:600;margin-top:4px">Choose a customer.</div>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
         <div>
           <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Plate Number *</label>
-          <input id="reg-b-plate" placeholder="e.g. ABC-1234" style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box;text-transform:uppercase;font-family:ui-monospace,monospace" oninput="this.value=this.value.toUpperCase();if($('reg-b-plate-err')){$('reg-b-plate-err').style.display='none';this.style.borderColor='var(--border)';}" />
+          <input
+            id="reg-b-plate"
+            placeholder="e.g. ABC-1234"
+            value="${escHtml(plateVal)}"
+            style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box;text-transform:uppercase;font-family:ui-monospace,monospace"
+            oninput="this.value=this.value.toUpperCase();if($('reg-b-plate-err')){$('reg-b-plate-err').style.display='none';this.style.borderColor='var(--border)';}"
+          />
           <div id="reg-b-plate-err" style="display:none;color:var(--danger,#DC2626);font-size:12px;font-weight:600;margin-top:4px"></div>
         </div>
         <div>
           <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Year (Optional)</label>
-          <input id="reg-b-year" type="number" placeholder="e.g. 2024" style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box" />
+          <input
+            id="reg-b-year"
+            type="number"
+            placeholder="e.g. 2024"
+            value="${escHtml(yearVal)}"
+            style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box"
+          />
         </div>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
         <div>
           <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Make / Brand *</label>
-          <input id="reg-b-make" placeholder="e.g. Yamaha" style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box" />
+          <input
+            id="reg-b-make"
+            placeholder="e.g. Yamaha"
+            value="${escHtml(makeVal)}"
+            style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box"
+            oninput="if($('reg-b-make-err')){$('reg-b-make-err').style.display='none';this.style.borderColor='var(--border)';}"
+          />
           <div id="reg-b-make-err" style="display:none;color:var(--danger,#DC2626);font-size:12px;font-weight:600;margin-top:4px">Make is required.</div>
         </div>
         <div>
           <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Model *</label>
-          <input id="reg-b-model" placeholder="e.g. NMAX 155" style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box" />
+          <input
+            id="reg-b-model"
+            placeholder="e.g. NMAX 155"
+            value="${escHtml(modelVal)}"
+            style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box"
+            oninput="if($('reg-b-model-err')){$('reg-b-model-err').style.display='none';this.style.borderColor='var(--border)';}"
+          />
           <div id="reg-b-model-err" style="display:none;color:var(--danger,#DC2626);font-size:12px;font-weight:600;margin-top:4px">Model is required.</div>
         </div>
       </div>
 
       <div style="margin-bottom:20px">
         <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Engine / Chassis No. (Optional)</label>
-        <input id="reg-b-engine" placeholder="Optional engine or chassis serial" style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box;font-family:ui-monospace,monospace" />
+        <input
+          id="reg-b-engine"
+          placeholder="Optional engine or chassis serial"
+          value="${escHtml(engineVal)}"
+          style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box;font-family:ui-monospace,monospace"
+        />
       </div>
 
       <div style="display:flex;justify-content:flex-end;gap:8px">
@@ -4725,48 +5096,34 @@ function openRegisterVehicleModal(preselectedCid) {
       </div>
     </div>
   `);
-}
 
-function onRegBikeCustomerChange(val) {
-  const newFields = $("reg-b-new-cust-fields");
-  if (newFields) {
-    newFields.style.display = val === "__new__" ? "block" : "none";
-  }
+  setTimeout(() => {
+    if (regSelectedCid) {
+      const pl = $("reg-b-plate");
+      if (pl) pl.focus();
+    } else {
+      const sc = $("reg-cust-search");
+      if (sc) sc.focus();
+    }
+  }, 50);
 }
 
 /**
- * Validates and registers a new motorcycle (and customer if inline new).
+ * Validates and registers a new motorcycle linked to the chosen customer.
  */
 function saveRegisterVehicle() {
-  let cid = v("reg-b-cid");
-  let custName = "";
-  if (cid === "__new__") {
-    const newName = (v("reg-new-c-name") || "").trim();
-    const newPhone = (v("reg-new-c-phone") || "").trim();
-    if (!newName) {
-      const err = $("reg-new-c-name-err");
-      if (err) err.style.display = "block";
-      const inp = $("reg-new-c-name");
-      if (inp) {
-        inp.style.borderColor = "var(--danger, #DC2626)";
-        inp.focus();
-      }
-      return;
+  if (!regSelectedCid) {
+    const err = $("reg-b-cid-err");
+    if (err) err.style.display = "block";
+    const inp = $("reg-cust-search");
+    if (inp) {
+      inp.style.borderColor = "var(--danger, #DC2626)";
+      inp.focus();
     }
-    cid = uid();
-    const newC = {
-      id: cid,
-      name: newName,
-      phone: newPhone,
-      joinedAt: today()
-    };
-    D.cu.push(newC);
-    custName = newName;
-    logAudit("Add customer", newName, "Customer profile created during vehicle registration");
-  } else {
-    const foundC = g("cu", cid);
-    custName = foundC ? foundC.name : "Customer";
+    return;
   }
+
+  const cid = regSelectedCid;
 
   const plate = (v("reg-b-plate") || "").trim().toUpperCase();
   const plateErr = $("reg-b-plate-err");
@@ -4834,7 +5191,6 @@ function saveRegisterVehicle() {
   };
 
   D.bk.push(newBike);
-  logAudit("Add motorcycle", plate, `${make} ${model} · Owner: ${custName}`);
   save();
   cm();
   expandedCustIds.add(cid);
@@ -4899,7 +5255,6 @@ function saveEditCustomer(cid) {
   }
   c.name = name;
   c.phone = phone;
-  logAudit("Edit customer", c.name, "Customer profile updated");
   save();
   cm();
   go("cust");
@@ -4925,7 +5280,6 @@ function deleteCustomer(cid) {
   askReason(`Delete Customer "${c.name}"`, "Delete Customer", (reason) => {
     D.cu = (D.cu || []).filter((x) => x.id !== cid);
     D.bk = (D.bk || []).filter((x) => x.cid !== cid);
-    logAudit("Delete customer", c.name, reason);
     save();
     cm();
     go("cust");
@@ -5067,7 +5421,6 @@ function saveEditBike(bid) {
       cm();
       askReason(`Edit Locked Plate ${oldPlate} → ${newPlate}`, "Confirm Plate Change", (reason) => {
         b.plate = newPlate;
-        logAudit("Edit plate", newPlate, `Plate changed from ${oldPlate} to ${newPlate}: ${reason}`);
         save();
         go("cust");
       });
@@ -5078,7 +5431,6 @@ function saveEditBike(bid) {
   }
 
   save();
-  logAudit("Edit customer", b.plate, `${c ? c.name : ""} · ${b.make} ${b.model}`);
   cm();
   go("cust");
 }
@@ -5101,7 +5453,6 @@ function deleteBike(bid) {
   }
   askReason(`Delete Motorcycle ${b.plate}`, "Delete", (reason) => {
     D.bk = (D.bk || []).filter((x) => x.id !== b.id);
-    logAudit("Delete motorcycle", b.plate, reason);
     save();
     cm();
     go("cust");
@@ -5280,20 +5631,15 @@ function getCatTableHtml() {
           <tr>
             <th>ITEM / SERVICE NAME</th>
             <th>CATEGORY</th>
-            <th class="r">DEFAULT REFERENCE PRICE</th>
-            ${isSuperUser ? `<th class="r">COST</th><th class="r">MARGIN</th>` : ""}
+            <th class="r">PRICE</th>
             <th class="r" style="width:140px">ACTIONS</th>
           </tr>
         </thead>
         <tbody>
           ${
             !filtered.length
-              ? `<tr><td colspan="${isSuperUser ? 6 : 4}" style="text-align:center;color:var(--text-muted);padding:24px">No menu items found.</td></tr>`
+              ? `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px">No menu items found.</td></tr>`
               : filtered.map((it) => {
-                  const hasCost = it.costPrice !== undefined && it.costPrice !== null && it.costPrice !== "";
-                  const costVal = Number(it.costPrice) || 0;
-                  const marginVal = (Number(it.price) || 0) - costVal;
-                  const marginPct = (Number(it.price) || 0) > 0 ? ((marginVal / Number(it.price)) * 100).toFixed(1) + "%" : "-";
                   return `
                     <tr>
                       <td><b>${escHtml(it.name || "")}</b></td>
@@ -5303,10 +5649,6 @@ function getCatTableHtml() {
                         </span>
                       </td>
                       <td class="r"><b>${P(it.price)}</b></td>
-                      ${isSuperUser ? `
-                        <td class="r">${hasCost ? P(costVal) : "-"}</td>
-                        <td class="r">${hasCost ? `${P(marginVal)} <small style="color:var(--text-muted)">(${marginPct})</small>` : "-"}</td>
-                      ` : ""}
                       <td class="r" style="white-space:nowrap">
                         <button type="button" class="btn g sm" onclick="openEditCatalogModal('${it.type}', '${it.id}')">Edit</button>
                         ${isSuperUser ? `
@@ -5406,7 +5748,7 @@ function renderCatalogModal(mode, type, id) {
       value="${escHtml(name)}"
       style="height:42px;font-size:14px;margin-bottom:12px;width:100%;box-sizing:border-box"
     />
-    <label for="cat-modal-price">Default Reference Price (₱)</label>
+    <label for="cat-modal-price">Price (₱)</label>
     <input
       id="cat-modal-price"
       type="number"
@@ -5414,20 +5756,8 @@ function renderCatalogModal(mode, type, id) {
       min="0"
       placeholder="0.00"
       value="${price !== '' ? price : ''}"
-      style="height:42px;font-size:14px;margin-bottom:12px;width:100%;box-sizing:border-box"
+      style="height:42px;font-size:14px;margin-bottom:16px;width:100%;box-sizing:border-box"
     />
-    ${isSuper() ? `
-      <label for="cat-modal-cost">Cost Price (₱) <small style="color:var(--text-muted);font-weight:normal">(optional)</small></label>
-      <input
-        id="cat-modal-cost"
-        type="number"
-        step="any"
-        min="0"
-        placeholder="0.00"
-        value="${cost !== '' ? cost : ''}"
-        style="height:42px;font-size:14px;margin-bottom:16px;width:100%;box-sizing:border-box"
-      />
-    ` : `<div style="margin-bottom:4px"></div>`}
     <div class="acts">
       <button type="button" class="btn g" onclick="fin()">Cancel</button>
       <button type="button" class="btn" onclick="saveCatalogModalItem('${mode}', '${type || ""}', '${id || ""}')">
@@ -5446,21 +5776,19 @@ function renderCatalogModal(mode, type, id) {
 function saveCatalogModalItem(mode, type, id) {
   const nameInp = $("cat-modal-name");
   const priceInp = $("cat-modal-price");
-  const costInp = $("cat-modal-cost");
 
   const rawName = nameInp ? nameInp.value.trim() : "";
   const name = rawName || "Unnamed item";
   const price = priceInp ? Math.max(0, Number(priceInp.value) || 0) : 0;
-  const costPrice = (isSuper() && costInp && costInp.value.trim() !== "") ? Math.max(0, Number(costInp.value) || 0) : null;
   const targetKind = catModalKind;
 
   if (mode === "add") {
     if (targetKind === "labor") {
       if (!Array.isArray(D.sv)) D.sv = [];
-      D.sv.push({ id: uid(), name, labor: price, parts: [], costPrice });
+      D.sv.push({ id: uid(), name, labor: price, parts: [] });
     } else {
       if (!Array.isArray(D.pt)) D.pt = [];
-      D.pt.push({ id: uid(), sku: "", name, cost: price, costPrice });
+      D.pt.push({ id: uid(), sku: "", name, cost: price });
     }
   } else if (mode === "edit") {
     if (type === "sv" && targetKind === "labor") {
@@ -5468,34 +5796,30 @@ function saveCatalogModalItem(mode, type, id) {
       if (s) {
         s.name = name;
         s.labor = price;
-        if (isSuper()) s.costPrice = costPrice;
       }
     } else if (type === "pt" && targetKind === "part") {
       const p = g("pt", id);
       if (p) {
         p.name = name;
         p.cost = price;
-        if (isSuper()) p.costPrice = costPrice;
       }
     } else if (type === "sv" && targetKind === "part") {
       const old = g("sv", id);
-      const cp = isSuper() ? costPrice : (old ? old.costPrice : null);
+      const cp = old && old.costPrice !== undefined ? old.costPrice : undefined;
       D.sv = D.sv.filter((s) => s.id !== id);
       if (!Array.isArray(D.pt)) D.pt = [];
-      D.pt.push({ id: uid(), sku: "", name, cost: price, costPrice: cp });
+      const newPt = { id: uid(), sku: "", name, cost: price };
+      if (cp !== undefined) newPt.costPrice = cp;
+      D.pt.push(newPt);
     } else if (type === "pt" && targetKind === "labor") {
       const old = g("pt", id);
-      const cp = isSuper() ? costPrice : (old ? old.costPrice : null);
+      const cp = old && old.costPrice !== undefined ? old.costPrice : undefined;
       D.pt = D.pt.filter((p) => p.id !== id);
       if (!Array.isArray(D.sv)) D.sv = [];
-      D.sv.push({ id: uid(), name, labor: price, parts: [], costPrice: cp });
+      const newSv = { id: uid(), name, labor: price, parts: [] };
+      if (cp !== undefined) newSv.costPrice = cp;
+      D.sv.push(newSv);
     }
-  }
-
-  if (mode === "add") {
-    logAudit("Add catalog item", name, `${targetKind} · Price: ${P(price)}${costPrice !== null ? ` · Cost: ${P(costPrice)}` : ""}`);
-  } else if (mode === "edit") {
-    logAudit("Edit catalog item", name, `${targetKind} · Price: ${P(price)}${costPrice !== null ? ` · Cost: ${P(costPrice)}` : ""}`);
   }
 
   save();
@@ -5516,7 +5840,6 @@ function askDeleteCatalogItem(type, id, name) {
   if (!isSuper()) return;
   askReason(`Delete Menu Item "${name}"`, "Delete Item", (reason) => {
     deleteCatalogItem(type, id);
-    logAudit("Delete catalog item", name, reason);
   });
 }
 
@@ -5550,14 +5873,14 @@ function openCatCsvModal() {
   M(`
     <h2>Import Catalog Items (CSV)</h2>
     <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;line-height:1.4">
-      Paste comma-separated rows in the format: <code>name, category, price, cost</code>.<br>
+      Paste comma-separated rows in the format: <code>name, category, price</code>.<br>
       Category accepts <b>labor</b> or <b>part</b> (case-insensitive). Header row is optional.
     </p>
     <div style="margin-bottom:12px">
       <textarea
         id="cat-csv-input"
         rows="6"
-        placeholder="e.g.&#10;Engine Oil 10W-40, part, 350, 220&#10;Brake Pad Replacement, labor, 250, 0"
+        placeholder="e.g.&#10;Engine Oil 10W-40, part, 350&#10;Brake Pad Replacement, labor, 250"
         style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:6px;padding:8px;font-size:13px;font-family:monospace"
         oninput="onCatCsvInput(this.value)"
       ></textarea>
@@ -5574,6 +5897,7 @@ function openCatCsvModal() {
 
 /**
  * Parses pasted CSV text and provides live preview counts and skip reasons.
+ * Accepts "name, category, price" format; ignores any 4th value if pasted.
  * @param {string} text - Raw CSV text.
  */
 function onCatCsvInput(text) {
@@ -5585,7 +5909,7 @@ function onCatCsvInput(text) {
 
   lines.forEach((line, lineIdx) => {
     const lower = line.toLowerCase();
-    if (lower.startsWith("name,") || lower.startsWith('"name",') || lower === "name,category,price,cost") {
+    if (lower.startsWith("name,") || lower.startsWith('"name",') || lower.startsWith("name,category,price")) {
       return;
     }
 
@@ -5593,7 +5917,6 @@ function onCatCsvInput(text) {
     const name = parts[0] || "";
     const rawCat = (parts[1] || "").toLowerCase();
     const priceStr = parts[2] || "";
-    const costStr = parts[3] || "";
 
     if (!name) {
       skipped.push(`Row ${lineIdx + 1}: empty name`);
@@ -5611,12 +5934,6 @@ function onCatCsvInput(text) {
       return;
     }
 
-    const cost = costStr !== "" ? parseFloat(costStr) : null;
-    if (costStr !== "" && (isNaN(cost) || cost < 0)) {
-      skipped.push(`Row ${lineIdx + 1} ("${name}"): invalid cost "${costStr}"`);
-      return;
-    }
-
     if (existingNames.has(name.toLowerCase())) {
       skipped.push(`Row ${lineIdx + 1} ("${name}"): exact duplicate name in catalog`);
       return;
@@ -5628,7 +5945,7 @@ function onCatCsvInput(text) {
     }
 
     const kind = (rawCat === "labor" || rawCat === "service") ? "labor" : "part";
-    valid.push({ name, kind, price, costPrice: cost });
+    valid.push({ name, kind, price });
   });
 
   catCsvParsed = { valid, skipped };
@@ -5655,7 +5972,7 @@ function onCatCsvInput(text) {
 }
 
 /**
- * Imports valid rows into catalog and logs audit entry (Super Admin only).
+ * Imports valid rows into catalog (Super Admin only).
  */
 function importCatCsv() {
   if (!isSuper()) return;
@@ -5671,21 +5988,18 @@ function importCatCsv() {
         id: uid(),
         name: item.name,
         labor: item.price,
-        parts: [],
-        costPrice: item.costPrice
+        parts: []
       });
     } else {
       D.pt.push({
         id: uid(),
         sku: "",
         name: item.name,
-        cost: item.price,
-        costPrice: item.costPrice
+        cost: item.price
       });
     }
   });
 
-  logAudit("Catalog import", "", `${valid.length} items`);
   save();
   cm();
   if (view === "cat") {
@@ -6840,11 +7154,7 @@ function setJobCardStatus(woId, newStatus) {
     const u = getCurrentUser();
     const activeName = (u && u.name) ? u.name.trim() : "Staff";
     o.mech = activeName;
-    if (typeof logAudit === "function") {
-      logAudit("Marked by", o.id, activeName, "Jobs");
-    }
   }
-  logAudit("Status moved", o.id, `${oldStatus} -> ${newStatus}`);
   if (newStatus === "Ready for Pickup") {
     o.readyAt = nowLocalIso();
   }
@@ -7357,7 +7667,6 @@ function saveEditDiagnosis(woId) {
       o.inspection.obd.codes = remainingCodes;
     }
 
-    logAudit("Edit diagnosis", o.id, reason);
     save();
     renderInspModal(o.id);
   }, { destructive: false });
@@ -7379,7 +7688,6 @@ function forceCancelJob(woId) {
       at: nowLocalTimestamp(),
       by: u ? u.name : "Super Admin"
     };
-    logAudit("Force-cancel repair", o.id, reason);
     save();
     closeInspModal();
     if (view === "rep") {
@@ -7417,7 +7725,6 @@ function reopenJob(woId) {
       delete o.cancel;
     }
 
-    logAudit("Reopen job", o.id, reason);
     save();
     closeInspModal();
     closeRecord();
@@ -9019,6 +9326,11 @@ function getInspStep2Html() {
 
         <!-- Shared Add to Findings Bar -->
         ${getSharedAddToFindingsBarHtml()}
+
+        <!-- Panel A Footer Buttons -->
+        <div class="insp-footer" style="position:static;padding-top:20px;border-top:1px solid var(--border);display:flex;justify-content:flex-start">
+          <button type="button" class="btn g" onclick="setInspDraftStep(1)">← Back</button>
+        </div>
       </div>
 
       <!-- View B Panel: Sections 4-5 -->
@@ -9056,12 +9368,12 @@ function getInspStep2Html() {
             ${getItemsBuilderHtml("draft", { readOnly: false, showLaborDone: false })}
           </div>
         </div>
-      </div>
 
-      <!-- Footer Buttons -->
-      <div class="insp-footer" style="position:static;padding-top:20px;border-top:1px solid var(--border);display:flex;justify-content:space-between">
-        <button type="button" class="btn g" onclick="setInspDraftStep(1)">← Back</button>
-        <button type="button" class="btn" onclick="setInspDraftStep(3)">Next: Confirmation →</button>
+        <!-- Panel B Footer Buttons -->
+        <div class="insp-footer" style="position:static;padding-top:20px;border-top:1px solid var(--border);display:flex;justify-content:space-between">
+          <button type="button" class="btn g" onclick="setInspDraftStep(1)">← Back</button>
+          <button type="button" class="btn" onclick="setInspDraftStep(3)">Next: Confirmation →</button>
+        </div>
       </div>
     </div>
   `;
@@ -10655,11 +10967,6 @@ function submitItemAddForm(context, targetKey = "items") {
 
   if (context !== "draft") {
     save();
-    if (targetKey === "extra") {
-      logAudit("Extra item added", context, `${newItem.name} (${newItem.kind}, ${P(newItem.price)})`);
-    } else {
-      logAudit("Item added", context, `${newItem.name} (${newItem.kind}, ${P(newItem.price)})`);
-    }
   }
 
   // Clear inputs
@@ -11326,11 +11633,7 @@ function startRepairFromAwaiting(woId) {
   const activeName = (u && u.name) ? u.name.trim() : "Staff";
   if (!o.mech || o.mech === "Unassigned") {
     o.mech = activeName;
-    if (typeof logAudit === "function") {
-      logAudit("Marked by", o.id, activeName, "Jobs");
-    }
   }
-  logAudit("Status moved", o.id, `${oldSt} -> In Progress`);
   o.approved = true;
   if (Array.isArray(o.items)) {
     o.items.forEach((it) => {
@@ -11368,7 +11671,6 @@ function returnJobToRepair(woId) {
   }
   const oldSt = o.st;
   o.st = "In Progress";
-  logAudit("Status moved", o.id, `${oldSt} -> In Progress${reason ? ` (Reason: ${reason})` : ""}`);
   save();
   closeInspModal();
   setTimeout(() => {
@@ -11391,7 +11693,6 @@ function passJobChecking(woId) {
   const oldSt = o.st;
   o.st = "Ready for Pickup";
   o.readyAt = nowLocalIso();
-  logAudit("Status moved", o.id, `${oldSt} -> Ready for Pickup`);
   save();
   closeInspModal();
   setTimeout(() => {
@@ -12417,7 +12718,6 @@ function confirmInspectionJobOrder() {
     done: null
   };
   D.wo.push(wo);
-  logAudit("Job created", wo.id, `${b.plate} · ${c.name}`);
   save();
 
   resetInspDraft();
@@ -12953,7 +13253,6 @@ function recordAdvancePayment(woId) {
   });
 
   save();
-  logAudit("Advance payment", o.id, `${P(amt)} · ${advPayMethod || "Cash"}${ref ? ` (Ref: ${ref})` : ""}`);
   closeAdvanceModal();
   refreshBillView();
   if (view === "rep") {
@@ -13329,7 +13628,6 @@ function confirmSettleAndRelease(woId) {
   delete o.tempTendered;
 
   save();
-  logAudit("Settle balance", o.id, `${P(balanceDue)} · ${method} (Tendered: ${P(tendered)}, Change: ${P(change)})`);
   closeSettleBalanceModal();
   if (view === "bill") {
     refreshBillView();
@@ -13508,12 +13806,6 @@ let userMgmtTab = "directory";
 /** Active search query for user directory table. */
 let userSearch = "";
 
-/** Active role filter for user directory ("all", "superadmin", "admin", "mechanic"). */
-let userRoleFilter = "all";
-
-/** Active status filter for user directory ("all", "active", "inactive"). */
-let userStatusFilter = "all";
-
 /** Currently edited user ID in Add/Edit user modal (null = adding new user). */
 let editingUserId = null;
 
@@ -13543,37 +13835,14 @@ function onUserSearchInput(val) {
 }
 
 /**
- * Handles role filter dropdown changes.
- * @param {string} val - Selected role or "all".
- */
-function onUserRoleFilterChange(val) {
-  userRoleFilter = val;
-  const tbody = $("user-table-body");
-  if (tbody) tbody.innerHTML = getUserTableRowsHtml();
-}
-
-/**
- * Handles status filter dropdown changes.
- * @param {string} val - Selected status or "all".
- */
-function onUserStatusFilterChange(val) {
-  userStatusFilter = val;
-  const tbody = $("user-table-body");
-  if (tbody) tbody.innerHTML = getUserTableRowsHtml();
-}
-
-/**
- * Returns filtered user accounts matching search and dropdown filters.
+ * Returns filtered user accounts matching search query.
  * @returns {Array<Object>} Filtered list of user accounts.
  */
 function getFilteredUsers() {
   const users = loadUsers();
   const q = (userSearch || "").trim().toLowerCase();
+  if (!q) return users;
   return users.filter((u) => {
-    if (userRoleFilter !== "all" && u.role !== userRoleFilter) return false;
-    if (userStatusFilter === "active" && u.active === false) return false;
-    if (userStatusFilter === "inactive" && u.active !== false) return false;
-    if (!q) return true;
     const name = (u.name || "").toLowerCase();
     const email = (u.email || "").toLowerCase();
     return name.includes(q) || email.includes(q);
@@ -13718,7 +13987,6 @@ function toggleUserActive(userId) {
   if (u.role === "superadmin" && activeSuperAdmins <= 1 && u.active !== false) return;
 
   u.active = !u.active;
-  logAudit(u.active ? "Reactivate user" : "Deactivate user", u.email, `Account ${u.active ? "reactivated" : "deactivated"}`);
   saveUsers(users);
 
   const tbody = $("user-table-body");
@@ -13936,11 +14204,6 @@ function saveUserModal() {
       }
     }
 
-    if (oldRole !== target.role) {
-      logAudit("Role change", email, `${oldRole} -> ${target.role}`);
-    }
-    logAudit("Edit user", email, `Name: ${name}, Role: ${target.role}, Status: ${target.active !== false ? "Active" : "Inactive"}`);
-
     if (oldName && oldName !== name) {
       D.wo.forEach((wo) => {
         if (wo.mech && wo.mech.trim() === oldName.trim()) {
@@ -13966,7 +14229,6 @@ function saveUserModal() {
       lastLogin: ""
     };
     users.push(newUser);
-    logAudit("Add user", email, `Name: ${name}, Role: ${role}`);
   }
 
   saveUsers(users);
@@ -14200,8 +14462,6 @@ function toggleMatrixPermission(role, pageKey, checked) {
     localStorage.setItem("moto1_nav", JSON.stringify(currentNav));
   } catch (e) {}
 
-  logAudit("Permissions matrix change", role, `${checked ? "Granted" : "Revoked"} ${pageKey}`);
-
   renderNav();
   syncViewForRole();
 }
@@ -14227,8 +14487,6 @@ function resetMatrixDefaults() {
   try {
     localStorage.removeItem("moto1_nav");
   } catch (e) {}
-
-  logAudit("Permissions matrix reset", "All roles", "Reset matrix to system defaults");
 
   renderNav();
   const main = $("main");
@@ -14288,19 +14546,6 @@ function getUsersViewHtml() {
               oninput="onUserSearchInput(this.value)"
             />
           </div>
-
-          <select class="um-filter-select" onchange="onUserRoleFilterChange(this.value)">
-            <option value="all" ${userRoleFilter === "all" ? "selected" : ""}>Filter by Role: All</option>
-            <option value="superadmin" ${userRoleFilter === "superadmin" ? "selected" : ""}>Super Admin</option>
-            <option value="admin" ${userRoleFilter === "admin" ? "selected" : ""}>Admin</option>
-            <option value="mechanic" ${userRoleFilter === "mechanic" ? "selected" : ""}>Mechanic</option>
-          </select>
-
-          <select class="um-filter-select" onchange="onUserStatusFilterChange(this.value)">
-            <option value="all" ${userStatusFilter === "all" ? "selected" : ""}>Filter by Status: All</option>
-            <option value="active" ${userStatusFilter === "active" ? "selected" : ""}>Active</option>
-            <option value="inactive" ${userStatusFilter === "inactive" ? "selected" : ""}>Inactive</option>
-          </select>
         </div>
 
         <button type="button" class="btn-add-user" onclick="openAddUserModal()">
@@ -14361,138 +14606,6 @@ function setReportPeriod(period) {
   reportPeriod = period;
   const resEl = $("report-results-wrap");
   if (resEl) resEl.innerHTML = getReportResultsHtml();
-}
-
-/**
- * Helper to get the catalog cost price for an item name (case-insensitive).
- * Items without a cost price return 0.
- * @param {string} name - Item name.
- * @returns {number}
- */
-function getCatalogItemCost(name) {
-  if (!name) return 0;
-  const target = String(name).trim().toLowerCase();
-  const allItems = getCatalogItems("all");
-  const found = allItems.find((it) => it.name && it.name.trim().toLowerCase() === target);
-  if (found && found.costPrice !== null && found.costPrice !== undefined && !isNaN(found.costPrice) && Number(found.costPrice) > 0) {
-    return Number(found.costPrice);
-  }
-  return 0;
-}
-
-/**
- * Computes total cost of parts sold in the period from completed jobs and Quick Sales.
- * Items without a catalog cost price are counted as 0 cost.
- * @param {string} period - Active report period.
- * @returns {number}
- */
-function getPeriodPartsCost(period = reportPeriod) {
-  const metrics = getReportMetrics(period);
-  const periodSales = (Array.isArray(D.sales) ? D.sales : []).filter(
-    (s) => isCountableSale(s) && inDateRange(s.at ? s.at.slice(0, 10) : "", period)
-  );
-
-  let totalCost = 0;
-
-  // 1. Completed jobs parts
-  metrics.completedJobs.forEach((o) => {
-    const orderLines = lines(o);
-    orderLines.forEach((l) => {
-      if (l.kind === "part" && l.src !== "own") {
-        const itemCost = getCatalogItemCost(l.rawName || l.n);
-        const qty = Math.max(1, Number(l.qty) || 1);
-        totalCost += (qty * itemCost);
-      }
-    });
-  });
-
-  // 2. Quick Sales parts
-  periodSales.forEach((s) => {
-    if (Array.isArray(s.items)) {
-      s.items.forEach((it) => {
-        const itemCost = getCatalogItemCost(it.name);
-        const qty = Math.max(1, Number(it.qty) || 1);
-        totalCost += (qty * itemCost);
-      });
-    }
-  });
-
-  // 3. Quick Labor parts (matched by catalog costPrice by name)
-  (metrics.quickLaborRecords || []).forEach((o) => {
-    const orderLines = lines(o);
-    orderLines.forEach((l) => {
-      if (l.kind === "part" && l.src !== "own") {
-        const itemCost = getCatalogItemCost(l.rawName || l.n || l.name);
-        const qty = Math.max(1, Number(l.qty) || 1);
-        totalCost += (qty * itemCost);
-      }
-    });
-  });
-
-  return totalCost;
-}
-
-/**
- * Sanitizes a string for use in an HTML element id.
- * @param {string} str
- * @returns {string}
- */
-function sanitizeHtmlId(str) {
-  return String(str || "").replace(/[^a-zA-Z0-9_-]/g, "_");
-}
-
-/**
- * Updates a mechanic's commission rate in D.commission, saves, and updates the UI without full re-render.
- * Enforces Super Admin role inside the action function.
- * @param {string} mechName - Mechanic display name.
- * @param {string|number} newRate - Commission rate percentage (0-100).
- */
-function updateMechanicCommissionRate(mechName, newRate) {
-  if (!isSuper()) return;
-  if (!D.commission) D.commission = {};
-  const rate = Math.min(100, Math.max(0, Number(newRate) || 0));
-  D.commission[mechName] = rate;
-  save();
-
-  const metrics = getReportMetrics(reportPeriod);
-  const users = loadUsers();
-  const activeMechs = users.filter((u) => u.role === "mechanic" && u.active !== false);
-
-  let totalLabor = 0;
-  let totalComm = 0;
-
-  activeMechs.forEach((m) => {
-    const mName = m.name.trim();
-    const compJobs = metrics.completedJobs.filter((o) => o.mech && o.mech.trim().toLowerCase() === mName.toLowerCase());
-    const compQl = (metrics.quickLaborRecords || []).filter((o) => o.mech && o.mech.trim().toLowerCase() === mName.toLowerCase());
-    let laborRev = 0;
-    compJobs.forEach((o) => {
-      lines(o).forEach((l) => {
-        if (l.kind === "labor") {
-          laborRev += (l.a || 0);
-        }
-      });
-    });
-    compQl.forEach((o) => {
-      lines(o).forEach((l) => {
-        if (l.kind === "labor") {
-          laborRev += (l.a || 0);
-        }
-      });
-    });
-    const curRate = (D.commission && D.commission[mName] !== undefined) ? Number(D.commission[mName]) : 0;
-    const comm = Math.round(laborRev * (curRate / 100));
-    totalLabor += laborRev;
-    totalComm += comm;
-
-    const commCell = document.getElementById(`comm-amt-${sanitizeHtmlId(mName)}`);
-    if (commCell) commCell.textContent = P(comm);
-  });
-
-  const totLaborCell = document.getElementById("comm-tot-labor");
-  if (totLaborCell) totLaborCell.innerHTML = `<b>${P(totalLabor)}</b>`;
-  const totCommCell = document.getElementById("comm-tot-comm");
-  if (totCommCell) totCommCell.innerHTML = `<b>${P(totalComm)}</b>`;
 }
 
 /**
@@ -14592,46 +14705,34 @@ function exportReportCsv() {
     ["Average Job Value (PHP)", Math.round(metrics.avgValue)]
   ];
 
-  if (isSuper()) {
-    const totalRev = metrics.revenue + posSalesTotal;
-    const partsCost = getPeriodPartsCost(reportPeriod);
-    const grossProfit = totalRev - partsCost;
-
-    summaryLines.push(["Gross Profit (PHP)", grossProfit]);
-
-    const users = loadUsers();
-    const activeMechs = users.filter((u) => u.role === "mechanic" && u.active !== false);
-    let totalComm = 0;
-    const mechRowsForCsv = [];
-
-    activeMechs.forEach((m) => {
-      const mName = m.name.trim();
-      const compJobs = metrics.completedJobs.filter((o) => o.mech && o.mech.trim().toLowerCase() === mName.toLowerCase());
-      const compQl = (metrics.quickLaborRecords || []).filter((o) => o.mech && o.mech.trim().toLowerCase() === mName.toLowerCase());
-      let laborRev = 0;
-      compJobs.forEach((o) => {
-        lines(o).forEach((l) => {
-          if (l.kind === "labor") {
-            laborRev += (l.a || 0);
+  // Top 8 Most Labor Done for CSV
+  const laborCountsForCsv = {};
+  const allLaborOrdersForCsv = [...metrics.completedJobs, ...(metrics.quickLaborRecords || [])];
+  allLaborOrdersForCsv.forEach((o) => {
+    const orderLines = lines(o);
+    orderLines.forEach((l) => {
+      if (l.kind === "labor") {
+        const rawName = (l.rawName || l.n || l.name || "").replace(/\s*\(labor\)$/i, "").trim();
+        if (rawName) {
+          const key = rawName.toLowerCase();
+          const qty = Math.max(1, Number(l.qty) || 1);
+          const rev = Number(l.a) || 0;
+          if (!laborCountsForCsv[key]) {
+            laborCountsForCsv[key] = { name: rawName, count: 0, revenue: 0 };
           }
-        });
-      });
-      compQl.forEach((o) => {
-        lines(o).forEach((l) => {
-          if (l.kind === "labor") {
-            laborRev += (l.a || 0);
-          }
-        });
-      });
-      const rate = (D.commission && D.commission[mName] !== undefined) ? Number(D.commission[mName]) : 0;
-      const comm = Math.round(laborRev * (rate / 100));
-      totalComm += comm;
-      mechRowsForCsv.push([`Commission: ${mName} (${rate}%)`, comm]);
+          laborCountsForCsv[key].count += qty;
+          laborCountsForCsv[key].revenue += rev;
+        }
+      }
     });
+  });
+  const topLaborForCsv = Object.values(laborCountsForCsv)
+    .sort((a, b) => b.count - a.count || b.revenue - a.revenue)
+    .slice(0, 8);
 
-    summaryLines.push(["Total Mechanic Commission (PHP)", totalComm]);
-    mechRowsForCsv.forEach((row) => summaryLines.push(row));
-  }
+  topLaborForCsv.forEach((item) => {
+    summaryLines.push(["Most Labor Done", item.name, item.count, item.revenue]);
+  });
 
   const encodedSummary = summaryLines.map((row) => row.map(escapeCsv).join(","));
 
@@ -14710,25 +14811,48 @@ function exportReportCsv() {
 function getReportResultsHtml() {
   const metrics = getReportMetrics(reportPeriod);
 
-  // 1. Staff Performance calculation
+  // 1. Staff Performance calculation (includes Admin, Super Admin, and any account that marked work)
   const users = loadUsers();
   const activeMechs = users.filter((u) => u.role === "mechanic" && u.active !== false);
   const qlRecords = Array.isArray(metrics.quickLaborRecords) ? metrics.quickLaborRecords : [];
 
-  const mechRows = activeMechs.map((m) => {
-    const mName = m.name.trim();
-    const compJobs = metrics.completedJobs.filter((o) => o.mech && o.mech.trim().toLowerCase() === mName.toLowerCase());
-    const compQl = qlRecords.filter((o) => o.mech && o.mech.trim().toLowerCase() === mName.toLowerCase());
+  // Collect distinct staff names: active mechanics plus any account that marked work in period
+  const staffNamesMap = new Map();
+  activeMechs.forEach((m) => {
+    const trimmed = (m.name || "").trim();
+    if (trimmed) staffNamesMap.set(trimmed.toLowerCase(), trimmed);
+  });
+  metrics.completedJobs.forEach((o) => {
+    const rawMech = (o.mech || "").trim();
+    if (rawMech && rawMech.toLowerCase() !== "unassigned") {
+      if (!staffNamesMap.has(rawMech.toLowerCase())) {
+        staffNamesMap.set(rawMech.toLowerCase(), rawMech);
+      }
+    }
+  });
+  qlRecords.forEach((o) => {
+    const rawMech = (o.mech || "").trim();
+    if (rawMech && rawMech.toLowerCase() !== "unassigned") {
+      if (!staffNamesMap.has(rawMech.toLowerCase())) {
+        staffNamesMap.set(rawMech.toLowerCase(), rawMech);
+      }
+    }
+  });
+
+  const mechRows = Array.from(staffNamesMap.values()).map((name) => {
+    const lowerName = name.toLowerCase();
+    const compJobs = metrics.completedJobs.filter((o) => o.mech && o.mech.trim().toLowerCase() === lowerName);
+    const compQl = qlRecords.filter((o) => o.mech && o.mech.trim().toLowerCase() === lowerName);
     const jobRev = compJobs.reduce((sum, o) => sum + total(o), 0);
     const qlRev = compQl.reduce((sum, o) => sum + (Number(o.total) || total(o) || 0), 0);
     return {
-      name: mName,
+      name: name,
       completed: compJobs.length + compQl.length,
       revenue: jobRev + qlRev
     };
   });
 
-  // Not recorded row
+  // Not recorded row for unassigned/empty names
   const unassignedCompJobs = metrics.completedJobs.filter((o) => !o.mech || !o.mech.trim() || o.mech.trim().toLowerCase() === "unassigned");
   const unassignedQl = qlRecords.filter((o) => !o.mech || !o.mech.trim() || o.mech.trim().toLowerCase() === "unassigned");
   const unassignedJobRev = unassignedCompJobs.reduce((sum, o) => sum + total(o), 0);
@@ -14742,7 +14866,34 @@ function getReportResultsHtml() {
 
   mechRows.sort((a, b) => b.completed - a.completed || b.revenue - a.revenue);
 
-  // 2. Top Customer Complaints
+  // 2. Most Labor Done (top 8 across completed jobs and quick labor records)
+  const laborCounts = {};
+  const allLaborOrders = [...metrics.completedJobs, ...qlRecords];
+  allLaborOrders.forEach((o) => {
+    const orderLines = lines(o);
+    orderLines.forEach((l) => {
+      if (l.kind === "labor") {
+        const rawName = (l.rawName || l.n || l.name || "").replace(/\s*\(labor\)$/i, "").trim();
+        if (rawName) {
+          const key = rawName.toLowerCase();
+          const qty = Math.max(1, Number(l.qty) || 1);
+          const rev = Number(l.a) || 0;
+          if (!laborCounts[key]) {
+            laborCounts[key] = { name: rawName, count: 0, revenue: 0 };
+          }
+          laborCounts[key].count += qty;
+          laborCounts[key].revenue += rev;
+        }
+      }
+    });
+  });
+
+  const topLabor = Object.values(laborCounts)
+    .sort((a, b) => b.count - a.count || b.revenue - a.revenue)
+    .slice(0, 8);
+  const maxLaborCount = Math.max(...topLabor.map((x) => x.count), 1);
+
+  // 3. Top Customer Complaints
   const jobsCreatedInPeriod = D.wo.filter((o) => isCountableJob(o) && inDateRange(o.at, reportPeriod));
   const complaintCounts = {};
   jobsCreatedInPeriod.forEach((o) => {
@@ -14758,7 +14909,7 @@ function getReportResultsHtml() {
     .slice(0, 5);
   const maxComplaint = Math.max(...topComplaints.map((x) => x.count), 1);
 
-  // 3. Most Frequent Fault Codes
+  // 4. Most Frequent Fault Codes
   const codeCounts = {};
   const codeLabels = {};
   metrics.completedJobs.forEach((o) => {
@@ -14786,103 +14937,6 @@ function getReportResultsHtml() {
 
   const stat = (i, bg, l, n, t) =>
     `<div class="card st"><div class="ic" style="background:${bg}">${i}</div><div><small>${l}</small><b>${n}</b>${t}</div></div>`;
-
-  // Super Admin extras: Gross Profit and Mechanic Commission
-  let mechanicCommissionCard = "";
-
-  if (isSuper()) {
-    const totalRevenue = metrics.revenue + posSalesTotal;
-    const partsCost = getPeriodPartsCost(reportPeriod);
-    const grossProfit = totalRevenue - partsCost;
-
-    let totalCommLabor = 0;
-    let totalCommAmt = 0;
-    const commRows = activeMechs.map((m) => {
-      const mName = m.name.trim();
-      const compJobs = metrics.completedJobs.filter((o) => o.mech && o.mech.trim().toLowerCase() === mName.toLowerCase());
-      const compQl = (metrics.quickLaborRecords || []).filter((o) => o.mech && o.mech.trim().toLowerCase() === mName.toLowerCase());
-      let laborRev = 0;
-      compJobs.forEach((o) => {
-        lines(o).forEach((l) => {
-          if (l.kind === "labor") {
-            laborRev += (l.a || 0);
-          }
-        });
-      });
-      compQl.forEach((o) => {
-        lines(o).forEach((l) => {
-          if (l.kind === "labor") {
-            laborRev += (l.a || 0);
-          }
-        });
-      });
-      const rate = (D.commission && D.commission[mName] !== undefined) ? Number(D.commission[mName]) : 0;
-      const comm = Math.round(laborRev * (rate / 100));
-      totalCommLabor += laborRev;
-      totalCommAmt += comm;
-      return { name: mName, labor: laborRev, rate, commission: comm };
-    });
-
-    mechanicCommissionCard = `
-      <!-- Mechanic Commission Card (Super Admin only) -->
-      <div class="card reports-grid-wide">
-        <div class="hd" style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-          <span>${ICONS.user}</span>
-          <span>Mechanic Commission</span>
-        </div>
-        <p style="margin:0 0 16px 0;font-size:13px;color:var(--text-secondary)">Commission earned on labor revenue from completed jobs in the selected period. Total gross profit: <b>${P(grossProfit)}</b>.</p>
-        ${commRows.length ? `
-          <div class="tw">
-            <table>
-              <thead>
-                <tr>
-                  <th>MECHANIC</th>
-                  <th class="r">LABOR REVENUE</th>
-                  <th style="text-align:right;width:120px">RATE %</th>
-                  <th class="r">COMMISSION</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${commRows.map((r) => `
-                  <tr>
-                    <td><b>${escHtml(r.name)}</b></td>
-                    <td class="r" id="comm-labor-${sanitizeHtmlId(r.name)}" style="font-weight:600">${P(r.labor)}</td>
-                    <td style="text-align:right">
-                      <div style="display:inline-flex;align-items:center;gap:4px">
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="1"
-                          value="${r.rate}"
-                          class="inp"
-                          style="width:65px;padding:4px 8px;text-align:right;font-size:13px"
-                          id="comm-rate-input-${sanitizeHtmlId(r.name)}"
-                          oninput="updateMechanicCommissionRate('${escHtml(r.name)}', this.value)"
-                        />
-                        <span style="font-size:12px;color:var(--text-secondary)">%</span>
-                      </div>
-                    </td>
-                    <td class="r" id="comm-amt-${sanitizeHtmlId(r.name)}" style="font-weight:700">${P(r.commission)}</td>
-                  </tr>
-                `).join("")}
-              </tbody>
-              <tfoot>
-                <tr style="border-top:2px solid var(--border);font-weight:700;background:var(--bg-subtle)">
-                  <td>Total</td>
-                  <td class="r" id="comm-tot-labor">${P(totalCommLabor)}</td>
-                  <td></td>
-                  <td class="r" id="comm-tot-comm" style="font-weight:700">${P(totalCommAmt)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        ` : `
-          <div class="empty">No active mechanics found.</div>
-        `}
-      </div>
-    `;
-  }
 
   return `
     <!-- KPI Row -->
@@ -14927,7 +14981,86 @@ function getReportResultsHtml() {
         `}
       </div>
 
-      ${mechanicCommissionCard}
+      <!-- Most Labor Done (spans full width of 2-col grid) -->
+      <div class="card reports-grid-wide">
+        <div class="hd" style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+          <span>${LINE_ICONS.rep}</span>
+          <span>Most Labor Done</span>
+        </div>
+        ${topLabor.length ? `
+          <div style="display:flex;flex-direction:column;gap:12px">
+            ${topLabor.map((item, idx) => {
+              const pct = Math.round((item.count / maxLaborCount) * 100);
+              const countLabel = `${item.count} time${item.count === 1 ? "" : "s"}`;
+              return `
+                <div class="report-bar-row" style="margin-bottom:0">
+                  <div class="report-bar-header" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                    <div style="display:flex;align-items:center;gap:8px;min-width:0">
+                      <span style="font-size:12px;font-weight:700;color:var(--text-muted);min-width:20px">#${idx + 1}</span>
+                      <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><b>${escHtml(item.name)}</b></span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;flex-shrink:0">
+                      <span style="font-size:13px;color:var(--text-secondary)">${countLabel}</span>
+                      <b style="font-size:13px">${P(item.revenue)}</b>
+                    </div>
+                  </div>
+                  <div class="report-bar-track" style="margin-top:6px">
+                    <div class="report-bar-fill" style="width:${pct}%;background:var(--accent)"></div>
+                  </div>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        ` : `
+          <div class="empty">No labor recorded in this period.</div>
+        `}
+      </div>
+
+      <!-- Top Customer Complaints -->
+      <div class="card">
+        <div class="hd" style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span>${ICONS.chat}</span><span>Top Customer Complaints</span></div>
+        ${topComplaints.length ? `
+          <div>
+            ${topComplaints.map((c) => {
+              const pct = (c.count / maxComplaint) * 100;
+              return `
+                <div class="report-bar-row">
+                  <div class="report-bar-header">
+                    <span><b>${escHtml(c.label)}</b></span>
+                    <b>${c.count}</b>
+                  </div>
+                  <div class="report-bar-track">
+                    <div class="report-bar-fill" style="width:${pct}%;background:var(--accent)"></div>
+                  </div>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        ` : `
+          <div class="empty">No complaints recorded.</div>
+        `}
+      </div>
+
+      <!-- Most Frequent Fault Codes -->
+      <div class="card">
+        <div class="hd" style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span>${LINE_ICONS.pos}</span><span>Most Frequent Fault Codes</span></div>
+        ${topCodes.length ? `
+          <div style="display:flex;flex-direction:column;gap:8px">
+            ${topCodes.map((c) => `
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="display:inline-block;padding:2px 6px;border-radius:4px;background:var(--danger-soft);color:var(--danger);border:1px solid var(--danger-border);font-weight:700;font-size:11px">${escHtml(c.code)}</span>
+                  <span style="font-size:13px;color:var(--text-secondary)">${escHtml(c.label || "Trouble code")}</span>
+                </div>
+                <b>${c.count}</b>
+              </div>
+            `).join("")}
+          </div>
+        ` : `
+          <div class="empty">No fault codes recorded.</div>
+        `}
+      </div>
+    </div>
 
       <!-- Top Customer Complaints -->
       <div class="card">
@@ -15050,6 +15183,7 @@ let auditPageLimit = 50;
  */
 function isAuditedActor(entry) {
   if (!entry || typeof entry !== "object") return false;
+  if (entry.action === "Login" || entry.action === "Logout") return true;
   const role = String(entry.role || "").toLowerCase().trim();
   if (role === "superadmin") return false;
   if (role === "admin" || role === "mechanic") return true;
@@ -15146,13 +15280,10 @@ function getFilteredAuditEntries() {
     const dateStr = entry.at ? String(entry.at).split(/[ T]/)[0] : "";
     if (!inDateRange(dateStr, auditPeriod)) return false;
 
-    // 2. Category
-    if (auditCategory !== "all" && entry.cat !== auditCategory) return false;
-
-    // 3. User
+    // 2. User
     if (auditUser !== "all" && (entry.by || "").trim() !== auditUser) return false;
 
-    // 4. Search
+    // 3. Search
     if (auditSearch) {
       const q = auditSearch;
       const userMatch = (entry.by || "").toLowerCase().includes(q);
@@ -15222,32 +15353,7 @@ function getAuditViewHtml() {
   }
 
   const isSuperUser = isSuper();
-  const subtitle = isSuperUser
-    ? "Full activity log: who did what, and when."
-    : "Operational activity: jobs, sales, and payments.";
-
-  const categories = isSuperUser
-    ? [
-        "Jobs",
-        "Payments",
-        "Quick Sales",
-        "Quick Labor",
-        "Customers",
-        "Sessions",
-        "Voids & Reversals",
-        "Overrides",
-        "Catalog",
-        "Users & Access",
-        "Deletions"
-      ]
-    : [
-        "Jobs",
-        "Payments",
-        "Quick Sales",
-        "Quick Labor",
-        "Customers",
-        "Sessions"
-      ];
+  const subtitle = "Login and logout activity.";
 
   const visibleEntries = getAuditEntries();
   const distinctUsers = Array.from(new Set(visibleEntries.map((e) => (e.by || "").trim()).filter(Boolean))).sort();
@@ -15295,14 +15401,6 @@ function getAuditViewHtml() {
         </div>
 
         <div style="display:flex;align-items:center;gap:6px">
-          <label for="audit-category-select" style="font-size:13px;font-weight:700;color:var(--text-secondary)">Category:</label>
-          <select id="audit-category-select" class="audit-select" onchange="setAuditCategory(this.value)">
-            <option value="all" ${auditCategory === "all" ? "selected" : ""}>All categories</option>
-            ${categories.map((c) => `<option value="${escHtml(c)}" ${auditCategory === c ? "selected" : ""}>${escHtml(c)}</option>`).join("")}
-          </select>
-        </div>
-
-        <div style="display:flex;align-items:center;gap:6px">
           <label for="audit-user-select" style="font-size:13px;font-weight:700;color:var(--text-secondary)">User:</label>
           <select id="audit-user-select" class="audit-select" onchange="setAuditUser(this.value)">
             <option value="all" ${auditUser === "all" ? "selected" : ""}>All users</option>
@@ -15343,16 +15441,12 @@ function getAuditResultsHtml() {
 
   // Summary card stats for the filtered rows in this period
   const totalEntries = filtered.length;
-  const distinctUsersCount = new Set(filtered.map((e) => (e.by || "").trim()).filter(Boolean)).size;
-
-  let voidsCount = 0;
-  let overridesCount = 0;
-  if (isSuperUser) {
-    filtered.forEach((e) => {
-      if (e.cat === "Voids & Reversals") voidsCount++;
-      if (e.cat === "Overrides") overridesCount++;
-    });
-  }
+  let loginsCount = 0;
+  let logoutsCount = 0;
+  filtered.forEach((e) => {
+    if (e.action === "Login") loginsCount++;
+    else if (e.action === "Logout") logoutsCount++;
+  });
 
   const stat = (i, bg, l, n, t) =>
     `<div class="card st"><div class="ic" style="background:${bg}">${i}</div><div><small>${l}</small><b>${n}</b>${t}</div></div>`;
@@ -15364,9 +15458,8 @@ function getAuditResultsHtml() {
     <!-- Summary Cards -->
     <div class="reports-kpi-grid audit-kpi-grid">
       ${stat(ICONS.clipboard, "", "TOTAL ENTRIES", totalEntries, "In period")}
-      ${stat(LINE_ICONS.cust, "", "ACTIVE USERS", distinctUsersCount, "Distinct")}
-      ${isSuperUser ? stat(ICONS.alert, "", "VOIDS & REVERSALS", voidsCount, "In period") : ""}
-      ${isSuperUser ? stat(ICONS.money, "", "OVERRIDES", overridesCount, "Price & plate") : ""}
+      ${stat(LINE_ICONS.cust, "", "LOGINS", loginsCount, "In period")}
+      ${stat(LINE_ICONS.cust, "", "LOGOUTS", logoutsCount, "In period")}
     </div>
 
     <!-- Count line -->
@@ -15425,7 +15518,7 @@ function getAuditResultsHtml() {
       ` : `
         <div style="padding:48px 20px;text-align:center">
           <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px">No audit entries found.</div>
-          <div style="font-size:13px;color:var(--text-muted)">Try a different period, category, or search.</div>
+          <div style="font-size:13px;color:var(--text-muted)">Try a different period, user, or search.</div>
         </div>
       `}
     </div>
@@ -15575,8 +15668,6 @@ function exportAuditCsv() {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-
-  logAudit("Export audit log", `${filtered.length} rows`, `Exported ${filtered.length} rows to CSV`);
 }
 
 
@@ -16489,13 +16580,7 @@ function chargePosSale() {
 
   if (!Array.isArray(D.sales)) D.sales = [];
   D.sales.push(newSale);
-  logAudit("Quick sale recorded", newSale.no, `${P(newSale.total)} · ${newSale.method} (${items.length} items)`);
   save();
-
-  // Log price overrides without interrupting checkout
-  overrides.forEach((ov) => {
-    logAudit("Price override", newSale.no, `${ov.name}: ${P(ov.origPrice)} -> ${P(ov.price)}`);
-  });
 
   // Reset cart state
   posCart = [];
@@ -16642,7 +16727,6 @@ function openPosVoidModal(saleId) {
     s.voidAt = nowLocalTimestamp();
     const u = getCurrentUser();
     s.voidBy = u ? u.name : "Super Admin";
-    logAudit("Void sale", s.no, reason);
     save();
     renderPosTodaySales();
     updatePosHeaderStats();
@@ -18189,16 +18273,7 @@ function recordQuickFix() {
 
   if (!Array.isArray(D.wo)) D.wo = [];
   D.wo.push(newFix);
-  logAudit("Marked by", newFix.no, activeName, "Quick Labor");
-  logAudit("Quick labor recorded", newFix.no, `${P(newFix.total)} · ${newFix.mech} (${items.length} items)`, "Quick Labor");
   save();
-
-  // Log price overrides to audit trail
-  overrides.forEach((ov) => {
-    if (typeof logAudit === "function") {
-      logAudit("Price override", txnId, `${ov.name}: ${P(ov.origPrice)} -> ${P(ov.price)}`);
-    }
-  });
 
   // Reset page state
   quickLaborCart = [];

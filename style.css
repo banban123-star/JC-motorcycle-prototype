@@ -224,6 +224,16 @@ aside {
   flex: none;
 }
 
+.sidebar-logo-img {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  object-fit: contain;
+  border-radius: 10px;
+  flex: none;
+}
+
 /* Sidebar toggle button (desktop collapse & mobile close) */
 .btn-sidebar-toggle {
   all: unset;
@@ -2059,6 +2069,14 @@ body.logged-in .login-screen {
   margin: 0 auto 16px;
   display: flex;
   justify-content: center;
+}
+
+.login-logo-img {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  border-radius: 10px;
+  display: block;
 }
 
 .login-logo-tile i {
@@ -7817,6 +7835,265 @@ body.is-mobile .jc-stage-actions button,
     align-items: stretch;
   }
 }
+
+/* ==========================================================
+   CUSTOMERS & MOTORCYCLES REBUILD
+   ========================================================== */
+
+.cust-header {
+  margin-bottom: 20px;
+}
+
+.cust-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text);
+  margin: 0 0 4px 0;
+  letter-spacing: -0.02em;
+}
+
+.cust-subtitle {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.cust-toolbar {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.cust-search-wrap {
+  position: relative;
+  flex: 1 1 280px;
+  max-width: 440px;
+  display: flex;
+  align-items: center;
+}
+
+.cust-search-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--text-muted);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+}
+
+.cust-search-input {
+  width: 100%;
+  height: 38px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  padding: 0 32px 0 36px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg-page);
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+  box-sizing: border-box;
+}
+
+.cust-search-input:focus {
+  border-color: var(--accent);
+  background: var(--bg-surface);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.cust-search-clear {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: none;
+  padding: 4px;
+  line-height: 1;
+  border-radius: 4px;
+}
+
+.cust-search-clear:hover {
+  color: var(--text);
+  background: var(--bg-subtle);
+}
+
+.cust-search-clear.visible {
+  display: block;
+}
+
+.cust-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cust-filter-select {
+  height: 38px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--bg-surface);
+  cursor: pointer;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.cust-filter-select:focus {
+  border-color: var(--accent);
+}
+
+.cust-table-card {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+}
+
+.cust-chevron-btn {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--text-muted);
+  transition: background 150ms ease;
+}
+
+.cust-chevron-btn:hover {
+  background: var(--bg-subtle);
+  color: var(--text);
+}
+
+.cust-chevron {
+  transition: transform 180ms ease;
+}
+
+.cust-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+.cust-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 13px;
+}
+
+.cust-pill-count {
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+}
+
+.cust-pill {
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cust-pill.in-shop {
+  background: #EFF6FF;
+  color: #1D4ED8;
+  border: 1px solid #BFDBFE;
+}
+
+.cust-pill.cleared {
+  background: #ECFDF5;
+  color: #059669;
+  border: 1px solid #A7F3D0;
+}
+
+.cust-pill.in-repair {
+  background: #EFF6FF;
+  color: #1D4ED8;
+  border: 1px solid #BFDBFE;
+}
+
+.cust-sub-panel {
+  background: #F8FAFC;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 20px 14px 52px;
+}
+
+.cust-bike-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.cust-bike-item:last-child {
+  margin-bottom: 0;
+}
+
+.cust-bike-icon {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 8px;
+  background: #EFF6FF;
+  border: 1px solid #DBEAFE;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  margin-right: 14px;
+  flex: none;
+}
+
+.cust-btn-new-wo {
+  background: transparent !important;
+  color: var(--accent) !important;
+  border: 1px solid var(--accent) !important;
+  font-weight: 600 !important;
+}
+
+.cust-btn-new-wo:hover {
+  background: var(--accent-soft) !important;
+}
+
+.cust-sub-empty {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 8px 0;
+}
+
 
 
 

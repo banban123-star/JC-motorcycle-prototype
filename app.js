@@ -799,8 +799,10 @@ function logAudit(action, ref, note, customCat) {
  * @param {object} [opts]
  */
 let _askReasonCallback = null;
+let _askReasonAlertOnly = false;
 function askReason(title, confirmLabel, onConfirm, opts = {}) {
   _askReasonCallback = onConfirm;
+  _askReasonAlertOnly = Boolean(opts.alertOnly);
   const md = $("pos-void-md");
   const ov = $("pos-void-ov");
   if (!md || !ov) return;
@@ -818,20 +820,22 @@ function askReason(title, confirmLabel, onConfirm, opts = {}) {
         <button type="button" class="search-clear visible" onclick="closeReasonModal()" style="position:static" title="Close">✕</button>
       </div>
       ${description ? `<p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;line-height:1.4">${description}</p>` : ""}
-      <div style="margin-bottom:12px">
-        <label for="modal-reason-input" style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text-secondary)">Reason (required):</label>
-        <input
-          id="modal-reason-input"
-          type="text"
-          placeholder="${escHtml(placeholder)}"
-          style="width:100%;height:40px;border-radius:8px;border:1px solid var(--border);padding:0 10px;box-sizing:border-box;font-size:13px;outline:none"
-          onkeydown="if(event.key==='Enter'){event.preventDefault();submitReason();}"
-        />
-        <div id="modal-reason-err" style="color:var(--danger, #DC2626);font-size:12px;font-weight:600;margin-top:4px;display:none">Please enter a reason.</div>
-      </div>
+      ${!_askReasonAlertOnly ? `
+        <div style="margin-bottom:12px">
+          <label for="modal-reason-input" style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text-secondary)">Reason (required):</label>
+          <input
+            id="modal-reason-input"
+            type="text"
+            placeholder="${escHtml(placeholder)}"
+            style="width:100%;height:40px;border-radius:8px;border:1px solid var(--border);padding:0 10px;box-sizing:border-box;font-size:13px;outline:none"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();submitReason();}"
+          />
+          <div id="modal-reason-err" style="color:var(--danger, #DC2626);font-size:12px;font-weight:600;margin-top:4px;display:none">Please enter a reason.</div>
+        </div>
+      ` : ""}
       <div style="display:flex;justify-content:flex-end;gap:8px">
-        <button type="button" class="btn g" onclick="closeReasonModal()" style="min-height:40px">Cancel</button>
-        <button type="button" class="btn ${isDestructive ? "btn-destructive" : ""}" style="${isDestructive ? "background:#ffffff;color:var(--danger, #dc2626);border:1px solid var(--danger-border, #fca5a5);min-height:40px;" : "min-height:40px;"}" onclick="submitReason()">${escHtml(confirmLabel || "Confirm")}</button>
+        ${!_askReasonAlertOnly ? `<button type="button" class="btn g" onclick="closeReasonModal()" style="min-height:40px">Cancel</button>` : ""}
+        <button type="button" class="btn ${isDestructive && !_askReasonAlertOnly ? "btn-destructive" : ""}" style="${isDestructive && !_askReasonAlertOnly ? "background:#ffffff;color:var(--danger, #dc2626);border:1px solid var(--danger-border, #fca5a5);min-height:40px;" : "min-height:40px;"}" onclick="submitReason()">${escHtml(confirmLabel || "Confirm")}</button>
       </div>
     </div>
   `;
@@ -848,9 +852,16 @@ function closeReasonModal() {
   const ov = $("pos-void-ov");
   if (ov) ov.classList.remove("on");
   _askReasonCallback = null;
+  _askReasonAlertOnly = false;
 }
 
 function submitReason() {
+  if (_askReasonAlertOnly) {
+    const cb = _askReasonCallback;
+    closeReasonModal();
+    if (cb) cb();
+    return;
+  }
   const inp = $("modal-reason-input");
   const err = $("modal-reason-err");
   const val = inp ? inp.value.trim() : "";
@@ -2716,6 +2727,8 @@ function go(v) {
     billSearch = "";
     billFilter = "all";
     catFilter = "all";
+    custSearch = "";
+    custFilter = "all";
     if (v === "audit") {
       auditSearch = "";
       auditPeriod = "7days";
@@ -3462,167 +3475,257 @@ function dashMechanic() {
   `;
 }
 
-/**
- * Generates Super Admin-only dashboard cards:
- * 1. Net Revenue Trend (last 7 local days as CSS bars with vs. previous 7 days % change).
- * 2. Voids & Overrides (monthly count badges and 8 latest audit log entries).
- * @returns {string} HTML string.
- */
-function getSuperDashboardExtraHtml() {
-  const now = new Date();
-  const pad = (n) => (n < 10 ? "0" + n : String(n));
-  const formatYmd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+/** State for Customers & Motorcycles view */
+let custSearch = "";
+let custFilter = "all";
+const expandedCustIds = new Set();
 
-  // 1. Net Revenue Trend
-  const last7Days = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-    last7Days.push({
-      dateStr: formatYmd(d),
-      label: d.toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric" }),
-      total: 0
-    });
+function getCustomerBikes(cid) {
+  return (Array.isArray(D.bk) ? D.bk : []).filter((b) => b.cid === cid && !b.archived);
+}
+
+function getBikeOpenJobs(bid) {
+  return (Array.isArray(D.wo) ? D.wo : []).filter((o) => o.bid === bid && isCountableJob(o) && o.st !== "Completed" && o.st !== "Cancelled");
+}
+
+function getCustomerOpenJobs(cid) {
+  const bikes = getCustomerBikes(cid);
+  const bIds = new Set(bikes.map((b) => b.id));
+  return (Array.isArray(D.wo) ? D.wo : []).filter((o) => (o.cid === cid || bIds.has(o.bid)) && isCountableJob(o) && o.st !== "Completed" && o.st !== "Cancelled");
+}
+
+function getCustomerJoinedDisplay(c) {
+  if (c.joinedAt) {
+    return `Joined: ${formatJobDate(c.joinedAt)}`;
   }
-
-  // Prev 7 days
-  const prev7Days = [];
-  for (let i = 13; i >= 7; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-    prev7Days.push({
-      dateStr: formatYmd(d),
-      total: 0
-    });
+  const bikes = getCustomerBikes(c.id);
+  const bikeIds = new Set(bikes.map((b) => b.id));
+  const wos = (Array.isArray(D.wo) ? D.wo : []).filter((o) => (o.cid === c.id || bikeIds.has(o.bid)) && (o.at || o.date || o.created));
+  if (wos.length > 0) {
+    let earliest = null;
+    for (const o of wos) {
+      const dStr = (o.at || o.date || o.created || "").slice(0, 10);
+      if (dStr && (!earliest || dStr < earliest)) {
+        earliest = dStr;
+      }
+    }
+    if (earliest) return `Joined: ${formatJobDate(earliest)}`;
   }
+  return `Joined: ${formatJobDate(today())}`;
+}
 
-  // Sum completed non-reversed jobs and non-void sales
-  const countableJobs = (Array.isArray(D.wo) ? D.wo : []).filter((o) => o.st === "Completed" && isCountableJob(o));
-  const countableSales = (Array.isArray(D.sales) ? D.sales : []).filter(isCountableSale);
+function customerMatchesSearch(c, q) {
+  if (!q) return true;
+  if ((c.name || "").toLowerCase().includes(q)) return true;
+  if ((c.phone || "").toLowerCase().includes(q)) return true;
+  const bikes = getCustomerBikes(c.id);
+  for (const b of bikes) {
+    if ((b.plate || "").toLowerCase().includes(q)) return true;
+    if ((b.make || "").toLowerCase().includes(q)) return true;
+    if ((b.model || "").toLowerCase().includes(q)) return true;
+    if ((b.engine || "").toLowerCase().includes(q)) return true;
+  }
+  return false;
+}
 
-  countableJobs.forEach((o) => {
-    const dStr = (o.done || o.at || "").slice(0, 10);
-    const day = last7Days.find((x) => x.dateStr === dStr);
-    if (day) day.total += total(o);
-    const prevDay = prev7Days.find((x) => x.dateStr === dStr);
-    if (prevDay) prevDay.total += total(o);
+function onCustSearchInput(val) {
+  custSearch = val;
+  const clearBtn = $("cust-search-clear");
+  if (clearBtn) {
+    if (val) clearBtn.classList.add("visible");
+    else clearBtn.classList.remove("visible");
+  }
+  const trimmed = val.trim().toLowerCase();
+  if (trimmed) {
+    const activeCustomers = (Array.isArray(D.cu) ? D.cu : []).filter((c) => !c.archived);
+    for (const c of activeCustomers) {
+      if (customerMatchesSearch(c, trimmed)) {
+        expandedCustIds.add(c.id);
+      }
+    }
+  }
+  const wrap = $("cust-table-wrap");
+  if (wrap) {
+    wrap.innerHTML = renderCustTableHtml();
+  }
+}
+
+function clearCustSearch() {
+  custSearch = "";
+  const inp = $("cust-search-input");
+  if (inp) {
+    inp.value = "";
+    inp.focus();
+  }
+  const clearBtn = $("cust-search-clear");
+  if (clearBtn) clearBtn.classList.remove("visible");
+  const wrap = $("cust-table-wrap");
+  if (wrap) {
+    wrap.innerHTML = renderCustTableHtml();
+  }
+}
+
+function onCustFilterChange(val) {
+  custFilter = val;
+  const wrap = $("cust-table-wrap");
+  if (wrap) {
+    wrap.innerHTML = renderCustTableHtml();
+  }
+}
+
+function toggleCustExpand(cid) {
+  if (expandedCustIds.has(cid)) {
+    expandedCustIds.delete(cid);
+  } else {
+    expandedCustIds.add(cid);
+  }
+  const wrap = $("cust-table-wrap");
+  if (wrap) {
+    wrap.innerHTML = renderCustTableHtml();
+  }
+}
+
+function renderCustTableHtml() {
+  const activeCustomers = (Array.isArray(D.cu) ? D.cu : []).filter((c) => !c.archived);
+  activeCustomers.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+  const q = custSearch.trim().toLowerCase();
+
+  const filtered = activeCustomers.filter((c) => {
+    if (q && !customerMatchesSearch(c, q)) return false;
+    const bikes = getCustomerBikes(c.id);
+    const openJobs = getCustomerOpenJobs(c.id);
+
+    if (custFilter === "in-shop") {
+      return openJobs.length > 0;
+    }
+    if (custFilter === "cleared") {
+      return bikes.length > 0 && openJobs.length === 0;
+    }
+    return true;
   });
-
-  countableSales.forEach((s) => {
-    const dStr = (s.date || s.at || "").slice(0, 10);
-    const day = last7Days.find((x) => x.dateStr === dStr);
-    if (day) day.total += (Number(s.total) || 0);
-    const prevDay = prev7Days.find((x) => x.dateStr === dStr);
-    if (prevDay) prevDay.total += (Number(s.total) || 0);
-  });
-
-  const sum7 = last7Days.reduce((acc, d) => acc + d.total, 0);
-  const sumPrev7 = prev7Days.reduce((acc, d) => acc + d.total, 0);
-
-  let vsText = "-";
-  if (sumPrev7 > 0) {
-    const diff = sum7 - sumPrev7;
-    const pct = ((diff / sumPrev7) * 100).toFixed(1);
-    vsText = diff >= 0 ? `+${pct}%` : `${pct}%`;
-  }
-
-  const maxDaily = Math.max(...last7Days.map((d) => d.total), 1);
-
-  // 2. Voids & Overrides
-  const currentMonth = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
-  const voidSalesCount = (Array.isArray(D.sales) ? D.sales : []).filter(
-    (s) => s.void && (s.voidAt || s.date || "").slice(0, 7) === currentMonth
-  ).length;
-  const reversedJobsCount = (Array.isArray(D.wo) ? D.wo : []).filter(
-    (o) => o.reversed && (o.reversed.at || o.done || "").slice(0, 7) === currentMonth
-  ).length;
-  const cancelledJobsCount = (Array.isArray(D.wo) ? D.wo : []).filter(
-    (o) => (o.st === "Cancelled" || o.cancel) && ((o.cancel && o.cancel.at) || o.at || "").slice(0, 7) === currentMonth
-  ).length;
-  const overridesCount = (Array.isArray(D.audit) ? D.audit : []).filter(
-    (a) => a.action === "Price override" && (a.at || "").slice(0, 7) === currentMonth
-  ).length;
-
-  const latestAudit = [...(Array.isArray(D.audit) ? D.audit : [])].reverse().slice(0, 8);
-  const canSeeHis = canOpen("his");
 
   return `
-    <div class="grid2" style="margin-top:20px">
-      <!-- Card A: Net Revenue Trend -->
-      <div class="card" style="padding:18px 20px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
-          <div>
-            <div style="font-weight:700;font-size:15px;color:var(--text)">Net Revenue Trend</div>
-            <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Last 7 local days (jobs + quick sales)</div>
-          </div>
-          <div style="text-align:right">
-            <div style="font-weight:800;font-size:16px;color:var(--text)">${P(sum7)}</div>
-            <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
-              vs previous 7 days: <b style="color:${vsText.startsWith('+') ? 'var(--success, #059669)' : (vsText.startsWith('-') ? 'var(--danger, #DC2626)' : 'var(--text)')}">${vsText}</b>
-            </div>
-          </div>
-        </div>
+    <div class="card tw cust-table-card">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:40px;text-align:center"></th>
+            <th>CUSTOMER DETAILS</th>
+            <th>REGISTERED VEHICLES</th>
+            <th>CONTACT</th>
+            <th class="r">ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${!filtered.length ? `
+            <tr>
+              <td colspan="5" style="text-align:center;padding:48px 16px;color:var(--text-muted)">
+                <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:4px">No customers found.</div>
+                <div style="font-size:13px">Try a different search or filter.</div>
+              </td>
+            </tr>
+          ` : filtered.map((c) => {
+            const isExpanded = expandedCustIds.has(c.id);
+            const bikes = getCustomerBikes(c.id);
+            const openJobs = getCustomerOpenJobs(c.id);
+            const joinedDisplay = getCustomerJoinedDisplay(c);
 
-        <div style="display:flex;align-items:flex-end;gap:10px;height:140px;padding-top:10px;border-bottom:1px solid var(--border)">
-          ${last7Days.map((d) => {
-            const barHeightPct = Math.round((d.total / maxDaily) * 100);
             return `
-              <div style="flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end" title="${d.label}: ${P(d.total)}">
-                <div style="font-size:10px;font-weight:700;color:var(--text-muted);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">${d.total > 0 ? P(d.total) : "0"}</div>
-                <div style="width:100%;max-width:32px;background:var(--primary, #2563EB);border-radius:4px 4px 0 0;height:${Math.max(barHeightPct, 4)}%"></div>
-                <div style="font-size:11px;color:var(--text-secondary);margin-top:6px;text-align:center">${d.label.split(",")[0]}</div>
-              </div>
+              <tr style="cursor:pointer" onclick="if(event.target.closest('button'))return;toggleCustExpand('${c.id}')">
+                <td style="text-align:center">
+                  <button
+                    type="button"
+                    class="cust-chevron-btn"
+                    onclick="event.stopPropagation();toggleCustExpand('${c.id}')"
+                    aria-expanded="${isExpanded ? "true" : "false"}"
+                    title="${isExpanded ? "Collapse" : "Expand"}"
+                  >
+                    <svg class="cust-chevron ${isExpanded ? "expanded" : ""}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                  </button>
+                </td>
+                <td>
+                  <div style="font-weight:700;color:var(--text)">${escHtml(c.name)}</div>
+                  <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${escHtml(joinedDisplay)}</div>
+                </td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                    <span class="cust-pill-count">${bikes.length} ${bikes.length === 1 ? "Vehicle" : "Vehicles"}</span>
+                    ${openJobs.length > 0 ? `
+                      <span class="cust-pill in-shop">● ${openJobs.length} IN-SHOP</span>
+                    ` : (bikes.length > 0 ? `
+                      <span class="cust-pill cleared">● CLEARED</span>
+                    ` : "")}
+                  </div>
+                </td>
+                <td>
+                  <span class="cust-mono">${escHtml(c.phone || "—")}</span>
+                </td>
+                <td class="r" style="white-space:nowrap">
+                  <button type="button" class="btn g sm" onclick="event.stopPropagation();openEditCustomerModal('${c.id}')">Edit Profile</button>
+                </td>
+              </tr>
+              ${isExpanded ? `
+                <tr class="cust-sub-row">
+                  <td colspan="5" style="padding:0">
+                    <div class="cust-sub-panel">
+                      ${!bikes.length ? `
+                        <div class="cust-sub-empty">
+                          <span>No vehicles registered for this customer yet.</span>
+                          <button type="button" class="btn sm" onclick="openRegisterVehicleModal('${c.id}')">+ Register Vehicle</button>
+                        </div>
+                      ` : bikes.map((b) => {
+                        const bOpenJobs = getBikeOpenJobs(b.id);
+                        const isInRepair = bOpenJobs.length > 0;
+                        return `
+                          <div class="cust-bike-item">
+                            <div style="display:flex;align-items:center;min-width:0">
+                              <div class="cust-bike-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                  <circle cx="5.5" cy="17.5" r="3.5"></circle>
+                                  <circle cx="18.5" cy="17.5" r="3.5"></circle>
+                                  <path d="M15 6h-3l-3 6.5h6l2-3.5h3"></path>
+                                  <path d="M9 12.5l-3.5 5"></path>
+                                  <path d="M18.5 14v3.5"></path>
+                                </svg>
+                              </div>
+                              <div style="min-width:0">
+                                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                                  <b style="color:var(--text)">${escHtml(b.make + " " + b.model)}${b.year ? ` (${b.year})` : ""}</b>
+                                  ${isInRepair ? `
+                                    <span class="cust-pill in-repair">IN-REPAIR</span>
+                                  ` : `
+                                    <span class="cust-pill cleared">CLEARED</span>
+                                  `}
+                                </div>
+                                <div class="cust-mono" style="font-size:12px;color:var(--text-muted);margin-top:2px">
+                                  Plate: ${escHtml(b.plate)}${b.engine ? ` | Engine/Chassis: ${escHtml(b.engine)}` : ""}
+                                </div>
+                              </div>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:8px;margin-left:16px;flex:none">
+                              <button type="button" class="btn g sm" onclick="hisBike='${b.id}';go('his')" title="View service history">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px">
+                                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                  <circle cx="12" cy="12" r="3"></circle>
+                                </svg>View History
+                              </button>
+                              <button type="button" class="btn g sm" onclick="openEditBikeModal('${b.id}')">Edit</button>
+                              <button type="button" class="btn sm cust-btn-new-wo" onclick="startNewInspectionWorkOrder('${b.id}')">New work order</button>
+                            </div>
+                          </div>
+                        `;
+                      }).join("")}
+                    </div>
+                  </td>
+                </tr>
+              ` : ""}
             `;
           }).join("")}
-        </div>
-      </div>
-
-      <!-- Card B: Voids & Overrides -->
-      <div class="card" style="padding:18px 20px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-          <div>
-            <div style="font-weight:700;font-size:15px;color:var(--text)">Voids &amp; Overrides</div>
-            <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Monthly counts &amp; audit history</div>
-          </div>
-          ${canSeeHis ? `<button type="button" class="btn g sm" onclick="go('his')">View in Service History</button>` : ""}
-        </div>
-
-        <!-- Monthly metric badges -->
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
-          <div style="padding:8px;background:var(--bg-surface-alt, #F8FAFC);border:1px solid var(--border);border-radius:6px;text-align:center">
-            <div style="font-size:11px;color:var(--text-muted);font-weight:600">Void Sales</div>
-            <div style="font-size:16px;font-weight:800;color:var(--danger, #DC2626);margin-top:2px">${voidSalesCount}</div>
-          </div>
-          <div style="padding:8px;background:var(--bg-surface-alt, #F8FAFC);border:1px solid var(--border);border-radius:6px;text-align:center">
-            <div style="font-size:11px;color:var(--text-muted);font-weight:600">Reversals</div>
-            <div style="font-size:16px;font-weight:800;color:var(--danger, #DC2626);margin-top:2px">${reversedJobsCount}</div>
-          </div>
-          <div style="padding:8px;background:var(--bg-surface-alt, #F8FAFC);border:1px solid var(--border);border-radius:6px;text-align:center">
-            <div style="font-size:11px;color:var(--text-muted);font-weight:600">Cancelled</div>
-            <div style="font-size:16px;font-weight:800;color:var(--text-secondary);margin-top:2px">${cancelledJobsCount}</div>
-          </div>
-          <div style="padding:8px;background:var(--bg-surface-alt, #F8FAFC);border:1px solid var(--border);border-radius:6px;text-align:center">
-            <div style="font-size:11px;color:var(--text-muted);font-weight:600">Overrides</div>
-            <div style="font-size:16px;font-weight:800;color:var(--primary, #2563EB);margin-top:2px">${overridesCount}</div>
-          </div>
-        </div>
-
-        <!-- Latest audit entries -->
-        <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:8px">Latest Audit Logs:</div>
-        <div style="max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:6px">
-          ${!latestAudit.length ? `<div style="font-size:13px;color:var(--text-muted);padding:8px 0">No audit records yet.</div>` : latestAudit.map((a) => `
-            <div style="font-size:12px;padding:6px 8px;background:var(--bg-surface-alt, #F8FAFC);border-radius:4px;border:1px solid var(--border);display:flex;justify-content:space-between;gap:8px">
-              <div>
-                <span style="font-weight:700;color:var(--text)">${escHtml(a.action)}</span>
-                ${a.ref ? `<span style="color:var(--text-muted)"> (${escHtml(a.ref)})</span>` : ""}
-                <div style="color:var(--text-secondary);margin-top:2px;font-style:italic">${escHtml(a.note || "No reason given")}</div>
-              </div>
-              <div style="text-align:right;white-space:nowrap;font-size:11px;color:var(--text-muted)">
-                <div>${escHtml(a.at)}</div>
-                <div>${escHtml(a.by)}</div>
-              </div>
-            </div>
-          `).join("")}
-        </div>
-      </div>
+        </tbody>
+      </table>
     </div>
   `;
 }
@@ -3632,7 +3735,7 @@ function getSuperDashboardExtraHtml() {
  */
 const R = {
   /**
-   * Dashboard view: shows KPI summary cards, priority repair queue, and active alerts.
+   * Dashboard view: shows KPI summary cards and priority repair queue.
    * @returns {string} HTML string.
    */
   dash() {
@@ -3663,76 +3766,61 @@ const R = {
 
     return `<div class="card top"><div><h1>Welcome back</h1><p>${roleLabel} | ${d}</p></div><span class="pill">● Saved on this device</span></div>
  <div class="stats">${stat(LINE_ICONS.rep, "", "ACTIVE REPAIRS", act.length, "In progress")}${stat(ICONS.money, "", "PENDING PAYMENTS", rdy.length, "Ready for pickup")}${stat(ICONS.checkCircle, "", "TODAY’S SERVICES", dn.length, "Jobs finished")}</div>
- <div class="grid2"><div class="card"><div class="hd" style="display:flex;align-items:center;gap:8px"><span>${LINE_ICONS.rep}</span><span>Priority Repair Queue</span><button class="btn g sm" onclick="go('rep')" style="margin-left:auto">View all</button></div>${tbl(countableWos.filter((o) => o.st != "Completed"))}</div>
- <div class="card"><div class="hd" style="display:flex;align-items:center;gap:8px"><span>${ICONS.bell}</span><span>Alerts &amp; Reminders</span></div>
- ${rdy.length ? `<div class="al or">Pending settlement<span>${rdy.length} repaired vehicle${rdy.length > 1 ? "s are" : " is"} waiting for customer payment &amp; pickup.</span></div>` : ""}
- ${!rdy.length ? `<div class="empty">All clear.</div>` : ""}</div></div>
- ${isSuper() ? getSuperDashboardExtraHtml() : ""}`;
+ <div class="card"><div class="hd" style="display:flex;align-items:center;gap:8px"><span>${LINE_ICONS.rep}</span><span>Priority Repair Queue</span><button class="btn g sm" onclick="go('rep')" style="margin-left:auto">View all</button></div>${tbl(countableWos.filter((o) => o.st != "Completed"))}</div>`;
   },
 
   /**
-   * Customers & Motorcycles view: lists registered motorcycles, owner contact, and quick actions.
+   * Customers & Motorcycles view: lists customers with expandable registered motorcycles and quick actions.
    * @returns {string} HTML string.
    */
   cust() {
-    const list = custShowArchived ? (D.bk || []) : (D.bk || []).filter((b) => !b.archived);
-    return `<div class="card top">
-      <div>
-        <h1>Customers &amp; Motorcycles</h1>
-        <p>Owners and the motorcycles they bring in</p>
+    return `
+      <div class="cust-header">
+        <h1 class="cust-title">Customers &amp; Motorcycles</h1>
+        <p class="cust-subtitle">Manage customer profiles and registered motorcycles</p>
       </div>
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        ${isSuper() ? `
-          <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer">
-            <input type="checkbox" ${custShowArchived ? "checked" : ""} onchange="custShowArchived=this.checked;go('cust')">
-            Show archived
-          </label>
-        ` : ""}
-        <button class="btn" onclick="mCust()">+ Add customer / motorcycle</button>
+
+      <div class="cust-toolbar">
+        <div class="cust-search-wrap">
+          <span class="cust-search-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </span>
+          <input
+            id="cust-search-input"
+            type="text"
+            class="cust-search-input"
+            placeholder="Search customers or plates..."
+            value="${escHtml(custSearch)}"
+            oninput="onCustSearchInput(this.value)"
+          />
+          <button
+            type="button"
+            id="cust-search-clear"
+            class="cust-search-clear ${custSearch ? "visible" : ""}"
+            onclick="clearCustSearch()"
+            title="Clear search"
+            aria-label="Clear search"
+          >✕</button>
+        </div>
+
+        <div class="cust-toolbar-actions">
+          <select id="cust-filter-select" class="cust-filter-select" onchange="onCustFilterChange(this.value)">
+            <option value="all" ${custFilter === "all" ? "selected" : ""}>All Customers</option>
+            <option value="in-shop" ${custFilter === "in-shop" ? "selected" : ""}>In-Shop</option>
+            <option value="cleared" ${custFilter === "cleared" ? "selected" : ""}>Cleared</option>
+          </select>
+          <button type="button" class="btn" onclick="openNewCustomerModal()">+ New Customer</button>
+          <button type="button" class="btn g" onclick="openRegisterVehicleModal()">+ Register Vehicle</button>
+        </div>
       </div>
-    </div>
-    <div class="card tw">
-      <table>
-        <thead>
-          <tr>
-            <th>PLATE NO.</th>
-            <th>MOTORCYCLE</th>
-            <th>YEAR</th>
-            <th>OWNER</th>
-            <th class="r">ACTIONS</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${!list.length ? `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">No motorcycles registered.</td></tr>` : list.map((b) => {
-            const c = own(b);
-            const isArch = Boolean(b.archived);
-            return `
-              <tr style="${isArch ? "background:var(--bg-surface-alt, #F8FAFC);opacity:0.8" : ""}">
-                <td>
-                  <b>${escHtml(b.plate)}</b>
-                  ${isArch ? `<span class="badge-reversed" style="margin-left:4px">ARCHIVED</span>` : ""}
-                </td>
-                <td>${escHtml(b.make + " " + b.model)}</td>
-                <td>${b.year || "-"}</td>
-                <td>${escHtml(c ? c.name : "-")}<br><small style="color:var(--text-muted)">${escHtml(c ? c.phone : "")}</small></td>
-                <td class="r" style="white-space:nowrap">
-                  <button type="button" class="btn g sm" onclick="hisBike='${b.id}';go('his')">History</button>
-                  <button type="button" class="btn sm" onclick="startNewInspectionWorkOrder('${b.id}')">New work order</button>
-                  <button type="button" class="btn g sm" onclick="openEditBikeModal('${b.id}')">Edit</button>
-                  ${isSuper() ? (isArch ? `
-                    <button type="button" class="btn g sm" onclick="restoreBike('${b.id}')">Restore</button>
-                    <button type="button" class="btn sm btn-destructive" onclick="deleteBike('${b.id}')">Delete</button>
-                  ` : `
-                    <button type="button" class="btn sm btn-destructive" onclick="archiveBike('${b.id}')">Archive</button>
-                    <button type="button" class="btn sm btn-destructive" onclick="deleteBike('${b.id}')">Delete</button>
-                  `) : ""}
-                </td>
-              </tr>
-            `;
-          }).join("")}
-        </tbody>
-      </table>
-    </div>`;
+
+      <div id="cust-table-wrap">
+        ${renderCustTableHtml()}
+      </div>
+    `;
   },
 
   /**
@@ -4545,53 +4633,350 @@ document.onkeydown = (e) => {
   }
 };
 
-/** State toggle for showing archived customers/motorcycles (Super Admin only). */
-let custShowArchived = false;
-
 /**
- * Opens the "Add customer / motorcycle" modal.
+ * Opens the "New Customer" modal.
  */
-function mCust() {
-  const activeCustomers = (Array.isArray(D.cu) ? D.cu : []).filter((c) => !c.archived);
-  M(`<h2>Add customer / motorcycle</h2><label>Owner</label><select id="fc" onchange="$('nw').style.display=this.value?'none':'block'"><option value="">New customer…</option>${activeCustomers.map((c) => `<option value="${c.id}">${escHtml(c.name)}</option>`).join("")}</select>
- <div id="nw"><label>Full name</label><input id="fn"><label>Phone</label><input id="fp"></div>
- <div class="row"><div><label>Make</label><input id="fm"></div><div><label>Model</label><input id="fo"></div><div><label>Year</label><input id="fy" type="number"></div><div><label>Plate number</label><input id="fl"></div></div>${acts("addC()")}`);
+function openNewCustomerModal() {
+  M(`
+    <div style="padding:10px 4px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:12px">
+        <h2 style="margin:0;font-size:18px;font-weight:700">New Customer</h2>
+        <button type="button" class="search-clear visible" onclick="cm()" style="position:static" title="Close">✕</button>
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Full Name *</label>
+        <input id="new-c-name" placeholder="e.g. Juan dela Cruz" style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box" />
+        <div id="new-c-name-err" style="display:none;color:var(--danger,#DC2626);font-size:12px;font-weight:600;margin-top:4px">Full name is required.</div>
+      </div>
+      <div style="margin-bottom:20px">
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Phone Number</label>
+        <input id="new-c-phone" placeholder="e.g. 0917-123-4567" style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box;font-family:ui-monospace,monospace" />
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button type="button" class="btn g" onclick="cm()">Cancel</button>
+        <button type="button" class="btn" onclick="saveNewCustomer()">Save Customer</button>
+      </div>
+    </div>
+  `);
+  setTimeout(() => {
+    const el = $("new-c-name");
+    if (el) el.focus();
+  }, 50);
 }
 
 /**
- * Validates and adds a new customer (if needed) and motorcycle to D.
+ * Saves a new customer profile.
  */
-function addC() {
-  let cid = v("fc");
-  if (!cid) {
-    if (!v("fn")) {
+function saveNewCustomer() {
+  const name = (v("new-c-name") || "").trim();
+  const phone = (v("new-c-phone") || "").trim();
+  const errEl = $("new-c-name-err");
+  if (!name) {
+    if (errEl) errEl.style.display = "block";
+    const inp = $("new-c-name");
+    if (inp) {
+      inp.style.borderColor = "var(--danger, #DC2626)";
+      inp.focus();
+    }
+    return;
+  }
+  const newC = {
+    id: uid(),
+    name: name,
+    phone: phone,
+    joinedAt: today()
+  };
+  D.cu.push(newC);
+  logAudit("Add customer", newC.name, "Customer profile created");
+  save();
+  cm();
+  expandedCustIds.add(newC.id);
+  go("cust");
+}
+
+/**
+ * Opens the "Register Vehicle" modal.
+ * @param {string} [preselectedCid] - Optional customer ID to preselect.
+ */
+function openRegisterVehicleModal(preselectedCid) {
+  const activeCustomers = (Array.isArray(D.cu) ? D.cu : []).filter((c) => !c.archived).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  const hasCust = activeCustomers.length > 0;
+  const initialCid = preselectedCid || (hasCust ? activeCustomers[0].id : "__new__");
+
+  M(`
+    <div style="padding:10px 4px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:12px">
+        <h2 style="margin:0;font-size:18px;font-weight:700">Register Vehicle</h2>
+        <button type="button" class="search-clear visible" onclick="cm()" style="position:static" title="Close">✕</button>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Owner / Customer *</label>
+        <select id="reg-b-cid" onchange="onRegBikeCustomerChange(this.value)" style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;background:var(--bg-surface);box-sizing:border-box">
+          ${activeCustomers.map((c) => `<option value="${c.id}" ${c.id === initialCid ? "selected" : ""}>${escHtml(c.name)} ${c.phone ? `(${c.phone})` : ""}</option>`).join("")}
+          <option value="__new__" ${initialCid === "__new__" ? "selected" : ""}>+ Add new customer profile...</option>
+        </select>
+      </div>
+
+      <div id="reg-b-new-cust-fields" style="display:${initialCid === "__new__" ? "block" : "none"};background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px">
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px">New Customer Details</div>
+        <div style="margin-bottom:8px">
+          <label style="display:block;font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:4px">Full Name *</label>
+          <input id="reg-new-c-name" placeholder="Customer full name" style="width:100%;height:36px;padding:0 8px;border-radius:6px;border:1px solid var(--border);font-size:13px;box-sizing:border-box;background:var(--bg-surface)" />
+          <div id="reg-new-c-name-err" style="display:none;color:var(--danger,#DC2626);font-size:11px;font-weight:600;margin-top:3px">Customer name is required.</div>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:4px">Phone Number</label>
+          <input id="reg-new-c-phone" placeholder="Contact number" style="width:100%;height:36px;padding:0 8px;border-radius:6px;border:1px solid var(--border);font-size:13px;box-sizing:border-box;font-family:ui-monospace,monospace;background:var(--bg-surface)" />
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Plate Number *</label>
+          <input id="reg-b-plate" placeholder="e.g. ABC-1234" style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box;text-transform:uppercase;font-family:ui-monospace,monospace" oninput="this.value=this.value.toUpperCase();if($('reg-b-plate-err')){$('reg-b-plate-err').style.display='none';this.style.borderColor='var(--border)';}" />
+          <div id="reg-b-plate-err" style="display:none;color:var(--danger,#DC2626);font-size:12px;font-weight:600;margin-top:4px"></div>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Year (Optional)</label>
+          <input id="reg-b-year" type="number" placeholder="e.g. 2024" style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box" />
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Make / Brand *</label>
+          <input id="reg-b-make" placeholder="e.g. Yamaha" style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box" />
+          <div id="reg-b-make-err" style="display:none;color:var(--danger,#DC2626);font-size:12px;font-weight:600;margin-top:4px">Make is required.</div>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Model *</label>
+          <input id="reg-b-model" placeholder="e.g. NMAX 155" style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box" />
+          <div id="reg-b-model-err" style="display:none;color:var(--danger,#DC2626);font-size:12px;font-weight:600;margin-top:4px">Model is required.</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:20px">
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Engine / Chassis No. (Optional)</label>
+        <input id="reg-b-engine" placeholder="Optional engine or chassis serial" style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box;font-family:ui-monospace,monospace" />
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button type="button" class="btn g" onclick="cm()">Cancel</button>
+        <button type="button" class="btn" onclick="saveRegisterVehicle()">Register Vehicle</button>
+      </div>
+    </div>
+  `);
+}
+
+function onRegBikeCustomerChange(val) {
+  const newFields = $("reg-b-new-cust-fields");
+  if (newFields) {
+    newFields.style.display = val === "__new__" ? "block" : "none";
+  }
+}
+
+/**
+ * Validates and registers a new motorcycle (and customer if inline new).
+ */
+function saveRegisterVehicle() {
+  let cid = v("reg-b-cid");
+  let custName = "";
+  if (cid === "__new__") {
+    const newName = (v("reg-new-c-name") || "").trim();
+    const newPhone = (v("reg-new-c-phone") || "").trim();
+    if (!newName) {
+      const err = $("reg-new-c-name-err");
+      if (err) err.style.display = "block";
+      const inp = $("reg-new-c-name");
+      if (inp) {
+        inp.style.borderColor = "var(--danger, #DC2626)";
+        inp.focus();
+      }
       return;
     }
     cid = uid();
-    D.cu.push({ id: cid, name: v("fn"), phone: v("fp") });
+    const newC = {
+      id: cid,
+      name: newName,
+      phone: newPhone,
+      joinedAt: today()
+    };
+    D.cu.push(newC);
+    custName = newName;
+    logAudit("Add customer", newName, "Customer profile created during vehicle registration");
+  } else {
+    const foundC = g("cu", cid);
+    custName = foundC ? foundC.name : "Customer";
   }
 
-  if (!v("fl") || !v("fm")) {
+  const plate = (v("reg-b-plate") || "").trim().toUpperCase();
+  const plateErr = $("reg-b-plate-err");
+  const plateInp = $("reg-b-plate");
+  if (!plate) {
+    if (plateErr) {
+      plateErr.textContent = "Plate number is required.";
+      plateErr.style.display = "block";
+    }
+    if (plateInp) {
+      plateInp.style.borderColor = "var(--danger, #DC2626)";
+      plateInp.focus();
+    }
     return;
   }
 
-  D.bk.push({
+  // Duplicate plate validation
+  const isDup = (Array.isArray(D.bk) ? D.bk : []).some((b) => !b.archived && (b.plate || "").toUpperCase() === plate);
+  if (isDup) {
+    if (plateErr) {
+      plateErr.textContent = "This plate number is already registered.";
+      plateErr.style.display = "block";
+    }
+    if (plateInp) {
+      plateInp.style.borderColor = "var(--danger, #DC2626)";
+      plateInp.focus();
+    }
+    return;
+  }
+
+  const make = (v("reg-b-make") || "").trim();
+  const model = (v("reg-b-model") || "").trim();
+  if (!make) {
+    const err = $("reg-b-make-err");
+    if (err) err.style.display = "block";
+    const inp = $("reg-b-make");
+    if (inp) {
+      inp.style.borderColor = "var(--danger, #DC2626)";
+      inp.focus();
+    }
+    return;
+  }
+  if (!model) {
+    const err = $("reg-b-model-err");
+    if (err) err.style.display = "block";
+    const inp = $("reg-b-model");
+    if (inp) {
+      inp.style.borderColor = "var(--danger, #DC2626)";
+      inp.focus();
+    }
+    return;
+  }
+
+  const yearVal = v("reg-b-year");
+  const engineVal = (v("reg-b-engine") || "").trim();
+
+  const newBike = {
     id: uid(),
     cid: cid,
-    make: v("fm"),
-    model: v("fo"),
-    year: +v("fy") || "",
-    plate: v("fl").toUpperCase()
-  });
+    plate: plate,
+    make: make,
+    model: model,
+    year: yearVal ? +yearVal : "",
+    engine: engineVal
+  };
 
-  logAudit("Add customer", v("fl").toUpperCase(), `${v("fn") || "Customer"} · ${v("fm")} ${v("fo")}`);
-
-  fin();
+  D.bk.push(newBike);
+  logAudit("Add motorcycle", plate, `${make} ${model} · Owner: ${custName}`);
+  save();
+  cm();
+  expandedCustIds.add(cid);
+  go("cust");
 }
 
 /**
- * Opens the Edit Motorcycle / Customer modal.
- * Locks the plate number as read-only for Admin if motorcycle has existing work orders.
+ * Opens the Edit Customer Profile modal.
+ * @param {string} cid - Customer ID.
+ */
+function openEditCustomerModal(cid) {
+  const c = g("cu", cid);
+  if (!c) return;
+
+  M(`
+    <div style="padding:10px 4px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:12px">
+        <h2 style="margin:0;font-size:18px;font-weight:700">Edit Customer Profile</h2>
+        <button type="button" class="search-clear visible" onclick="cm()" style="position:static" title="Close">✕</button>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Full Name *</label>
+        <input id="edit-c-name" value="${escHtml(c.name || "")}" style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box" />
+        <div id="edit-c-name-err" style="display:none;color:var(--danger,#DC2626);font-size:12px;font-weight:600;margin-top:4px">Full name is required.</div>
+      </div>
+
+      <div style="margin-bottom:20px">
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Phone Number</label>
+        <input id="edit-c-phone" value="${escHtml(c.phone || "")}" style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box;font-family:ui-monospace,monospace" />
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          ${isSuper() ? `
+            <button type="button" class="btn sm btn-destructive" onclick="deleteCustomer('${c.id}')">Delete Customer</button>
+          ` : ""}
+        </div>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn g" onclick="cm()">Cancel</button>
+          <button type="button" class="btn" onclick="saveEditCustomer('${c.id}')">Save Changes</button>
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+function saveEditCustomer(cid) {
+  const c = g("cu", cid);
+  if (!c) return;
+  const name = (v("edit-c-name") || "").trim();
+  const phone = (v("edit-c-phone") || "").trim();
+  if (!name) {
+    const err = $("edit-c-name-err");
+    if (err) err.style.display = "block";
+    const inp = $("edit-c-name");
+    if (inp) {
+      inp.style.borderColor = "var(--danger, #DC2626)";
+      inp.focus();
+    }
+    return;
+  }
+  c.name = name;
+  c.phone = phone;
+  logAudit("Edit customer", c.name, "Customer profile updated");
+  save();
+  cm();
+  go("cust");
+}
+
+function deleteCustomer(cid) {
+  if (!isSuper()) return;
+  const c = g("cu", cid);
+  if (!c) return;
+  const customerBikes = (Array.isArray(D.bk) ? D.bk : []).filter((b) => b.cid === cid);
+  const bikeIds = new Set(customerBikes.map((b) => b.id));
+  const hasWo = (Array.isArray(D.wo) ? D.wo : []).some((o) => o.cid === cid || bikeIds.has(o.bid));
+  const hasSales = (Array.isArray(D.sales) ? D.sales : []).some((s) => s.cid === cid);
+
+  if (hasWo || hasSales) {
+    askReason("Cannot Delete Customer", "OK", () => {}, {
+      description: "Has service history. It cannot be deleted.",
+      alertOnly: true
+    });
+    return;
+  }
+
+  askReason(`Delete Customer "${c.name}"`, "Delete Customer", (reason) => {
+    D.cu = (D.cu || []).filter((x) => x.id !== cid);
+    D.bk = (D.bk || []).filter((x) => x.cid !== cid);
+    logAudit("Delete customer", c.name, reason);
+    save();
+    cm();
+    go("cust");
+  });
+}
+
+/**
+ * Opens the Edit Motorcycle modal.
+ * Locks the plate number as read-only if motorcycle has existing work orders.
  * @param {string} bid - Motorcycle ID.
  */
 function openEditBikeModal(bid) {
@@ -4602,45 +4987,71 @@ function openEditBikeModal(bid) {
   const canEditPlate = isSuper() || !hasJobs;
 
   M(`
-    <h2>Edit Motorcycle / Customer</h2>
-    <div style="margin-bottom:12px">
-      <label>Owner Name</label>
-      <input id="edit-c-name" value="${escHtml(c ? c.name : "")}" style="width:100%;height:38px;padding:0 8px;margin-bottom:8px;border-radius:6px;border:1px solid var(--border)" />
-      <label>Owner Phone</label>
-      <input id="edit-c-phone" value="${escHtml(c ? c.phone : "")}" style="width:100%;height:38px;padding:0 8px;border-radius:6px;border:1px solid var(--border)" />
-    </div>
-    <div class="row" style="margin-bottom:12px">
-      <div>
-        <label>Make</label>
-        <input id="edit-b-make" value="${escHtml(b.make || "")}" style="width:100%;height:38px;padding:0 8px;border-radius:6px;border:1px solid var(--border)" />
+    <div style="padding:10px 4px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:12px">
+        <h2 style="margin:0;font-size:18px;font-weight:700">Edit Motorcycle</h2>
+        <button type="button" class="search-clear visible" onclick="cm()" style="position:static" title="Close">✕</button>
       </div>
-      <div>
-        <label>Model</label>
-        <input id="edit-b-model" value="${escHtml(b.model || "")}" style="width:100%;height:38px;padding:0 8px;border-radius:6px;border:1px solid var(--border)" />
+
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Owner</label>
+        <div style="font-size:14px;font-weight:600;color:var(--text);padding:8px 12px;background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px">
+          ${escHtml(c ? c.name : "Unassigned")} ${c && c.phone ? `<span style="font-weight:400;color:var(--text-muted);margin-left:6px">(${escHtml(c.phone)})</span>` : ""}
+        </div>
       </div>
-      <div>
-        <label>Year</label>
-        <input id="edit-b-year" type="number" value="${b.year || ""}" style="width:100%;height:38px;padding:0 8px;border-radius:6px;border:1px solid var(--border)" />
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Make / Brand *</label>
+          <input id="edit-b-make" value="${escHtml(b.make || "")}" style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box" />
+          <div id="edit-b-make-err" style="display:none;color:var(--danger,#DC2626);font-size:12px;font-weight:600;margin-top:4px">Make is required.</div>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Model *</label>
+          <input id="edit-b-model" value="${escHtml(b.model || "")}" style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box" />
+          <div id="edit-b-model-err" style="display:none;color:var(--danger,#DC2626);font-size:12px;font-weight:600;margin-top:4px">Model is required.</div>
+        </div>
       </div>
-    </div>
-    <div style="margin-bottom:12px">
-      <label>Plate Number</label>
-      <input
-        id="edit-b-plate"
-        value="${escHtml(b.plate || "")}"
-        ${!canEditPlate ? "readonly disabled style='width:100%;height:38px;padding:0 8px;background:var(--bg-surface-alt, #F8FAFC);color:var(--text-muted);border-radius:6px;border:1px solid var(--border)'" : "style='width:100%;height:38px;padding:0 8px;border-radius:6px;border:1px solid var(--border)'"}
-      />
-      ${!canEditPlate ? `<small style="display:block;color:var(--text-muted);margin-top:4px;font-style:italic">Plate is locked after the first job.</small>` : ""}
-    </div>
-    <div style="display:flex;justify-content:flex-end;gap:8px">
-      <button type="button" class="btn g" onclick="cm()">Cancel</button>
-      <button type="button" class="btn" onclick="saveEditBike('${b.id}')">Save Changes</button>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Plate Number *</label>
+          <input
+            id="edit-b-plate"
+            value="${escHtml(b.plate || "")}"
+            ${!canEditPlate ? "readonly disabled style='width:100%;height:40px;padding:0 10px;background:var(--bg-subtle);color:var(--text-muted);border-radius:8px;border:1px solid var(--border);font-family:ui-monospace,monospace;box-sizing:border-box'" : "style='width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-family:ui-monospace,monospace;box-sizing:border-box'"}
+          />
+          ${!canEditPlate ? `<small style="display:block;color:var(--text-muted);margin-top:4px;font-style:italic">Plate is locked after the first job.</small>` : ""}
+          <div id="edit-b-plate-err" style="display:none;color:var(--danger,#DC2626);font-size:12px;font-weight:600;margin-top:4px"></div>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Year (Optional)</label>
+          <input id="edit-b-year" type="number" value="${b.year || ""}" style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box" />
+        </div>
+      </div>
+
+      <div style="margin-bottom:20px">
+        <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Engine / Chassis No. (Optional)</label>
+        <input id="edit-b-engine" value="${escHtml(b.engine || "")}" placeholder="Optional engine or chassis serial" style="width:100%;height:40px;padding:0 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;box-sizing:border-box;font-family:ui-monospace,monospace" />
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          ${isSuper() ? `
+            <button type="button" class="btn sm btn-destructive" onclick="deleteBike('${b.id}')">Delete Motorcycle</button>
+          ` : ""}
+        </div>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn g" onclick="cm()">Cancel</button>
+          <button type="button" class="btn" onclick="saveEditBike('${b.id}')">Save Changes</button>
+        </div>
+      </div>
     </div>
   `);
 }
 
 /**
- * Saves edits to motorcycle and owner records.
+ * Saves edits to motorcycle records.
  * Prompts for audit reason if Super Admin changed a locked plate number.
  * @param {string} bid - Motorcycle ID.
  */
@@ -4652,15 +5063,43 @@ function saveEditBike(bid) {
   const newPlate = (v("edit-b-plate") || "").trim().toUpperCase();
   const hasJobs = (Array.isArray(D.wo) ? D.wo : []).some((o) => o.bid === b.id);
 
-  if (c) {
-    c.name = v("edit-c-name") || c.name;
-    c.phone = v("edit-c-phone") || c.phone;
+  const make = (v("edit-b-make") || "").trim();
+  const model = (v("edit-b-model") || "").trim();
+  if (!make) {
+    const err = $("edit-b-make-err");
+    if (err) err.style.display = "block";
+    const inp = $("edit-b-make");
+    if (inp) {
+      inp.style.borderColor = "var(--danger, #DC2626)";
+      inp.focus();
+    }
+    return;
   }
-  b.make = v("edit-b-make") || b.make;
-  b.model = v("edit-b-model") || b.model;
-  b.year = +v("edit-b-year") || b.year;
+  if (!model) {
+    const err = $("edit-b-model-err");
+    if (err) err.style.display = "block";
+    const inp = $("edit-b-model");
+    if (inp) {
+      inp.style.borderColor = "var(--danger, #DC2626)";
+      inp.focus();
+    }
+    return;
+  }
+  b.make = make;
+  b.model = model;
+  b.year = +v("edit-b-year") || "";
+  b.engine = (v("edit-b-engine") || "").trim();
 
   if (newPlate && newPlate !== oldPlate) {
+    const isDup = (Array.isArray(D.bk) ? D.bk : []).some((x) => x.id !== b.id && !x.archived && (x.plate || "").toUpperCase() === newPlate);
+    if (isDup) {
+      const err = $("edit-b-plate-err");
+      if (err) {
+        err.textContent = "This plate number is already registered.";
+        err.style.display = "block";
+      }
+      return;
+    }
     if (hasJobs) {
       if (!isSuper()) {
         cm();
@@ -4687,42 +5126,6 @@ function saveEditBike(bid) {
 }
 
 /**
- * Soft deletes / archives a motorcycle record with required reason (Super Admin only).
- * @param {string} bid - Motorcycle ID.
- */
-function archiveBike(bid) {
-  if (!isSuper()) return;
-  const b = g("bk", bid);
-  if (!b) return;
-  askReason(`Archive Motorcycle ${b.plate}`, "Archive", (reason) => {
-    b.archived = true;
-    b.archivedAt = nowLocalTimestamp();
-    b.archivedReason = reason;
-    const u = getCurrentUser();
-    b.archivedBy = u ? u.name : "Super Admin";
-    logAudit("Archive motorcycle", b.plate, reason);
-    save();
-    go("cust");
-  }, { description: "Archived records are hidden from lists, intake, and search, but remain attached to past work orders." });
-}
-
-/**
- * Restores an archived motorcycle record (Super Admin only).
- * @param {string} bid - Motorcycle ID.
- */
-function restoreBike(bid) {
-  if (!isSuper()) return;
-  const b = g("bk", bid);
-  if (!b) return;
-  b.archived = false;
-  delete b.archivedAt;
-  delete b.archivedBy;
-  logAudit("Restore motorcycle", b.plate, "Restored");
-  save();
-  go("cust");
-}
-
-/**
  * Hard deletes a motorcycle record if it has NO history; refuses otherwise (Super Admin only).
  * @param {string} bid - Motorcycle ID.
  */
@@ -4733,8 +5136,8 @@ function deleteBike(bid) {
   const hasHistory = (Array.isArray(D.wo) ? D.wo : []).some((o) => o.bid === b.id);
   if (hasHistory) {
     askReason("Cannot Delete Motorcycle", "OK", () => {}, {
-      description: "Has service history. Archive it instead.",
-      destructive: false
+      description: "Has service history. It cannot be deleted.",
+      alertOnly: true
     });
     return;
   }
@@ -4742,8 +5145,23 @@ function deleteBike(bid) {
     D.bk = (D.bk || []).filter((x) => x.id !== b.id);
     logAudit("Delete motorcycle", b.plate, reason);
     save();
+    cm();
     go("cust");
   });
+}
+
+/**
+ * Legacy alias for vehicle registration.
+ */
+function mCust() {
+  openRegisterVehicleModal();
+}
+
+/**
+ * Legacy alias for adding customer/vehicle.
+ */
+function addC() {
+  saveRegisterVehicle();
 }
 
 /**

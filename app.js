@@ -686,6 +686,7 @@ const AUDIT_CATEGORIES = {
   // Action text -> Category mappings
   "Job created":               "Jobs",
   "Status moved":              "Jobs",
+  "Marked by":                 "Jobs",
   "Assign mechanic":           "Jobs",
   "Item added":                "Jobs",
   "Extra item added":          "Jobs",
@@ -768,9 +769,6 @@ function logAudit(action, ref, note, customCat) {
   try {
     const u = getCurrentUser();
     const role = u ? (u.activeRole || u.role) : "";
-    if (role === "superadmin" || isSuper()) {
-      return;
-    }
     if (!Array.isArray(D.audit)) D.audit = [];
     const actionStr = String(action || "");
     const cat = customCat || getAuditCategory(actionStr);
@@ -879,6 +877,27 @@ function submitReason() {
 function isCountableJob(o) {
   if (!o) return false;
   if (o.reversed || o.st === "Cancelled" || o.cancel) return false;
+  return true;
+}
+
+/**
+ * Checks whether an order object represents a Quick Labor record.
+ * @param {object} o
+ * @returns {boolean}
+ */
+function isQuickLaborRecord(o) {
+  if (!o) return false;
+  return o.type === "quicklabor" || o.type === "QUICK LABOR";
+}
+
+/**
+ * Checks whether a Quick Labor record is countable (not reversed, cancelled, or void).
+ * @param {object} o
+ * @returns {boolean}
+ */
+function isCountableQuickLabor(o) {
+  if (!isQuickLaborRecord(o)) return false;
+  if (o.reversed || o.void || o.cancel || o.st === "Cancelled") return false;
   return true;
 }
 
@@ -2343,7 +2362,7 @@ function tbl(L, full) {
           <tr>
             <th>PLATE NO.</th>
             <th>STATUS</th>
-            <th>DONE BY</th>
+            <th>MARKED BY</th>
             <th>SERVICES</th>
             <th class="r">TOTAL</th>
             <th></th>
@@ -2893,7 +2912,7 @@ function renderRepCard(o) {
       <div class="rep-card-divider"></div>
       <div class="rep-card-body">
         <div class="rep-card-row">
-          <span class="rep-card-label">DONE BY</span>
+          <span class="rep-card-label">MARKED BY</span>
           <span class="rep-card-val">${mechName}</span>
         </div>
         <div class="rep-card-row">
@@ -3263,7 +3282,7 @@ function getHisResultsHtml() {
         <tr>
           <th>COMPLETION DATE &amp; TIME</th>
           <th>VEHICLE &amp; CUSTOMER INFO</th>
-          <th>DONE BY</th>
+          <th>MARKED BY</th>
           <th>PRIMARY ISSUE / DIAGNOSIS</th>
           <th class="r">TOTAL COST (₱)</th>
           <th class="r">ACTIONS</th>
@@ -3766,7 +3785,6 @@ const R = {
    * @returns {string} HTML string.
    */
   ql() {
-    initDefaultQuickLaborMech();
     return getQuickLaborViewHtml();
   },
 
@@ -3777,7 +3795,6 @@ const R = {
    * @returns {string} HTML string.
    */
   qlabor() {
-    initDefaultQuickLaborMech();
     return getQuickLaborViewHtml();
   },
 
@@ -4160,7 +4177,7 @@ function exportHisCsv() {
     "Motorcycle",
     "Customer Name",
     "Customer Phone",
-    "Done By",
+    "Marked By",
     "Services",
     "Notes",
     "Total Cost"
@@ -4323,7 +4340,7 @@ function openRecord(id) {
         <div style="font-size:11px;color:var(--text-muted)">${formatJobTime(dateVal)}</div>
       </div>
       <div>
-        <div class="rec-field-label">Done by</div>
+        <div class="rec-field-label">Marked by</div>
         <div class="rec-field-val">${(o.mech && o.mech !== "Unassigned") ? escHtml(o.mech) : "-"}</div>
       </div>
     </div>
@@ -4406,7 +4423,7 @@ function openRecord(id) {
             </div>
             <div class="rec-tl-body">
               <div><b>Services:</b> ${wSvcs || "—"}</div>
-              <div><b>Done by:</b> ${(w.mech && w.mech !== "Unassigned") ? escHtml(w.mech) : "-"}</div>
+              <div><b>Marked by:</b> ${(w.mech && w.mech !== "Unassigned") ? escHtml(w.mech) : "-"}</div>
               ${w.note ? `<div><b>Notes:</b> ${w.note}</div>` : ""}
             </div>
           </div>
@@ -6441,11 +6458,13 @@ function setJobCardStatus(woId, newStatus) {
 
   const oldStatus = o.st;
   o.st = newStatus;
-  // Auto-stamp active mechanic into wo.mech on Repair Done -> Checking (overwrites earlier name); Admins do not overwrite
+  // Auto-stamp active logged-in user into wo.mech on Repair Done -> Checking (overwrites earlier value, any role)
   if (newStatus === "Checking" && oldStatus === "In Progress") {
     const u = getCurrentUser();
-    if (u && u.activeRole === "mechanic") {
-      o.mech = u.name;
+    const activeName = (u && u.name) ? u.name.trim() : "Staff";
+    o.mech = activeName;
+    if (typeof logAudit === "function") {
+      logAudit("Marked by", o.id, activeName, "Jobs");
     }
   }
   logAudit("Status moved", o.id, `${oldStatus} -> ${newStatus}`);
@@ -6642,7 +6661,7 @@ function renderInspModal(id) {
             <span class="jc-info-val">${formatJobDate(o.at)}</span>
           </div>
           <div class="jc-info-item">
-            <span class="jc-info-label">Done by</span>
+            <span class="jc-info-label">Marked by</span>
             <span class="jc-info-val">${escHtml((o.mech && o.mech !== "Unassigned") ? o.mech : "-")}</span>
           </div>
           <div class="jc-info-item">
@@ -10918,10 +10937,14 @@ function startRepairFromAwaiting(woId) {
 
   const oldSt = o.st;
   o.st = "In Progress";
-  // Auto-stamp active mechanic into wo.mech on Start Repair only if empty; Admins do not overwrite
+  // Auto-stamp active logged-in user into wo.mech on Start Repair only if empty (any role)
   const u = getCurrentUser();
-  if (u && u.activeRole === "mechanic" && (!o.mech || o.mech === "Unassigned")) {
-    o.mech = u.name;
+  const activeName = (u && u.name) ? u.name.trim() : "Staff";
+  if (!o.mech || o.mech === "Unassigned") {
+    o.mech = activeName;
+    if (typeof logAudit === "function") {
+      logAudit("Marked by", o.id, activeName, "Jobs");
+    }
   }
   logAudit("Status moved", o.id, `${oldSt} -> In Progress`);
   o.approved = true;
@@ -12320,7 +12343,7 @@ function getBillResultsHtml() {
                     <b>${c ? escHtml(c.name) : (o.customer ? escHtml(o.customer) : "Walk-in Customer")}</b>
                     <div style="font-size:12px;color:var(--text-secondary)">${c && c.phone ? escHtml(c.phone) : "—"}</div>
                     <div style="font-size:12px;font-weight:600;margin-top:2px">${b ? escHtml(b.plate) : (o.vehicleLine ? escHtml(o.vehicleLine) : "Walk-in Motorcycle")}${b ? ` · ${escHtml(b.make + " " + b.model)}` : ""}</div>
-                    ${(o.mech && o.mech !== "Unassigned") ? `<div style="font-size:11px;color:var(--text-muted)">Done by: ${escHtml(o.mech)}</div>` : ""}
+                    ${(o.mech && o.mech !== "Unassigned") ? `<div style="font-size:11px;color:var(--text-muted)">Marked by: ${escHtml(o.mech)}</div>` : ""}
                   </td>
                   <td>
                     <div style="font-weight:700;font-size:14px">${P(brk.total)} <span style="font-size:11px;font-weight:500;color:var(--text-muted)">${totalLabel}</span></div>
@@ -12967,7 +12990,7 @@ function openReceipt(woId) {
         <div style="color:var(--text-secondary)">${b ? escHtml(b.make + " " + b.model) : ""}</div>
       </div>
       <div>
-        <div style="color:var(--text-muted);font-weight:600">DONE BY</div>
+        <div style="color:var(--text-muted);font-weight:600">MARKED BY</div>
         <div style="font-weight:700;color:var(--text-primary)">${escHtml((o.mech && o.mech !== "Unassigned") ? o.mech : "-")}</div>
       </div>
       <div>
@@ -13983,6 +14006,18 @@ function getPeriodPartsCost(period = reportPeriod) {
     }
   });
 
+  // 3. Quick Labor parts (matched by catalog costPrice by name)
+  (metrics.quickLaborRecords || []).forEach((o) => {
+    const orderLines = lines(o);
+    orderLines.forEach((l) => {
+      if (l.kind === "part" && l.src !== "own") {
+        const itemCost = getCatalogItemCost(l.rawName || l.n || l.name);
+        const qty = Math.max(1, Number(l.qty) || 1);
+        totalCost += (qty * itemCost);
+      }
+    });
+  });
+
   return totalCost;
 }
 
@@ -14018,8 +14053,16 @@ function updateMechanicCommissionRate(mechName, newRate) {
   activeMechs.forEach((m) => {
     const mName = m.name.trim();
     const compJobs = metrics.completedJobs.filter((o) => o.mech && o.mech.trim().toLowerCase() === mName.toLowerCase());
+    const compQl = (metrics.quickLaborRecords || []).filter((o) => o.mech && o.mech.trim().toLowerCase() === mName.toLowerCase());
     let laborRev = 0;
     compJobs.forEach((o) => {
+      lines(o).forEach((l) => {
+        if (l.kind === "labor") {
+          laborRev += (l.a || 0);
+        }
+      });
+    });
+    compQl.forEach((o) => {
       lines(o).forEach((l) => {
         if (l.kind === "labor") {
           laborRev += (l.a || 0);
@@ -14043,39 +14086,65 @@ function updateMechanicCommissionRate(mechName, newRate) {
 
 /**
  * Computes performance metrics for the active report period.
- * Ignores reversed and cancelled jobs.
+ * Ignores reversed, cancelled, and void records.
+ * Incorporates job orders, Quick Sales, and Quick Labor records.
  * @param {string} period - Active filter period.
  * @returns {Object} Calculated metrics.
  */
 function getReportMetrics(period = reportPeriod) {
-  const completedInPeriod = D.wo.filter((o) => isCountableJob(o) && o.st === "Completed" && inDateRange(o.done || o.at, period));
+  const completedJobs = (Array.isArray(D.wo) ? D.wo : []).filter(
+    (o) => isCountableJob(o) && !isQuickLaborRecord(o) && o.st === "Completed" && inDateRange(o.done || o.at, period)
+  );
 
-  let revenue = 0;
-  let labor = 0;
-  let parts = 0;
+  const quickLaborInPeriod = (Array.isArray(D.wo) ? D.wo : []).filter(
+    (o) => isCountableQuickLabor(o) && inDateRange(o.doneAt || o.done || o.markedAt || o.at || "", period)
+  );
 
-  completedInPeriod.forEach((o) => {
-    revenue += total(o);
+  let jobRevenue = 0;
+  let jobLabor = 0;
+  let jobParts = 0;
+
+  completedJobs.forEach((o) => {
+    jobRevenue += total(o);
     const orderLines = lines(o);
     orderLines.forEach((l) => {
       if (l.kind === "labor") {
-        labor += (l.a || 0);
+        jobLabor += (l.a || 0);
       } else if (l.kind === "part") {
-        parts += (l.a || 0);
+        jobParts += (l.a || 0);
       }
     });
   });
 
-  const completedCount = completedInPeriod.length;
-  const avgValue = completedCount > 0 ? (revenue / completedCount) : 0;
+  let qlRevenue = 0;
+  let qlLabor = 0;
+  let qlParts = 0;
+
+  quickLaborInPeriod.forEach((o) => {
+    qlRevenue += (Number(o.total) || total(o) || 0);
+    const orderLines = lines(o);
+    orderLines.forEach((l) => {
+      if (l.kind === "labor") {
+        qlLabor += (l.a || 0);
+      } else if (l.kind === "part") {
+        qlParts += (l.a || 0);
+      }
+    });
+  });
+
+  const jobsCompletedCount = completedJobs.length;
+  const avgJobValue = jobsCompletedCount > 0 ? (jobRevenue / jobsCompletedCount) : 0;
 
   return {
-    revenue,
-    labor,
-    parts,
-    completed: completedCount,
-    avgValue,
-    completedJobs: completedInPeriod
+    revenue: jobRevenue + qlRevenue,
+    labor: jobLabor + qlLabor,
+    parts: jobParts + qlParts,
+    completed: jobsCompletedCount,
+    avgValue: avgJobValue,
+    completedJobs: completedJobs,
+    quickLaborRecords: quickLaborInPeriod,
+    quickLaborTotal: qlRevenue,
+    quickLaborCount: quickLaborInPeriod.length
   };
 }
 
@@ -14106,6 +14175,8 @@ function exportReportCsv() {
     ["Parts Billed (PHP)", metrics.parts],
     ["Quick Sales Total", posSalesTotal],
     ["Quick Sales Count", posSalesCount],
+    ["Quick Labor Total", metrics.quickLaborTotal],
+    ["Quick Labor Count", metrics.quickLaborCount],
     ["Jobs Completed", metrics.completed],
     ["Average Job Value (PHP)", Math.round(metrics.avgValue)]
   ];
@@ -14125,8 +14196,16 @@ function exportReportCsv() {
     activeMechs.forEach((m) => {
       const mName = m.name.trim();
       const compJobs = metrics.completedJobs.filter((o) => o.mech && o.mech.trim().toLowerCase() === mName.toLowerCase());
+      const compQl = (metrics.quickLaborRecords || []).filter((o) => o.mech && o.mech.trim().toLowerCase() === mName.toLowerCase());
       let laborRev = 0;
       compJobs.forEach((o) => {
+        lines(o).forEach((l) => {
+          if (l.kind === "labor") {
+            laborRev += (l.a || 0);
+          }
+        });
+      });
+      compQl.forEach((o) => {
         lines(o).forEach((l) => {
           if (l.kind === "labor") {
             laborRev += (l.a || 0);
@@ -14154,7 +14233,7 @@ function exportReportCsv() {
     "Motorcycle",
     "Customer Name",
     "Customer Phone",
-    "Done By",
+    "Marked By",
     "Services",
     "Total Cost (PHP)"
   ];
@@ -14223,20 +14302,31 @@ function getReportResultsHtml() {
   // 1. Staff Performance calculation
   const users = loadUsers();
   const activeMechs = users.filter((u) => u.role === "mechanic" && u.active !== false);
+  const qlRecords = Array.isArray(metrics.quickLaborRecords) ? metrics.quickLaborRecords : [];
+
   const mechRows = activeMechs.map((m) => {
     const mName = m.name.trim();
     const compJobs = metrics.completedJobs.filter((o) => o.mech && o.mech.trim().toLowerCase() === mName.toLowerCase());
-    const rev = compJobs.reduce((sum, o) => sum + total(o), 0);
-    return { name: mName, completed: compJobs.length, revenue: rev };
+    const compQl = qlRecords.filter((o) => o.mech && o.mech.trim().toLowerCase() === mName.toLowerCase());
+    const jobRev = compJobs.reduce((sum, o) => sum + total(o), 0);
+    const qlRev = compQl.reduce((sum, o) => sum + (Number(o.total) || total(o) || 0), 0);
+    return {
+      name: mName,
+      completed: compJobs.length + compQl.length,
+      revenue: jobRev + qlRev
+    };
   });
 
   // Not recorded row
   const unassignedCompJobs = metrics.completedJobs.filter((o) => !o.mech || !o.mech.trim() || o.mech.trim().toLowerCase() === "unassigned");
-  const unassignedRev = unassignedCompJobs.reduce((sum, o) => sum + total(o), 0);
+  const unassignedQl = qlRecords.filter((o) => !o.mech || !o.mech.trim() || o.mech.trim().toLowerCase() === "unassigned");
+  const unassignedJobRev = unassignedCompJobs.reduce((sum, o) => sum + total(o), 0);
+  const unassignedQlRev = unassignedQl.reduce((sum, o) => sum + (Number(o.total) || total(o) || 0), 0);
+
   mechRows.push({
     name: "Not recorded",
-    completed: unassignedCompJobs.length,
-    revenue: unassignedRev
+    completed: unassignedCompJobs.length + unassignedQl.length,
+    revenue: unassignedJobRev + unassignedQlRev
   });
 
   mechRows.sort((a, b) => b.completed - a.completed || b.revenue - a.revenue);
@@ -14299,8 +14389,16 @@ function getReportResultsHtml() {
     const commRows = activeMechs.map((m) => {
       const mName = m.name.trim();
       const compJobs = metrics.completedJobs.filter((o) => o.mech && o.mech.trim().toLowerCase() === mName.toLowerCase());
+      const compQl = (metrics.quickLaborRecords || []).filter((o) => o.mech && o.mech.trim().toLowerCase() === mName.toLowerCase());
       let laborRev = 0;
       compJobs.forEach((o) => {
+        lines(o).forEach((l) => {
+          if (l.kind === "labor") {
+            laborRev += (l.a || 0);
+          }
+        });
+      });
+      compQl.forEach((o) => {
         lines(o).forEach((l) => {
           if (l.kind === "labor") {
             laborRev += (l.a || 0);
@@ -14382,6 +14480,7 @@ function getReportResultsHtml() {
       ${stat(LINE_ICONS.rep, "", "LABOR EARNINGS", P(metrics.labor), "From services")}
       ${stat(LINE_ICONS.cat, "", "PARTS BILLED", P(metrics.parts), "From items/fluids")}
       ${stat(LINE_ICONS.pos, "", "QUICK SALES", P(posSalesTotal), `${posSalesCount} sale${posSalesCount === 1 ? "" : "s"}`)}
+      ${stat(LINE_ICONS.ql, "", "QUICK LABOR", P(metrics.quickLaborTotal), `${metrics.quickLaborCount} record${metrics.quickLaborCount === 1 ? "" : "s"}`)}
       ${stat(ICONS.checkCircle, "", "JOBS COMPLETED", metrics.completed, "In period")}
       ${stat(LINE_ICONS.reports, "", "AVERAGE JOB VALUE", P(Math.round(metrics.avgValue)), "Per completed job")}
     </div>
@@ -14396,7 +14495,7 @@ function getReportResultsHtml() {
             <table>
               <thead>
                 <tr>
-                  <th>DONE BY</th>
+                  <th>Marked by</th>
                   <th>JOBS COMPLETED</th>
                   <th class="r">REVENUE</th>
                 </tr>
@@ -16513,20 +16612,14 @@ let qlJobType = "labor";
 let qlLaborOnlyConfirmActive = false;
 let qlLaborOnlyConfirmTimer = null;
 
-/** Mechanic name selected in Step 1 "Who did the work". */
-let quickLaborMech = "";
-
-/** Error display flag for Step 1 when user attempts to record without mechanic. */
-let quickLaborStep1Err = false;
-
-/** Search queries for Step 2 (labor) and Step 3 (parts). */
+/** Search queries for Step 1 (labor) and Step 2 (parts). */
 let quickLaborSearchLabor = "";
 let quickLaborSearchPart = "";
 
 /** Optional Customer or bike plate string. */
 let quickLaborCustomer = "";
 
-/** Checkbox state for "Work is finished" in Step 4 and Summary panel. */
+/** Checkbox state for "Work is finished" in Step 3/4 and Summary panel. */
 let qlWorkFinished = false;
 
 /** Payment method: "Cash" | "GCash" | "Maya". */
@@ -16547,19 +16640,7 @@ let quickLaborCustomLaborOpen = false;
 let quickLaborCustomPartOpen = false;
 
 /**
- * Initializes default mechanic from logged-in user if their role is mechanic.
- */
-function initDefaultQuickLaborMech() {
-  const u = typeof getCurrentUser === "function" ? getCurrentUser() : null;
-  if (u && u.role === "mechanic") {
-    quickLaborMech = u.name;
-  } else if (!quickLaborMech) {
-    quickLaborMech = "";
-  }
-}
-
-/**
- * Resets all Quick Labor working state to Step 1 defaults.
+ * Resets all Quick Labor working state to defaults.
  */
 function resetQuickLaborState() {
   quickLaborCart = [];
@@ -16577,17 +16658,6 @@ function resetQuickLaborState() {
   if (quickLaborClearConfirmTimer) clearTimeout(quickLaborClearConfirmTimer);
   quickLaborCustomLaborOpen = false;
   quickLaborCustomPartOpen = false;
-  quickLaborStep1Err = false;
-  initDefaultQuickLaborMech();
-}
-
-/**
- * Returns active mechanics list loaded from moto1_users.
- * @returns {Array<Object>} Active mechanic user records.
- */
-function getActiveMechanics() {
-  const users = typeof loadUsers === "function" ? loadUsers() : [];
-  return users.filter((u) => u.role === "mechanic" && u.active !== false);
 }
 
 /**
@@ -16746,65 +16816,6 @@ function renderQuickLaborTypeBar() {
   if (barWrap) barWrap.innerHTML = getQuickLaborTypeBarHtml();
 }
 
-/**
- * Sets selected mechanic in Step 1.
- * @param {string} mech - Mechanic name.
- */
-function setQuickLaborMech(mech) {
-  quickLaborMech = mech || "";
-  quickLaborStep1Err = false;
-  renderQuickLaborStep1();
-  renderQuickLaborRightPanel();
-}
-
-/**
- * Generates HTML for Step 1 card.
- * @returns {string} HTML string.
- */
-function getQuickLaborStep1Html() {
-  const isDone = Boolean(quickLaborMech && quickLaborMech.trim());
-  const activeMechs = getActiveMechanics();
-  const u = typeof getCurrentUser === "function" ? getCurrentUser() : null;
-  const isMechanic = u && u.role === "mechanic";
-  const canChangeMech = (typeof isSuper === "function" && isSuper()) || (typeof isAdmin === "function" && isAdmin());
-
-  return `
-    <div class="ql-step-card" id="ql-step-1">
-      <div class="ql-step-header">
-        <div class="ql-step-badge ${isDone ? 'done' : 'active'}">${isDone ? '✓' : '1'}</div>
-        <div>
-          <div class="ql-step-title">Who did the work</div>
-          <div class="ql-step-subtitle">Handled by active mechanic (required)</div>
-        </div>
-      </div>
-      <div>
-        <select
-          id="ql-mech-select"
-          class="his-select"
-          ${(!canChangeMech && isMechanic) ? "disabled" : ""}
-          style="width:100%;height:44px;font-size:14px;border:1px solid ${quickLaborStep1Err && !isDone ? 'var(--danger, #DC2626)' : 'var(--border)'};border-radius:8px;background:var(--bg-surface);color:var(--text);padding:0 12px"
-          onchange="setQuickLaborMech(this.value)"
-        >
-          <option value="">Select mechanic...</option>
-          ${activeMechs.map((m) => `<option value="${escHtml(m.name)}" ${quickLaborMech === m.name ? "selected" : ""}>${escHtml(m.name)}</option>`).join("")}
-        </select>
-        ${
-          quickLaborStep1Err && !isDone
-            ? `<div id="ql-mech-err" style="color:var(--danger, #DC2626);font-size:12px;font-weight:600;margin-top:6px">Choose who did the work.</div>`
-            : ""
-        }
-      </div>
-    </div>
-  `;
-}
-
-/**
- * Re-renders only the Step 1 card.
- */
-function renderQuickLaborStep1() {
-  const card = $("ql-step-1-wrap");
-  if (card) card.innerHTML = getQuickLaborStep1Html();
-}
 
 /**
  * Retrieves catalog labor items matching active Step 2 search query.
@@ -17010,7 +17021,7 @@ function renderQuickLaborStep2Badge() {
   const isDone = quickLaborCart.some((it) => it.kind === "labor");
   if (badge) {
     badge.className = `ql-step-badge ${isDone ? "done" : "active"}`;
-    badge.textContent = isDone ? "✓" : "2";
+    badge.textContent = isDone ? "✓" : "1";
   }
 }
 
@@ -17228,10 +17239,9 @@ function renderQuickLaborChosenParts() {
 function renderQuickLaborStep3Badge() {
   const badge = $("ql-step-3-badge");
   const isDone = quickLaborCart.some((it) => it.kind === "part");
-  const stepNum = qlJobType === "fix" ? "3" : "2";
   if (badge) {
     badge.className = `ql-step-badge ${isDone ? "done" : "active"}`;
-    badge.textContent = isDone ? "✓" : stepNum;
+    badge.textContent = isDone ? "✓" : "2";
   }
 }
 
@@ -17529,7 +17539,7 @@ function setQuickLaborWorkFinished(checked) {
  */
 function renderQuickLaborStep4Badge() {
   const badge = $("ql-step-4-badge");
-  const stepNum = qlJobType === "laborparts" ? "4" : "3";
+  const stepNum = qlJobType === "laborparts" ? "3" : "2";
   if (badge) {
     badge.className = `ql-step-badge ${qlWorkFinished ? "done" : "active"}`;
     badge.textContent = qlWorkFinished ? "✓" : stepNum;
@@ -17553,17 +17563,13 @@ function getQuickLaborCashCalcHtml(total, tendered) {
 /**
  * Computes disabled reason text for the Record Quick Fix button.
  * Reasons (checked in priority order):
- * 1. "Select who did the work"
- * 2. "Add at least one labor"
- * 3. "Add at least one part" (Labor + Parts only)
- * 4. "Confirm the work is finished"
+ * 1. "Add at least one labor"
+ * 2. "Add at least one part" (Labor + Parts only)
+ * 3. "Confirm the work is finished"
  * @param {number} total - Grand total.
  * @returns {string} Reason string or empty if enabled.
  */
 function getQuickLaborRecordReason(total = getQuickLaborTotal()) {
-  if (!quickLaborMech || !quickLaborMech.trim()) {
-    return "Select who did the work";
-  }
   if (!quickLaborCart.some((it) => it.kind === "labor")) {
     return "Add at least one labor";
   }
@@ -17708,21 +17714,7 @@ function updateQuickLaborMobileBar() {
 function recordQuickFix() {
   const total = getQuickLaborTotal();
 
-  // Validate Step 1: mechanic required
-  if (!quickLaborMech || !quickLaborMech.trim()) {
-    quickLaborStep1Err = true;
-    renderQuickLaborStep1();
-    const sel = $("ql-mech-select");
-    if (sel) {
-      sel.focus();
-      if (typeof sel.scrollIntoView === "function") {
-        sel.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-    }
-    return;
-  }
-
-  // Validate all other conditions
+  // Validate all conditions
   const reason = getQuickLaborRecordReason(total);
   if (reason) return;
 
@@ -17761,6 +17753,9 @@ function recordQuickFix() {
   const laborSubtotal = getQuickLaborLaborSubtotal();
   const partsSubtotal = qlJobType === "laborparts" ? getQuickLaborPartsSubtotal() : 0;
 
+  const curUser = typeof getCurrentUser === "function" ? getCurrentUser() : null;
+  const activeName = (curUser && curUser.name && curUser.name.trim()) ? curUser.name.trim() : "Staff";
+
   const newFix = {
     id: "w" + uid(),
     no: txnId,
@@ -17770,10 +17765,11 @@ function recordQuickFix() {
     st: "Completed",
     done: nowLocalString(),
     doneAt: nowLocalString(),
+    markedAt: nowLocalString(),
     at: today(),
     customer: (quickLaborCustomer && quickLaborCustomer.trim()) ? quickLaborCustomer.trim() : "Walk-in Customer",
     vehicleLine: (quickLaborCustomer && quickLaborCustomer.trim()) ? quickLaborCustomer.trim() : "Walk-in Motorcycle",
-    mech: quickLaborMech.trim(),
+    mech: activeName,
     items: items,
     laborSubtotal: laborSubtotal,
     partsSubtotal: partsSubtotal,
@@ -17789,7 +17785,8 @@ function recordQuickFix() {
 
   if (!Array.isArray(D.wo)) D.wo = [];
   D.wo.push(newFix);
-  logAudit("Quick labor recorded", newFix.no, `${P(newFix.total)} · ${newFix.mech} (${items.length} items)`);
+  logAudit("Marked by", newFix.no, activeName, "Quick Labor");
+  logAudit("Quick labor recorded", newFix.no, `${P(newFix.total)} · ${newFix.mech} (${items.length} items)`, "Quick Labor");
   save();
 
   // Log price overrides to audit trail
@@ -17799,7 +17796,7 @@ function recordQuickFix() {
     }
   });
 
-  // Reset page state to Step 1
+  // Reset page state
   quickLaborCart = [];
   quickLaborCustomer = "";
   qlWorkFinished = false;
@@ -17809,10 +17806,6 @@ function recordQuickFix() {
   if (quickLaborClearConfirmTimer) clearTimeout(quickLaborClearConfirmTimer);
   qlLaborOnlyConfirmActive = false;
   if (qlLaborOnlyConfirmTimer) clearTimeout(qlLaborOnlyConfirmTimer);
-  quickLaborStep1Err = false;
-
-  // If logged in as mechanic, keep their name preselected; otherwise reset
-  initDefaultQuickLaborMech();
 
   closeQuickLaborBottomSheet();
   renderQuickLaborView();
@@ -17834,16 +17827,11 @@ function getQuickLaborLeftColHtml() {
   const isLaborParts = qlJobType === "laborparts";
 
   return `
-    <!-- STEP 1: Who did the work -->
-    <div id="ql-step-1-wrap">
-      ${getQuickLaborStep1Html()}
-    </div>
-
-    <!-- STEP 2: Labor done (Required for both Labor Only and Labor + Parts) -->
+    <!-- STEP 1: Labor done (Required for both Labor Only and Labor + Parts) -->
     <div class="ql-step-card" id="ql-step-2">
       <div class="ql-step-header">
         <div class="ql-step-badge ${quickLaborCart.some((it) => it.kind === 'labor') ? 'done' : 'active'}" id="ql-step-2-badge">
-          ${quickLaborCart.some((it) => it.kind === 'labor') ? '✓' : '2'}
+          ${quickLaborCart.some((it) => it.kind === 'labor') ? '✓' : '1'}
         </div>
         <div>
           <div class="ql-step-title">Labor done</div>
@@ -17887,14 +17875,14 @@ function getQuickLaborLeftColHtml() {
       </div>
     </div>
 
-    <!-- STEP 3: Parts replaced (Labor + Parts only) -->
+    <!-- STEP 2: Parts replaced (Labor + Parts only) -->
     ${
       isLaborParts
         ? `
           <div class="ql-step-card" id="ql-step-3">
             <div class="ql-step-header">
               <div class="ql-step-badge ${quickLaborCart.some((it) => it.kind === 'part') ? 'done' : 'active'}" id="ql-step-3-badge">
-                ${quickLaborCart.some((it) => it.kind === 'part') ? '✓' : '3'}
+                ${quickLaborCart.some((it) => it.kind === 'part') ? '✓' : '2'}
               </div>
               <div>
                 <div class="ql-step-title">Parts replaced</div>
@@ -17941,11 +17929,11 @@ function getQuickLaborLeftColHtml() {
         : ""
     }
 
-    <!-- STEP 4: Confirm work is finished -->
+    <!-- STEP 3/4: Confirm work is finished -->
     <div class="ql-step-card" id="ql-step-4">
       <div class="ql-step-header">
         <div class="ql-step-badge ${qlWorkFinished ? 'done' : 'active'}" id="ql-step-4-badge">
-          ${qlWorkFinished ? '✓' : (isLaborParts ? '4' : '3')}
+          ${qlWorkFinished ? '✓' : (isLaborParts ? '3' : '2')}
         </div>
         <div>
           <div class="ql-step-title">Confirm work is finished</div>
@@ -17968,7 +17956,7 @@ function getQuickLaborLeftColHtml() {
 
     <div class="ql-steps-footer-note">
       ${isLaborParts
-        ? "Steps 2 and 3 can be done in any order, but the job is recorded only after the work is done."
+        ? "Steps 1 and 2 can be done in any order, but the job is recorded only after the work is done."
         : "The job is recorded after the work is done."}
     </div>
   `;
@@ -18018,14 +18006,8 @@ function getQuickLaborRightPanelHtml() {
         </div>
       </div>
 
-      <!-- Handled by & Customer / Plate -->
+      <!-- Customer / Plate -->
       <div style="background:var(--bg-subtle);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <span style="color:var(--text-muted);font-weight:600">Handled by:</span>
-          <b style="color:${quickLaborMech ? 'var(--text-primary)' : 'var(--danger, #DC2626)'}">
-            ${escHtml(quickLaborMech || 'Not selected')}
-          </b>
-        </div>
         <div>
           <input
             id="ql-customer-input"
@@ -18261,8 +18243,6 @@ function renderQuickLaborView() {
  * @returns {string} HTML markup string.
  */
 function getQuickLaborViewHtml() {
-  initDefaultQuickLaborMech();
-
   return `
     <h1 class="sr-only">Quick Labor</h1>
 
@@ -18271,7 +18251,7 @@ function getQuickLaborViewHtml() {
     </div>
 
     <div class="pos-layout">
-      <!-- Left Column: 4 Step Cards stacked -->
+      <!-- Left Column: Step Cards stacked -->
       <div class="pos-left-col" id="ql-left-col">
         ${getQuickLaborLeftColHtml()}
       </div>
